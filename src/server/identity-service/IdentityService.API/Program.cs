@@ -2,9 +2,10 @@ using IdentityService.API.Middleware;
 using IdentityService.Application.Abstractions.Notifications;
 using IdentityService.Application.Abstractions.Persistence;
 using IdentityService.Application.Configuration;
-using IdentityService.Application.Services;
+using IdentityService.Application.Commands.Auth;
 using IdentityService.Infrastructure.Notifications;
 using IdentityService.Infrastructure.Persistence.Sql;
+using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -50,7 +51,7 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddScoped<IIdentityService, IdentityService.Application.Services.IdentityService>();
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<RegisterCommand>());
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddDbContext<IdentityDbContext>(options =>
 {

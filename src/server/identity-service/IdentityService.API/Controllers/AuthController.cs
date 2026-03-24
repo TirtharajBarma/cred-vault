@@ -1,7 +1,9 @@
 using IdentityService.API.Models;
+using IdentityService.Application.Commands.Auth;
+using IdentityService.Application.Queries.Auth;
 using IdentityService.Application.DTOs.Requests;
 using IdentityService.Application.DTOs.Responses;
-using IdentityService.Application.Services;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityService.API.Controllers;
@@ -10,38 +12,38 @@ namespace IdentityService.API.Controllers;
 [Route("api/v1/identity/auth")]
 public class AuthController : ControllerBase
 {
-    private readonly IIdentityService _identityService;
+    private readonly IMediator _mediator;
 
-    public AuthController(IIdentityService identityService)
+    public AuthController(IMediator mediator)
     {
-        _identityService = identityService;
+        _mediator = mediator;
     }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
-        var result = await _identityService.RegisterAsync(request, cancellationToken);
+        var result = await _mediator.Send(new RegisterCommand(request.FullName, request.Email, request.Password), cancellationToken);
         return FromAuthResult(result, StatusCodes.Status201Created);
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await _identityService.LoginAsync(request, cancellationToken);
+        var result = await _mediator.Send(new LoginQuery(request.Email, request.Password), cancellationToken);
         return FromAuthResult(result, StatusCodes.Status200OK);
     }
 
     [HttpPost("resend-verification")]
     public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationRequest request, CancellationToken cancellationToken)
     {
-        var result = await _identityService.ResendVerificationAsync(request, cancellationToken);
+        var result = await _mediator.Send(new ResendVerificationCommand(request.Email), cancellationToken);
         return FromOperationResult(result);
     }
 
     [HttpPost("verify-email-otp")]
     public async Task<IActionResult> VerifyEmailOtp([FromBody] VerifyEmailOtpRequest request, CancellationToken cancellationToken)
     {
-        var result = await _identityService.VerifyEmailOtpAsync(request, cancellationToken);
+        var result = await _mediator.Send(new VerifyEmailOtpCommand(request.Email, request.Otp), cancellationToken);
         return FromOperationResult(result);
     }
 

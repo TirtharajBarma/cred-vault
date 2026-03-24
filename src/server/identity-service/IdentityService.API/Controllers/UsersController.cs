@@ -2,7 +2,9 @@ using System.Security.Claims;
 using IdentityService.Application.DTOs.Requests;
 using IdentityService.Application.DTOs.Responses;
 using IdentityService.API.Models;
-using IdentityService.Application.Services;
+using IdentityService.Application.Commands.Users;
+using IdentityService.Application.Queries.Users;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,11 +15,11 @@ namespace IdentityService.API.Controllers;
 [Authorize]
 public class UsersController : ControllerBase
 {
-    private readonly IIdentityService _identityService;
+    private readonly IMediator _mediator;
 
-    public UsersController(IIdentityService identityService)
+    public UsersController(IMediator mediator)
     {
-        _identityService = identityService;
+        _mediator = mediator;
     }
 
     [HttpGet("me")]
@@ -34,7 +36,7 @@ public class UsersController : ControllerBase
             });
         }
 
-        var result = await _identityService.GetMeAsync(userId.Value, cancellationToken);
+        var result = await _mediator.Send(new GetMeQuery(userId.Value), cancellationToken);
         return FromUserResult(result);
     }
 
@@ -52,7 +54,7 @@ public class UsersController : ControllerBase
             });
         }
 
-        var result = await _identityService.UpdateMeAsync(userId.Value, request, cancellationToken);
+        var result = await _mediator.Send(new UpdateMeCommand(userId.Value, request.FullName), cancellationToken);
         return FromUserResult(result);
     }
 
@@ -70,7 +72,7 @@ public class UsersController : ControllerBase
             });
         }
 
-        var result = await _identityService.ChangeMyPasswordAsync(userId.Value, request, cancellationToken);
+        var result = await _mediator.Send(new ChangeMyPasswordCommand(userId.Value, request.CurrentPassword, request.NewPassword), cancellationToken);
         return FromOperationResult(result);
     }
 
@@ -78,7 +80,7 @@ public class UsersController : ControllerBase
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> GetUserById(Guid userId, CancellationToken cancellationToken)
     {
-        var result = await _identityService.GetUserByIdAsync(userId, cancellationToken);
+        var result = await _mediator.Send(new GetUserByIdQuery(userId), cancellationToken);
         return FromUserResult(result);
     }
 
@@ -86,7 +88,7 @@ public class UsersController : ControllerBase
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromBody] UpdateUserStatusRequest request, CancellationToken cancellationToken)
     {
-        var result = await _identityService.UpdateUserStatusAsync(userId, request, cancellationToken);
+        var result = await _mediator.Send(new UpdateUserStatusCommand(userId, request.Status), cancellationToken);
         return FromUserResult(result);
     }
 
