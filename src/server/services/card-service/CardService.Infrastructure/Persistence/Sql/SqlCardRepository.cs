@@ -1,0 +1,85 @@
+using CardService.Application.Abstractions.Persistence;
+using CardService.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace CardService.Infrastructure.Persistence.Sql;
+
+public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
+{
+    public async Task AddAsync(CreditCard card, CancellationToken cancellationToken = default)
+    {
+        await dbContext.CreditCards.AddAsync(card, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<CreditCard?> GetByIdAsync(Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CreditCards
+            .Include(x => x.Issuer)
+            .FirstOrDefaultAsync(x => x.Id == cardId, cancellationToken);
+    }
+
+    public Task<CreditCard?> GetByUserAndIdAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CreditCards
+            .Include(x => x.Issuer)
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.Id == cardId, cancellationToken);
+    }
+
+    public Task<List<CreditCard>> ListByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CreditCards
+            .Include(x => x.Issuer)
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.IsDefault)
+            .ThenByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(CreditCard card, CancellationToken cancellationToken = default)
+    {
+        dbContext.CreditCards.Update(card);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(CreditCard card, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        card.IsDeleted = true;
+        card.DeletedAtUtc = now;
+        card.IsDefault = false;
+        card.UpdatedAtUtc = now;
+
+        dbContext.CreditCards.Update(card);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UnsetDefaultForUserAsync(Guid userId, Guid? exceptCardId, CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.CreditCards.Where(x => x.UserId == userId && x.IsDefault);
+        if (exceptCardId.HasValue)
+        {
+            query = query.Where(x => x.Id != exceptCardId.Value);
+        }
+
+        var cards = await query.ToListAsync(cancellationToken);
+        if (cards.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var card in cards)
+        {
+            card.IsDefault = false;
+            card.UpdatedAtUtc = now;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<CardIssuer?> GetIssuerByNetworkAsync(CardNetwork network, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.IsActive && x.Network == network, cancellationToken);
+    }
+}

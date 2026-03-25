@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="../../shared.contracts/Shared.Contracts/Shared.Contracts.csproj" />
+  <Project Path="CardService.API/CardService.API.csproj" />
+  <Project Path="CardService.Application/CardService.Application.csproj" />
+  <Project Path="CardService.Domain/CardService.Domain.csproj" />
+  <Project Path="CardService.Infrastructure/CardService.Infrastructure.csproj" />
+</Solution>
