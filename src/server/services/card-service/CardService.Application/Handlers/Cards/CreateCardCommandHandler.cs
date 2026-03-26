@@ -104,19 +104,50 @@ public sealed class CreateCardCommandHandler(ICardRepository cardRepository)
             };
         }
 
-        var issuer = await cardRepository.GetIssuerByNetworkAsync(network, cancellationToken);
+        if (request.IssuerId == Guid.Empty)
+        {
+            return new CardResult
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.ValidationError,
+                Message = "IssuerId is required."
+            };
+        }
+
+        var issuer = await cardRepository.GetIssuerByIdAsync(request.IssuerId, cancellationToken);
         if (issuer is null)
         {
             return new CardResult
             {
                 Success = false,
                 ErrorCode = ErrorCodes.ValidationError,
-                Message = "Card issuer is not supported."
+                Message = "Selected card issuer was not found."
+            };
+        }
+
+        if (issuer.Network != network)
+        {
+            return new CardResult
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.ValidationError,
+                Message = $"The card number provided is a {network} card, but the selected issuer ({issuer.Name}) expects a {issuer.Network} card."
             };
         }
 
         var last4 = digits.Length >= 4 ? digits[^4..] : digits;
         var now = DateTime.UtcNow;
+
+        var isDuplicate = await cardRepository.HasDuplicateCardAsync(request.UserId, network, last4, cancellationToken);
+        if (isDuplicate)
+        {
+            return new CardResult
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.ValidationError,
+                Message = "A card with this network and last 4 digits already exists in your account."
+            };
+        }
 
         var card = new CreditCard
         {

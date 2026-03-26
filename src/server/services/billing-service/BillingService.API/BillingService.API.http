@@ -1,0 +1,48 @@
+@BillingService.API_HostAddress = http://localhost:5003
+@TOKEN = REPLACE_WITH_JWT
+
+GET {{BillingService.API_HostAddress}}/api/v1/billing/health
+Accept: application/json
+
+###
+
+GET {{BillingService.API_HostAddress}}/api/v1/billing/rewards/tiers
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+
+POST {{BillingService.API_HostAddress}}/api/v1/billing/rewards/tiers
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+	"cardNetwork": "Visa",
+	"minSpend": 0,
+	"rewardRate": 0.015,
+	"effectiveFromUtc": "2026-01-01T00:00:00Z",
+	"effectiveToUtc": null
+}
+
+###
+
+POST {{BillingService.API_HostAddress}}/api/v1/billing/bills
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+	"cardId": "00000000-0000-0000-0000-000000000000",
+	"cardNetwork": "Visa",
+	"amount": 123.45,
+	"currency": "USD",
+	"billingDateUtc": "2026-03-01T00:00:00Z",
+	"dueDateUtc": "2026-03-15T00:00:00Z"
+}
+
+###
+
+GET {{BillingService.API_HostAddress}}/api/v1/billing/bills
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###

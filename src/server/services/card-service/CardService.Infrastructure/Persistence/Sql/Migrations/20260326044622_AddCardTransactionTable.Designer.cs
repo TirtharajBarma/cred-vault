@@ -4,6 +4,7 @@ using CardService.Infrastructure.Persistence.Sql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CardService.Infrastructure.Persistence.Sql.Migrations
 {
     [DbContext(typeof(CardDbContext))]
-    partial class CardDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260326044622_AddCardTransactionTable")]
+    partial class AddCardTransactionTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -47,7 +50,8 @@ namespace CardService.Infrastructure.Persistence.Sql.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Network");
+                    b.HasIndex("Network")
+                        .IsUnique();
 
                     b.ToTable("CardIssuers", (string)null);
                 });

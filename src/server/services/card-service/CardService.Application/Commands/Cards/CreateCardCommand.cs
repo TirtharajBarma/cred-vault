@@ -9,6 +9,7 @@ public sealed record CreateCardCommand(
     int ExpMonth,
     int ExpYear,
     string CardNumber,
+    Guid IssuerId,
     decimal CreditLimit,
     decimal OutstandingBalance,
     int BillingCycleStartDay,

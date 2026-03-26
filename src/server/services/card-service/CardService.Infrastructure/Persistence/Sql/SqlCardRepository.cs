@@ -82,4 +82,27 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
     {
         return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.IsActive && x.Network == network, cancellationToken);
     }
+
+    public Task<CardIssuer?> GetIssuerByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.IsActive && x.Id == id, cancellationToken);
+    }
+
+    public Task<List<CardIssuer>> ListIssuersAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardIssuers
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<bool> HasDuplicateCardAsync(Guid userId, CardNetwork network, string last4, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CreditCards
+            .Include(x => x.Issuer)
+            .AnyAsync(x => x.UserId == userId 
+                        && x.Issuer!.Network == network 
+                        && x.Last4 == last4
+                        && !x.IsDeleted, cancellationToken);
+    }
 }

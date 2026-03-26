@@ -1,15 +1,9 @@
-using System.Globalization;
 using CardService.Domain.Entities;
 
 namespace CardService.Application.Common;
 
 public static class CardHelpers
 {
-    public static string NormalizeBrand(string brand)
-    {
-        return (brand ?? string.Empty).Trim().ToLowerInvariant();
-    }
-
     public static bool IsValidExpiry(int expMonth, int expYear)
     {
         if (expMonth is < 1 or > 12)
@@ -65,17 +59,6 @@ public static class CardHelpers
         }
 
         return sum % 10 == 0;
-    }
-
-    public static string TitleCaseLabel(string label)
-    {
-        var trimmed = (label ?? string.Empty).Trim();
-        if (trimmed.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(trimmed.ToLowerInvariant());
     }
 
     public static bool IsValidBillingCycleStartDay(int day)

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Shared.Contracts.Models;
+using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Commands.Cards;
+using CardService.Application.Common;
 using CardService.Application.DTOs.Requests;
 using CardService.Application.DTOs.Responses;
 using CardService.Application.Queries.Cards;
@@ -38,6 +40,7 @@ public class CardsController : ControllerBase
                 request.ExpMonth,
                 request.ExpYear,
                 request.CardNumber,
+                request.IssuerId,
                 request.CreditLimit,
                 request.OutstandingBalance,
                 request.BillingCycleStartDay,
@@ -45,6 +48,15 @@ public class CardsController : ControllerBase
             cancellationToken);
 
         return FromCardResult(result, StatusCodes.Status201Created);
+    }
+
+    [HttpGet("issuers")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetIssuers(CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new ListIssuersQuery(), cancellationToken);
+        var response = BuildResponse(result.Success, result.Issuers, result.Message);
+        return Ok(response);
     }
 
     [HttpGet]
@@ -109,6 +121,28 @@ public class CardsController : ControllerBase
 
         var result = await _mediator.Send(new DeleteCardCommand(userId.Value, cardId), cancellationToken);
         return FromOperationResult(result);
+    }
+
+    // Admin-only: fetch any card by ID regardless of owner (used by BillingService)
+    [HttpGet("admin/{cardId:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> AdminGetCardById(
+        Guid cardId,
+        [FromServices] ICardRepository cardRepository,
+        CancellationToken cancellationToken)
+    {
+        var card = await cardRepository.GetByIdAsync(cardId, cancellationToken);
+        if (card is null)
+        {
+            return NotFound(new ApiResponse<object>
+            {
+                Success = false,
+                Message = "Card not found.",
+                TraceId = HttpContext.TraceIdentifier
+            });
+        }
+
+        return Ok(BuildResponse(true, CardMapping.ToDto(card), "Card fetched successfully."));
     }
 
     private IActionResult FromCardResult(CardResult result, int successStatusCode)

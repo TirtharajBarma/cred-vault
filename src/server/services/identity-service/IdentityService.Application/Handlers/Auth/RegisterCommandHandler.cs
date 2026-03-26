@@ -1,3 +1,4 @@
+using IdentityService.Application.Abstractions.Notifications;
 using IdentityService.Application.Abstractions.Persistence;
 using IdentityService.Application.Common;
 using Shared.Contracts.Configuration;
@@ -10,7 +11,10 @@ using Microsoft.Extensions.Options;
 
 namespace IdentityService.Application.Handlers.Auth;
 
-public sealed class RegisterCommandHandler(IUserRepository userRepository, IOptions<JwtOptions> jwtOptions)
+public sealed class RegisterCommandHandler(
+    IUserRepository userRepository,
+    IEmailSender emailSender,
+    IOptions<JwtOptions> jwtOptions)
     : IRequestHandler<RegisterCommand, AuthResult>
 {
     public async Task<AuthResult> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -40,6 +44,9 @@ public sealed class RegisterCommandHandler(IUserRepository userRepository, IOpti
             };
         }
 
+        var otp = IdentityHelpers.GenerateOtpCode();
+        var now = DateTime.UtcNow;
+
         var user = new IdentityUser
         {
             Id = Guid.NewGuid(),
@@ -47,13 +54,28 @@ public sealed class RegisterCommandHandler(IUserRepository userRepository, IOpti
             FullName = request.FullName.Trim(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             IsEmailVerified = false,
+            EmailVerificationOtp = otp,
+            EmailVerificationOtpExpiresAtUtc = now.AddMinutes(10),
             Status = UserStatus.PendingVerification,
             Role = UserRole.User,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
         };
 
         await userRepository.AddAsync(user, cancellationToken);
+
+        try
+        {
+            await emailSender.SendAsync(
+                user.Email,
+                "CredVault verification code",
+                $"Your verification OTP is {otp}. It will expire in 10 minutes.",
+                cancellationToken);
+        }
+        catch
+        {
+            // Registration succeeded; email failure is non-fatal — user can resend.
+        }
 
         var accessToken = IdentityHelpers.GenerateAccessToken(user, jwtOptions.Value);
 

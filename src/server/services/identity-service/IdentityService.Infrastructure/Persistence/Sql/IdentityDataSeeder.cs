@@ -1,5 +1,6 @@
 using IdentityService.Domain.Entities;
 using IdentityService.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace IdentityService.Infrastructure.Persistence.Sql;
 
@@ -7,7 +8,7 @@ public static class IdentityDataSeeder
 {
     public static async Task SeedAsync(IdentityDbContext dbContext, CancellationToken cancellationToken = default)
     {
-        if (dbContext.Users.Any())
+        if (await dbContext.Users.AnyAsync(cancellationToken))
         {
             return;
         }

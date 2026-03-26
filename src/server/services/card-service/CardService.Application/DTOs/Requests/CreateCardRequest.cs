@@ -9,6 +9,8 @@ public sealed class CreateCardRequest
 
     public string CardNumber { get; set; } = string.Empty;
 
+    public Guid IssuerId { get; set; }
+
     public decimal CreditLimit { get; set; }
     public decimal OutstandingBalance { get; set; }
     public int BillingCycleStartDay { get; set; }

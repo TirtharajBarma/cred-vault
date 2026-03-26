@@ -42,6 +42,7 @@ public class IssuersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> CreateIssuer(
         [FromServices] CardDbContext dbContext,
         [FromBody] CreateIssuerRequest request,
@@ -67,13 +68,14 @@ public class IssuersController : ControllerBase
             });
         }
 
-        var exists = await dbContext.CardIssuers.AnyAsync(x => x.Network == network, cancellationToken);
+        var normalizedName = request.Name.Trim().ToLower();
+        var exists = await dbContext.CardIssuers.AnyAsync(x => x.Name.ToLower() == normalizedName, cancellationToken);
         if (exists)
         {
             return BadRequest(new ApiResponse<object>
             {
                 Success = false,
-                Message = "Issuer for this network already exists.",
+                Message = "An issuer with this name already exists.",
                 TraceId = HttpContext.TraceIdentifier
             });
         }
@@ -112,7 +114,6 @@ public class IssuersController : ControllerBase
 
     private static bool TryParseNetwork(string input, out CardNetwork network)
     {
-        // Allow numeric values ("1"/"2") and names ("Visa"/"Mastercard").
         if (int.TryParse(input, out var networkInt) && Enum.IsDefined(typeof(CardNetwork), networkInt))
         {
             network = (CardNetwork)networkInt;
