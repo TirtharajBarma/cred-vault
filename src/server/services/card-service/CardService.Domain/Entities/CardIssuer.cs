@@ -1,3 +1,4 @@
+using Shared.Contracts.Enums;
 namespace CardService.Domain.Entities;
 
 public sealed class CardIssuer

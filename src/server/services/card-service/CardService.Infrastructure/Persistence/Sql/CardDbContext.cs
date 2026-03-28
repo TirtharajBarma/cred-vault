@@ -1,4 +1,5 @@
 using CardService.Domain.Entities;
+using Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CardService.Infrastructure.Persistence.Sql;

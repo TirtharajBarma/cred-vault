@@ -1,10 +1,12 @@
 using System.Security.Claims;
-using CardService.Application.Abstractions.Persistence;
+using CardService.Application.Commands.Transactions;
+using CardService.Application.Queries.Transactions;
 using CardService.Domain.Entities;
-using CardService.Infrastructure.Persistence.Sql;
+using Shared.Contracts.Controllers;
+using Shared.Contracts.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MediatR;
 using Shared.Contracts.Models;
 
 namespace CardService.API.Controllers;
@@ -12,15 +14,13 @@ namespace CardService.API.Controllers;
 [ApiController]
 [Route("api/v1/cards/{cardId:guid}/transactions")]
 [Authorize]
-public class CardTransactionsController : ControllerBase
+public class CardTransactionsController : BaseApiController
 {
-    private readonly ICardRepository _cardRepository;
-    private readonly CardDbContext _db;
+    private readonly IMediator _mediator;
 
-    public CardTransactionsController(ICardRepository cardRepository, CardDbContext db)
+    public CardTransactionsController(IMediator mediator)
     {
-        _cardRepository = cardRepository;
-        _db = db;
+        _mediator = mediator;
     }
 
     [HttpPost]
@@ -32,49 +32,27 @@ public class CardTransactionsController : ControllerBase
 
         var isAdmin = User.IsInRole("admin");
 
-        // Admins (e.g. BillingService forwarding payment) can post to any card; users only their own.
-        CreditCard? card;
-        if (isAdmin)
-            card = await _cardRepository.GetByIdAsync(cardId, cancellationToken);
-        else
-            card = await _cardRepository.GetByUserAndIdAsync(userId.Value, cardId, cancellationToken);
+        var command = new AddCardTransactionCommand(
+            UserId: userId.Value,
+            CardId: cardId,
+            Type: request.Type,
+            Amount: request.Amount,
+            Description: request.Description,
+            DateUtc: request.DateUtc,
+            IsAdmin: isAdmin
+        );
 
-        if (card is null)
-            return NotFound(new ApiResponse<object> { Success = false, Message = "Card not found.", TraceId = HttpContext.TraceIdentifier });
+        var result = await _mediator.Send(command, cancellationToken);
 
-        if (request.Amount <= 0)
-            return BadRequest(new ApiResponse<object> { Success = false, Message = "Amount must be greater than 0.", TraceId = HttpContext.TraceIdentifier });
-
-        if (request.Type == TransactionType.Purchase)
+        if (!result.Success)
         {
-            if (card.OutstandingBalance + request.Amount > card.CreditLimit)
-                return BadRequest(new ApiResponse<object> { Success = false, Message = "Transaction declined: Insufficient credit limit.", TraceId = HttpContext.TraceIdentifier });
-
-            card.OutstandingBalance += request.Amount;
-        }
-        else
-        {
-            card.OutstandingBalance = Math.Max(card.OutstandingBalance - request.Amount, 0);
+            if (result.Message == "Card not found.")
+                return NotFound(new ApiResponse<object> { Success = false, Message = result.Message, TraceId = HttpContext.TraceIdentifier });
+            
+            return BadRequest(new ApiResponse<object> { Success = false, Message = result.Message, TraceId = HttpContext.TraceIdentifier });
         }
 
-        var txn = new CardTransaction
-        {
-            Id = Guid.NewGuid(),
-            CardId = cardId,
-            UserId = card.UserId,
-            Type = request.Type,
-            Amount = request.Amount,
-            Description = request.Description ?? string.Empty,
-            DateUtc = request.DateUtc ?? DateTime.UtcNow
-        };
-
-        card.UpdatedAtUtc = DateTime.UtcNow;
-
-        // Stage the transaction in the same DbContext, then let UpdateAsync flush everything in one SaveChanges.
-        _db.CardTransactions.Add(txn);
-        await _cardRepository.UpdateAsync(card, cancellationToken);
-
-        return StatusCode(StatusCodes.Status201Created, new ApiResponse<CardTransaction> { Success = true, Message = "Transaction added.", Data = txn, TraceId = HttpContext.TraceIdentifier });
+        return StatusCode(StatusCodes.Status201Created, result);
     }
 
     [HttpGet]
@@ -84,19 +62,10 @@ public class CardTransactionsController : ControllerBase
         if (userId is null)
             return Unauthorized(new ApiResponse<object> { Success = false, Message = "User identity is missing from token.", TraceId = HttpContext.TraceIdentifier });
 
-        var txns = await _db.CardTransactions
-            .AsNoTracking()
-            .Where(x => x.CardId == cardId && x.UserId == userId.Value)
-            .OrderByDescending(x => x.DateUtc)
-            .ToListAsync(cancellationToken);
+        var query = new ListCardTransactionsQuery(UserId: userId.Value, CardId: cardId);
+        var result = await _mediator.Send(query, cancellationToken);
 
-        return Ok(new ApiResponse<List<CardTransaction>> { Success = true, Message = "Transactions fetched.", Data = txns, TraceId = HttpContext.TraceIdentifier });
-    }
-
-    private Guid? GetUserIdFromToken()
-    {
-        var claimValue = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(ClaimTypes.Name);
-        return Guid.TryParse(claimValue, out var id) ? id : null;
+        return Ok(result);
     }
 
     public class AddTransactionRequest

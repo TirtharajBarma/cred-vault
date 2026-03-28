@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using IdentityService.Application.DTOs.Requests;
 using IdentityService.Application.DTOs.Responses;
+using Shared.Contracts.Controllers;
 using Shared.Contracts.Models;
 using IdentityService.Application.Commands.Users;
 using IdentityService.Application.Queries.Users;
@@ -13,7 +14,7 @@ namespace IdentityService.API.Controllers;
 [ApiController]
 [Route("api/v1/identity/users")]
 [Authorize]
-public class UsersController : ControllerBase
+public class UsersController : BaseApiController
 {
     private readonly IMediator _mediator;
 
@@ -37,7 +38,7 @@ public class UsersController : ControllerBase
         }
 
         var result = await _mediator.Send(new GetMeQuery(userId.Value), cancellationToken);
-        return FromUserResult(result);
+        return FromAuthResult(result);
     }
 
     [HttpPut("me")]
@@ -55,7 +56,7 @@ public class UsersController : ControllerBase
         }
 
         var result = await _mediator.Send(new UpdateMeCommand(userId.Value, request.FullName), cancellationToken);
-        return FromUserResult(result);
+        return FromAuthResult(result);
     }
 
     [HttpPut("me/password")]
@@ -81,15 +82,20 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> GetUserById(Guid userId, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(new GetUserByIdQuery(userId), cancellationToken);
-        return FromUserResult(result);
+        return FromAuthResult(result);
     }
 
     [HttpPut("{userId:guid}/status")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromBody] UpdateUserStatusRequest request, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new UpdateUserStatusCommand(userId, request.Status), cancellationToken);
-        return FromUserResult(result);
+        if (!Enum.TryParse<IdentityService.Domain.Enums.UserStatus>(request.Status, true, out var status))
+        {
+            return BadRequest(BuildResponse(false, (object?)null, "Invalid status value."));
+        }
+
+        var result = await _mediator.Send(new UpdateUserStatusCommand(userId, status), cancellationToken);
+        return FromOperationResult(result);
     }
 
     private IActionResult FromUserResult(UserResult result)
@@ -106,6 +112,25 @@ public class UsersController : ControllerBase
             ErrorCodes.UserNotFound => NotFound(response),
             ErrorCodes.InvalidStatus => BadRequest(response),
             ErrorCodes.ValidationError => BadRequest(response),
+            ErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, response),
+            _ => BadRequest(response)
+        };
+    }
+
+    private IActionResult FromAuthResult(AuthResult result)
+    {
+        var response = BuildResponse(result.Success, new { result.User, result.AccessToken }, result.Message);
+
+        if (result.Success)
+        {
+            return Ok(response);
+        }
+
+        return result.ErrorCode switch
+        {
+            ErrorCodes.UserNotFound => NotFound(response),
+            ErrorCodes.InvalidCredentials => Unauthorized(response),
+            ErrorCodes.AccountLocked => BadRequest(response),
             ErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, response),
             _ => BadRequest(response)
         };
@@ -129,25 +154,4 @@ public class UsersController : ControllerBase
         };
     }
 
-    private ApiResponse<T> BuildResponse<T>(bool success, T data, string message)
-    {
-        return new ApiResponse<T>
-        {
-            Success = success,
-            Message = message,
-            Data = data,
-            TraceId = HttpContext.TraceIdentifier
-        };
-    }
-
-    private Guid? GetUserIdFromToken()
-    {
-        var claimValue = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(ClaimTypes.Name);
-        if (string.IsNullOrWhiteSpace(claimValue))
-        {
-            return null;
-        }
-
-        return Guid.TryParse(claimValue, out var userId) ? userId : null;
-    }
 }

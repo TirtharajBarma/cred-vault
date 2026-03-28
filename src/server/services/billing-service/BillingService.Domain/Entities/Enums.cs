@@ -15,9 +15,3 @@ public enum RewardTransactionType
     Redeemed = 3
 }
 
-public enum CardNetwork
-{
-    Unknown = 0,
-    Visa = 1,
-    Mastercard = 2
-}

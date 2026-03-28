@@ -1,4 +1,5 @@
 using BillingService.Domain.Entities;
+using Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace BillingService.Infrastructure.Persistence.Sql;

@@ -1,5 +1,6 @@
 using CardService.Application.DTOs.Responses;
 using CardService.Domain.Entities;
+using Shared.Contracts.Enums;
 
 namespace CardService.Application.Common;
 

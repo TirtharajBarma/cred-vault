@@ -1,0 +1,111 @@
+using PaymentService.Domain.Entities;
+using PaymentService.Domain.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using MassTransit;
+
+namespace PaymentService.Infrastructure.Persistence.Sql;
+
+public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options) : DbContext(options), IUnitOfWork
+{
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<RiskScore> RiskScores => Set<RiskScore>();
+    public DbSet<FraudAlert> FraudAlerts => Set<FraudAlert>();
+    public DbSet<PaymentSagaState> PaymentSagas => Set<PaymentSagaState>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.ToTable("Payments");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.UserId).IsRequired();
+            entity.Property(x => x.CardId).IsRequired();
+            entity.Property(x => x.BillId).IsRequired();
+            entity.Property(x => x.Amount).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.PaymentType).IsRequired().HasConversion<int>();
+            entity.Property(x => x.Status).IsRequired().HasConversion<int>();
+            entity.Property(x => x.FailureReason).HasMaxLength(500);
+
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.BillId);
+        });
+
+        modelBuilder.Entity<Transaction>(entity =>
+        {
+            entity.ToTable("Transactions");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Amount).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Type).IsRequired().HasConversion<int>();
+            entity.Property(x => x.Description).HasMaxLength(250);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+
+            entity.HasOne(x => x.Payment)
+                .WithMany(x => x.Transactions)
+                .HasForeignKey(x => x.PaymentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.PaymentId);
+        });
+
+        modelBuilder.Entity<RiskScore>(entity =>
+        {
+            entity.ToTable("RiskScores");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Score).IsRequired().HasColumnType("decimal(5,2)");
+            entity.Property(x => x.Decision).IsRequired().HasConversion<int>();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+
+            entity.HasOne(x => x.Payment)
+                .WithOne(x => x.RiskScore)
+                .HasForeignKey<RiskScore>(x => x.PaymentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.PaymentId);
+        });
+
+        modelBuilder.Entity<FraudAlert>(entity =>
+        {
+            entity.ToTable("FraudAlerts");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.AlertType).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.RiskScore).IsRequired().HasColumnType("decimal(5,2)");
+            entity.Property(x => x.Status).IsRequired().HasConversion<int>();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            entity.HasOne(x => x.Payment)
+                .WithOne(x => x.FraudAlert)
+                .HasForeignKey<FraudAlert>(x => x.PaymentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.PaymentId);
+        });
+
+        // MassTransit Saga Configuration
+        modelBuilder.Entity<PaymentSagaState>(entity =>
+        {
+            entity.ToTable("PaymentSagas");
+            entity.HasKey(x => x.CorrelationId);
+
+            entity.Property(x => x.CurrentState).HasMaxLength(64);
+            entity.Property(x => x.PaymentType).HasMaxLength(32);
+            entity.Property(x => x.RiskDecision).HasMaxLength(32);
+            entity.Property(x => x.CompensationReason).HasMaxLength(500);
+            entity.Property(x => x.OtpCode).HasMaxLength(8);
+            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.RiskScore).HasColumnType("decimal(5,2)");
+            entity.Property(x => x.RewardPointsGranted).HasColumnType("decimal(18,2)");
+        });
+    }
+}

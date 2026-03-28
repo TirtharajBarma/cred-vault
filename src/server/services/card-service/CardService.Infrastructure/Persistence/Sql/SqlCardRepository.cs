@@ -1,5 +1,6 @@
 using CardService.Application.Abstractions.Persistence;
 using CardService.Domain.Entities;
+using Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CardService.Infrastructure.Persistence.Sql;
@@ -104,5 +105,23 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
                         && x.Issuer!.Network == network 
                         && x.Last4 == last4
                         && !x.IsDeleted, cancellationToken);
+    }
+
+    public async Task AddTransactionAsync(CardTransaction transaction, CancellationToken cancellationToken = default)
+    {
+        await dbContext.CardTransactions.AddAsync(transaction, cancellationToken);
+        // Note: SaveChangesAsync left to caller if part of larger unit of work, but we'll call it here if stand-alone
+        // The original controller relied on UpdateAsync(card) to commit the transaction added to _db context.
+        // To keep it simple, we'll let UpdateAsync(card) flush the changes if used together, 
+        // but for safety, we DO NOT call SaveChangesAsync here to allow atomic transactions with UpdateAsync.
+    }
+
+    public Task<List<CardTransaction>> GetTransactionsByCardAndUserAsync(Guid cardId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardTransactions
+            .AsNoTracking()
+            .Where(x => x.CardId == cardId && x.UserId == userId)
+            .OrderByDescending(x => x.DateUtc)
+            .ToListAsync(cancellationToken);
     }
 }

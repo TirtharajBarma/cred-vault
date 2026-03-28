@@ -1,3 +1,4 @@
+using Shared.Contracts.Enums;
 namespace BillingService.Domain.Entities;
 
 public sealed class RewardTier

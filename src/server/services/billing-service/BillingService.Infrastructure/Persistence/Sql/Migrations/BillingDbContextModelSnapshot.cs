@@ -31,6 +31,9 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal?>("AmountPaid")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime>("BillingDateUtc")
                         .HasColumnType("datetime2");
 
@@ -56,6 +59,9 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
 
                     b.Property<decimal>("MinDue")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");

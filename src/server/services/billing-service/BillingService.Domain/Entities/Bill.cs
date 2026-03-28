@@ -1,3 +1,4 @@
+using Shared.Contracts.Enums;
 namespace BillingService.Domain.Entities;
 
 public sealed class Bill
@@ -17,6 +18,8 @@ public sealed class Bill
     public DateTime BillingDateUtc { get; set; }
     public DateTime DueDateUtc { get; set; }
 
+    public decimal? AmountPaid { get; set; }
+    public DateTime? PaidAtUtc { get; set; }
     public BillStatus Status { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }

@@ -1,4 +1,5 @@
 using CardService.Domain.Entities;
+using Shared.Contracts.Enums;
 
 namespace CardService.Application.Common;
 

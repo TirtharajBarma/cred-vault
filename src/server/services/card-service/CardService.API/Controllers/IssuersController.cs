@@ -1,6 +1,7 @@
 using CardService.Application.DTOs.Requests;
 using CardService.Application.DTOs.Responses;
 using CardService.Domain.Entities;
+using Shared.Contracts.Enums;
 using CardService.Infrastructure.Persistence.Sql;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
