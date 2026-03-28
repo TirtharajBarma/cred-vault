@@ -15,7 +15,6 @@ public record GenerateAdminBillCommand(Guid AdminUserId, Guid UserId, Guid CardI
 public class GenerateAdminBillCommandHandler(
     IBillRepository billRepository,
     IHttpClientFactory httpClientFactory,
-    Microsoft.Extensions.Configuration.IConfiguration configuration,
     IUnitOfWork unitOfWork,
     IPublishEndpoint publishEndpoint)
     : IRequestHandler<GenerateAdminBillCommand, ApiResponse<Bill>>
@@ -95,10 +94,7 @@ public class GenerateAdminBillCommandHandler(
     {
         try
         {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:CardService:BaseUrl"] ?? "http://localhost:5002/";
-            client.BaseAddress = new Uri(baseUrl);
-
+            var client = httpClientFactory.CreateClient("CardServiceClient");
             var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/cards/admin/{cardId}");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
@@ -118,10 +114,7 @@ public class GenerateAdminBillCommandHandler(
     {
         try
         {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
-            client.BaseAddress = new Uri(baseUrl);
-
+            var client = httpClientFactory.CreateClient("IdentityServiceClient");
             var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/identity/users/{userId}");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);

@@ -25,8 +25,7 @@ public class InitiatePaymentCommandHandler(
     IPaymentRepository paymentRepository,
     IUnitOfWork unitOfWork,
     IPublishEndpoint publishEndpoint,
-    IHttpClientFactory httpClientFactory,
-    Microsoft.Extensions.Configuration.IConfiguration configuration) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
+    IHttpClientFactory httpClientFactory) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
 {
     private record BillDto(Guid UserId, decimal MinDue);
 
@@ -78,17 +77,19 @@ public class InitiatePaymentCommandHandler(
             CreatedAt   = payment.CreatedAtUtc
         }, cancellationToken);
 
-        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: false);
+        // Pre-calculate risk to inform the client immediately if OTP is required.
+        // This mirrors the logic in the Saga (RiskScore >= 50 && < 75 means OTP).
+        var riskScore = PaymentService.Application.Services.RiskCalculator.Calculate(request.Amount);
+        bool otpRequired = riskScore >= 50 && riskScore < 75;
+
+        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: otpRequired);
     }
 
     private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
     {
         try
         {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:BillingService"] ?? "http://localhost:5003";
-            client.BaseAddress = new Uri(baseUrl);
-
+            var client = httpClientFactory.CreateClient("BillingServiceClient");
             var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/billing/bills/{billId}");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
@@ -108,10 +109,7 @@ public class InitiatePaymentCommandHandler(
     {
         try
         {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
-            client.BaseAddress = new Uri(baseUrl);
-
+            var client = httpClientFactory.CreateClient("IdentityServiceClient");
             var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/identity/users/{userId}");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);

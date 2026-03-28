@@ -34,7 +34,16 @@ builder.Services.AddScoped<IRewardRepository, SqlRewardRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // External Clients
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("CardServiceClient", client =>
+{
+    var baseUrl = builder.Configuration["Services:CardService:BaseUrl"] ?? "http://localhost:5002/";
+    client.BaseAddress = new Uri(baseUrl);
+});
+builder.Services.AddHttpClient("IdentityServiceClient", client =>
+{
+    var baseUrl = builder.Configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
+    client.BaseAddress = new Uri(baseUrl);
+});
 
 // Messaging
 builder.Services.AddStandardMessaging(builder.Configuration, x =>

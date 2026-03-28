@@ -31,8 +31,7 @@ public record UserDto(Guid Id, string Email, string FullName);
 public sealed class CreateCardCommandHandler(
     ICardRepository cardRepository,
     IPublishEndpoint publishEndpoint,
-    IHttpClientFactory httpClientFactory,
-    IConfiguration configuration)
+    IHttpClientFactory httpClientFactory)
     : IRequestHandler<CreateCardCommand, CardResult>
 {
     public async Task<CardResult> Handle(CreateCardCommand request, CancellationToken cancellationToken)
@@ -91,10 +90,7 @@ public sealed class CreateCardCommandHandler(
     {
         try
         {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
-            client.BaseAddress = new Uri(baseUrl);
-
+            var client = httpClientFactory.CreateClient("IdentityServiceClient");
             var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/identity/users/{userId}");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
