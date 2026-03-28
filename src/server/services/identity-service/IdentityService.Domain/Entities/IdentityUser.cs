@@ -11,6 +11,8 @@ public sealed class IdentityUser
 	public bool IsEmailVerified { get; set; }
 	public string? EmailVerificationOtp { get; set; }
 	public DateTime? EmailVerificationOtpExpiresAtUtc { get; set; }
+	public string? PasswordResetOtp { get; set; }
+	public DateTime? PasswordResetOtpExpiresAtUtc { get; set; }
 	public UserStatus Status { get; set; } = UserStatus.PendingVerification;
 	public UserRole Role { get; set; } = UserRole.User;
 	public DateTime CreatedAtUtc { get; set; }

@@ -43,6 +43,14 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
             return new ApiResponse<CardTransaction> { Success = false, Message = "Amount must be greater than 0." };
         }
 
+        var dateUtc = request.DateUtc ?? DateTime.UtcNow;
+        var isDuplicate = await cardRepository.HasDuplicateTransactionAsync(
+            request.CardId, request.Type, request.Amount, request.Description ?? string.Empty, dateUtc, cancellationToken);
+        if (isDuplicate)
+        {
+            return new ApiResponse<CardTransaction> { Success = false, Message = "A duplicate transaction already exists." };
+        }
+
         if (request.Type == TransactionType.Purchase)
         {
             if (card.OutstandingBalance + request.Amount > card.CreditLimit)
@@ -65,7 +73,7 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
             Type = request.Type,
             Amount = request.Amount,
             Description = request.Description ?? string.Empty,
-            DateUtc = request.DateUtc ?? DateTime.UtcNow
+            DateUtc = dateUtc
         };
 
         card.UpdatedAtUtc = DateTime.UtcNow;

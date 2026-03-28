@@ -2,9 +2,11 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using MassTransit;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
+using PaymentService.Application.Services;
 using Shared.Contracts.Events.Payment;
 
 namespace PaymentService.Application.Commands.Payments;
@@ -26,7 +28,8 @@ public class InitiatePaymentCommandHandler(
     IUnitOfWork unitOfWork,
     IPublishEndpoint publishEndpoint,
     IHttpClientFactory httpClientFactory,
-    Microsoft.Extensions.Configuration.IConfiguration configuration) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
+    Microsoft.Extensions.Configuration.IConfiguration configuration,
+    ILogger<InitiatePaymentCommandHandler> logger) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
 {
     private record BillDto(Guid UserId, decimal MinDue);
 
@@ -62,20 +65,41 @@ public class InitiatePaymentCommandHandler(
         await paymentRepository.AddAsync(payment);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // 3. Kick off the Saga (with user details for notifications)
         var (userSuccess, user, _) = await FetchUserDetailsAsync(payment.UserId, request.AuthorizationHeader, cancellationToken);
+        var riskScore = RiskCalculator.Calculate(payment.Amount);
+        var otpRequired = riskScore >= 50 && riskScore < 75;
+        var isBlocked = riskScore >= 75;
 
-        await publishEndpoint.Publish<IPaymentInitiated>(new
+        if (isBlocked || otpRequired)
         {
-            PaymentId   = payment.Id,
-            UserId      = payment.UserId,
-            Email       = user?.Email ?? string.Empty,
-            FullName    = user?.FullName ?? "User",
-            CardId      = payment.CardId,
-            BillId      = payment.BillId,
-            Amount      = payment.Amount,
-            PaymentType = payment.PaymentType.ToString(),
-            CreatedAt   = payment.CreatedAtUtc
+            logger.LogInformation("Publishing IPaymentInitiated for PaymentId={PaymentId}, RiskScore={RiskScore}", payment.Id, riskScore);
+            await publishEndpoint.Publish<IPaymentInitiated>(new
+            {
+                PaymentId   = payment.Id,
+                UserId      = payment.UserId,
+                Email       = user?.Email ?? string.Empty,
+                FullName    = user?.FullName ?? "User",
+                CardId      = payment.CardId,
+                BillId      = payment.BillId,
+                Amount      = payment.Amount,
+                PaymentType = payment.PaymentType.ToString(),
+                CreatedAt   = payment.CreatedAtUtc,
+                RiskScore   = riskScore
+            }, cancellationToken);
+            return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: otpRequired);
+        }
+
+        logger.LogInformation("Publishing IPaymentCompleted for PaymentId={PaymentId}, Amount={Amount}", payment.Id, payment.Amount);
+        await publishEndpoint.Publish<IPaymentCompleted>(new
+        {
+            PaymentId    = payment.Id,
+            UserId       = payment.UserId,
+            CardId       = payment.CardId,
+            BillId       = payment.BillId,
+            Amount       = payment.Amount,
+            RiskScore    = riskScore,
+            RiskDecision = RiskDecision.AutoApproved.ToString(),
+            CompletedAt  = DateTime.UtcNow
         }, cancellationToken);
 
         return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: false);

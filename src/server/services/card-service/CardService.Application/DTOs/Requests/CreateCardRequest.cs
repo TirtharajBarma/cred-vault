@@ -11,9 +11,5 @@ public sealed class CreateCardRequest
 
     public Guid IssuerId { get; set; }
 
-    public decimal CreditLimit { get; set; }
-    public decimal OutstandingBalance { get; set; }
-    public int BillingCycleStartDay { get; set; }
-
     public bool IsDefault { get; set; }
 }

@@ -47,19 +47,12 @@ builder.Services.AddMediatR(cfg =>
 });
 builder.Services.AddValidatorsFromAssemblyContaining<InitiatePaymentCommand>();
 
-// Messaging + Saga
+// Messaging (Saga removed - using direct event publishing for reliability)
 builder.Services.AddStandardMessaging(builder.Configuration, x =>
 {
     x.AddConsumer<PaymentCompletedConsumer>();
     x.AddConsumer<PaymentFailedConsumer>();
     x.AddConsumer<FraudDetectedConsumer>();
-
-    x.AddSagaStateMachine<PaymentSaga, PaymentSagaState>()
-        .EntityFrameworkRepository(r =>
-        {
-            r.ExistingDbContext<PaymentDbContext>();
-            r.UseSqlServer();
-        });
 });
 
 var app = builder.Build();

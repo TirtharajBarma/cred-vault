@@ -33,8 +33,8 @@ public static class IdentityDataSeeder
                 Email = "user@credvault.dev",
                 FullName = "Normal User",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123"),
-                IsEmailVerified = false,
-                Status = UserStatus.PendingVerification,
+                IsEmailVerified = true,
+                Status = UserStatus.Active,
                 Role = UserRole.User,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow

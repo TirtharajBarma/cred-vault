@@ -63,11 +63,12 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
             Success = true,
             Message = result.OtpRequired
                 ? "Payment initiated. OTP required — call /verify-otp to complete."
-                : "Payment initiated and processing.",
+                : "Payment completed successfully.",
             Data = new
             {
                 PaymentId   = result.PaymentId,
                 OtpRequired = result.OtpRequired,
+                Status      = result.OtpRequired ? "Pending OTP Verification" : "Completed",
                 // Only present in Development — remove in production
                 DevOtp      = devOtp
             },

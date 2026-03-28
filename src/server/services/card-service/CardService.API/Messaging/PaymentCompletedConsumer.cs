@@ -39,7 +39,12 @@ public class PaymentCompletedConsumer(
             return;
         }
 
+        var oldBalance = card.OutstandingBalance;
+        logger.LogInformation("Card {CardId}: OldBalance={OldBalance}, PaymentAmount={Amount}", card.Id, oldBalance, msg.Amount);
+        
         card.OutstandingBalance = Math.Max(card.OutstandingBalance - msg.Amount, 0);
+        
+        logger.LogInformation("Card {CardId}: NewBalance={NewBalance}", card.Id, card.OutstandingBalance);
         card.UpdatedAtUtc = DateTime.UtcNow;
 
         db.CardTransactions.Add(new CardTransaction
@@ -54,6 +59,7 @@ public class PaymentCompletedConsumer(
         });
 
         await cardRepository.UpdateAsync(card);
+        await db.SaveChangesAsync(context.CancellationToken);
         logger.LogInformation("Card {CardId} balance reduced by {Amount}.", card.Id, msg.Amount);
     }
 }

@@ -20,9 +20,6 @@ public sealed record CreateCardCommand(
     int ExpYear,
     string CardNumber,
     Guid IssuerId,
-    decimal CreditLimit,
-    decimal OutstandingBalance,
-    int BillingCycleStartDay,
     bool IsDefault,
     string AuthorizationHeader) : IRequest<CardResult>;
 
@@ -47,6 +44,9 @@ public sealed class CreateCardCommandHandler(
         if (issuer is null || issuer.Network != network) return new CardResult { Success = false, Message = "Issuer mismatch or not found." };
 
         var last4 = digits.Length >= 4 ? digits[^4..] : digits;
+
+        var isDuplicate = await cardRepository.HasDuplicateCardAsync(request.UserId, network, last4, cancellationToken);
+        if (isDuplicate) return new CardResult { Success = false, Message = "A card with the same network and last 4 digits already exists." };
         var card = new CreditCard
         {
             Id = Guid.NewGuid(),
@@ -57,9 +57,9 @@ public sealed class CreateCardCommandHandler(
             Last4 = last4,
             MaskedNumber = CardHelpers.MaskCardNumber(digits),
             IssuerId = issuer.Id,
-            CreditLimit = request.CreditLimit,
-            OutstandingBalance = request.OutstandingBalance,
-            BillingCycleStartDay = request.BillingCycleStartDay,
+            CreditLimit = 0,
+            OutstandingBalance = 0,
+            BillingCycleStartDay = DateTime.UtcNow.Day,
             IsDefault = request.IsDefault,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

@@ -124,4 +124,20 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .OrderByDescending(x => x.DateUtc)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<bool> HasDuplicateTransactionAsync(Guid cardId, TransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default)
+    {
+        var tolerance = TimeSpan.FromMinutes(1);
+        var minDate = dateUtc.Add(-tolerance);
+        var maxDate = dateUtc.Add(tolerance);
+
+        return await dbContext.CardTransactions
+            .AnyAsync(x => x.CardId == cardId 
+                && x.Type == type 
+                && x.Amount == amount
+                && x.Description == description
+                && x.DateUtc >= minDate 
+                && x.DateUtc <= maxDate,
+                cancellationToken);
+    }
 }

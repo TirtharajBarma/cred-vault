@@ -11,6 +11,7 @@ public interface IPaymentInitiated
     decimal Amount { get; }
     string PaymentType { get; }
     DateTime CreatedAt { get; }
+    int RiskScore { get; }
 }
 
 public interface IPaymentCompleted

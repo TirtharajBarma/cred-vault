@@ -22,7 +22,7 @@ public class BillsController(IMediator mediator) : BaseApiController
         if (userId is null) return UnauthorizedResponse();
 
         var result = await mediator.Send(new GetMyBillsQuery(userId.Value), cancellationToken);
-        return Ok(result);
+        return CreateResponse(result.Success, result.Data, result.Message);
     }
 
     [HttpGet("{billId:guid}")]
@@ -33,9 +33,7 @@ public class BillsController(IMediator mediator) : BaseApiController
 
         var result = await mediator.Send(new GetMyBillByIdQuery(userId.Value, billId), cancellationToken);
         
-        if (!result.Success) return NotFound(result);
-        
-        return Ok(result);
+        return CreateResponse(result.Success, result.Data, result.Message, result.Success ? null : "NotFound");
     }
 
     public sealed class GenerateBillRequest

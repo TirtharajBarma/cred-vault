@@ -11,9 +11,6 @@ public record UpdateCardCommand(
     string CardholderName,
     int ExpMonth,
     int ExpYear,
-    decimal CreditLimit,
-    decimal OutstandingBalance,
-    int BillingCycleStartDay,
     bool IsDefault) : IRequest<CardResult>;
 
 public sealed class UpdateCardCommandHandler(ICardRepository cardRepository)
@@ -27,9 +24,6 @@ public sealed class UpdateCardCommandHandler(ICardRepository cardRepository)
         card.CardholderName = request.CardholderName.Trim();
         card.ExpMonth = request.ExpMonth;
         card.ExpYear = request.ExpYear;
-        card.CreditLimit = request.CreditLimit;
-        card.OutstandingBalance = request.OutstandingBalance;
-        card.BillingCycleStartDay = request.BillingCycleStartDay;
         card.IsDefault = request.IsDefault;
         card.UpdatedAtUtc = DateTime.UtcNow;
 

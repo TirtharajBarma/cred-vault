@@ -1,0 +1,114 @@
+{
+  "success": true,
+  "message": "Login successful.",
+  "data": {
+    "success": true,
+    "message": "Login successful.",
+    "errorCode": null,
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL2VtYWlsYWRkcmVzcyI6ImFkbWluQGNyZWR2YXVsdC5kZXYiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJhZG1pbiIsImV4cCI6MTc3NDcyOTYzNiwiaXNzIjoiSWRlbnRpdHlTZXJ2aWNlIiwiYXVkIjoiQ3JlZFZhdWx0Q2xpZW50cyJ9.ZzKx3S4uzRUVyF-u7VQ9FVSI-T27AL0lDU60QVuBNtY",
+    "user": {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "email": "admin@credvault.dev",
+      "fullName": "Admin User",
+      "isEmailVerified": true,
+      "status": "active",
+      "role": "admin"
+    }
+  },
+  "traceId": "0HNKCVI8IGMP4:00000001"
+}
+
+{
+  "success": true,
+  "message": "Login successful.",
+  "data": {
+    "success": true,
+    "message": "Login successful.",
+    "errorCode": null,
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ODJmYWE1OS03ZjU2LTQ3NGQtODE3Yi03YjMwNzRjNzlhZmMiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6Ijg4MmZhYTU5LTdmNTYtNDc0ZC04MTdiLTdiMzA3NGM3OWFmYyIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL2VtYWlsYWRkcmVzcyI6ImpvaG4uZG9lQGV4YW1wbGUuY29tIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoidXNlciIsImV4cCI6MTc3NDcyODc1MywiaXNzIjoiSWRlbnRpdHlTZXJ2aWNlIiwiYXVkIjoiQ3JlZFZhdWx0Q2xpZW50cyJ9.0ju8WoyUtKfwcpzrVGtuByB0xCC8nx0Z-Yk3I7Qadco",
+    "user": {
+      "id": "882faa59-7f56-474d-817b-7b3074c79afc",
+      "email": "john.doe@example.com",
+      "fullName": "John Doe",
+      "isEmailVerified": true,
+      "status": "active",
+      "role": "user"
+    }
+  },
+  "traceId": "0HNKCVI8IGMP3:00000001"
+}
+
+
+
+----
+did not understand
+6.5 - Try Transaction on Another User's Card (Should Fail)
+POST http://localhost:5006/api/v1/cards/<SOME_OTHER_CARD_ID>/transactions
+Authorization: Bearer <USER_TOKEN>
+Content-Type: application/json
+{
+  "type": "Purchase",
+  "amount": 50.00,
+  "description": "Fraud Attempt"
+}
+❌ Expected: 404 or forbidden
+
+
+Goal
+The user is building a credit card management system (CredVault) with multiple microservices:
+- Identity Service (authentication)
+- Card Service (credit card management)
+- Billing Service (bills, rewards)
+- Payment Service (payment processing)
+- Notification Service
+- Gateway API
+The goal is to fix all sync issues between services so that when a payment is made:
+1. Card balance decreases
+2. Bill status changes to "Paid"
+3. Rewards points are created
+Instructions
+- Test all endpoints to verify sync is working properly
+- Fix any bugs found in the payment flow
+- Ensure migrations and RabbitMQ are working correctly
+- Don't rush - take time to think and fix properly
+Discoveries
+1. PaymentSaga was broken - Had MassTransit state machine errors ("The state is not defined"). We removed the saga registration from Program.cs and now use direct event publishing instead.
+2. Card Service Consumer receives events but doesn't save - Added await db.SaveChangesAsync() to PaymentCompletedConsumer in card-service.
+3. Rewards were not being created - Fixed two issues:
+   - MarkBillPaidCommand was using bill.Amount instead of request.Amount
+   - Added seed data for RewardTiers in BillingService startup
+4. IPaymentInitiated needed RiskScore - Added RiskScore property to the event interface.
+5. Test data resets on Docker down - Databases lose data when containers restart. Need to recreate test data (issuers, cards) each time.
+6. Payment sync is inconsistent - Latest finding: PaymentService logs show "Publishing IPaymentCompleted", CardService logs show "PaymentCompleted received", but card balance doesn't always update. The event IS reaching the consumer but the update isn't persisting.
+Accomplished
+✅ Removed broken PaymentSaga from Program.cs
+✅ Fixed card service consumer to save changes
+✅ Fixed rewards amount bug  
+✅ Added RewardTiers seed data
+✅ Added RiskScore to IPaymentInitiated
+✅ Added logging to payment service to verify publishing
+✅ Confirmed events reach billing service (bill status updates)
+✅ Confirmed events reach card service (logs show receipt)
+❌ Card balance not updating consistently - the consumer receives the event but the DB doesn't always update
+Relevant files / directories
+Modified:
+- /Users/tirtharaj/Desktop/Desktop/self-learning/project/src/server/services/payment-service/PaymentService.API/Program.cs - Removed saga registration
+- /Users/tirtharaj/Desktop/Desktop/self-learning/project/src/server/services/payment-service/PaymentService.Application/Commands/Payments/InitiatePaymentCommand.cs - Added logging, publishes IPaymentCompleted directly
+- /Users/tirtharaj/Desktop/Desktop/self-learning/project/src/server/services/payment-service/PaymentService.Application/Sagas/PaymentSaga.cs - Has issues, not currently used
+- /Users/tirtharaj/Desktop/Desktop/self-learning/project/src/server/services/card-service/CardService.API/Messaging/PaymentCompletedConsumer.cs - Added SaveChangesAsync
+- /Users/tirtharaj/Desktop/Desktop/self-learning/project/src/server/services/billing-service/BillingService.Application/Commands/Bills/MarkBillPaidCommand.cs - Fixed amount bug
+- /Users/tirtharaj/Desktop/Desktop/self-learning/project/src/server/services/billing-service/BillingService.API/Program.cs - Added RewardTiers seed data
+- /Users/tirtharaj/Desktop/Desktop/self-learning/project/src/server/shared.contracts/Shared.Contracts/Events/Payment/PaymentEvents.cs - Added RiskScore to IPaymentInitiated
+Testing:
+- Multiple Docker restarts to test with fresh databases
+- Created test data: issuers, cards, credit limits, bills
+- Payment flow tested multiple times with varying results
+Current Issue
+The card service receives the PaymentCompleted event (confirmed in logs) but the card balance doesn't update in the database. The billing service updates work correctly (bill status changes to Paid). Need to investigate why the card service consumer isn't persisting the balance update.
+Next Steps
+1. Investigate why CardService PaymentCompletedConsumer isn't persisting the balance update
+2. Check if there's an exception being swallowed in the consumer
+3. Verify the database transaction is being committed
+4. Consider adding more detailed logging in the card service consumer
+5. Test with a simple direct call to the consumer to isolate the issue
+

@@ -36,5 +36,19 @@ public class AuthController(IMediator mediator) : BaseApiController
         var result = await mediator.Send(new VerifyEmailOtpCommand(request.Email, request.Otp), cancellationToken);
         return CreateResponse(result.Success, result, result.Message, result.ErrorCode);
     }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new ForgotPasswordCommand(request.Email), cancellationToken);
+        return CreateResponse(result.Success, result, result.Message, result.ErrorCode);
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new ResetPasswordCommand(request.Email, request.Otp, request.NewPassword), cancellationToken);
+        return CreateResponse(result.Success, result, result.Message, result.ErrorCode);
+    }
 }
 

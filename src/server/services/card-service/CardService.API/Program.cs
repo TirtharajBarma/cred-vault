@@ -2,6 +2,7 @@ using Shared.Contracts.Middleware;
 using Shared.Contracts.Extensions;
 using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Commands.Cards;
+using CardService.Application.Queries.Cards;
 using CardService.API.Messaging;
 using CardService.Infrastructure.Persistence.Sql;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,11 @@ builder.Services.AddStandardAuth(builder.Configuration);
 builder.Services.AddHttpClient();
 
 // Service Specifics
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<CreateCardCommand>());
+builder.Services.AddMediatR(cfg => 
+{
+    cfg.RegisterServicesFromAssemblyContaining<CreateCardCommand>();
+    cfg.RegisterServicesFromAssemblyContaining<ListMyCardsQuery>();
+});
 builder.Services.AddDbContext<CardDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("CardDb"));

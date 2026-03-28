@@ -28,9 +28,6 @@ public class CardsController(IMediator mediator) : BaseApiController
                 request.ExpYear,
                 request.CardNumber,
                 request.IssuerId,
-                request.CreditLimit,
-                request.OutstandingBalance,
-                request.BillingCycleStartDay,
                 request.IsDefault,
                 Request.Headers.Authorization.ToString() ?? string.Empty),
             cancellationToken);
@@ -71,9 +68,6 @@ public class CardsController(IMediator mediator) : BaseApiController
                 request.CardholderName,
                 request.ExpMonth,
                 request.ExpYear,
-                request.CreditLimit,
-                request.OutstandingBalance,
-                request.BillingCycleStartDay,
                 request.IsDefault),
             cancellationToken);
 
@@ -101,6 +95,39 @@ public class CardsController(IMediator mediator) : BaseApiController
         if (card is null) return CreateResponse(false, (object?)null, "Card not found.", "CardNotFound");
 
         return CreateResponse(true, CardMapping.ToDto(card), "Card fetched successfully.");
+    }
+
+    public sealed class UpdateCardByAdminRequest
+    {
+        public decimal CreditLimit { get; set; }
+        public decimal? OutstandingBalance { get; set; }
+        public int? BillingCycleStartDay { get; set; }
+    }
+
+    [HttpPut("{cardId:guid}/admin")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> UpdateCardByAdmin(
+        Guid cardId,
+        [FromBody] UpdateCardByAdminRequest request,
+        [FromServices] ICardRepository cardRepository,
+        CancellationToken cancellationToken)
+    {
+        var card = await cardRepository.GetByIdAsync(cardId, cancellationToken);
+        if (card is null) return CreateResponse(false, (object?)null, "Card not found.", "CardNotFound");
+
+        if (request.CreditLimit > 0)
+            card.CreditLimit = request.CreditLimit;
+
+        if (request.OutstandingBalance.HasValue)
+            card.OutstandingBalance = request.OutstandingBalance.Value;
+
+        if (request.BillingCycleStartDay.HasValue && request.BillingCycleStartDay.Value >= 1 && request.BillingCycleStartDay.Value <= 28)
+            card.BillingCycleStartDay = request.BillingCycleStartDay.Value;
+
+        card.UpdatedAtUtc = DateTime.UtcNow;
+        await cardRepository.UpdateAsync(card, cancellationToken);
+
+        return CreateResponse(true, CardMapping.ToDto(card), "Card updated successfully.");
     }
 }
 

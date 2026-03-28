@@ -1,6 +1,7 @@
 using BillingService.Application.Abstractions.Persistence;
 using BillingService.Domain.Entities;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Shared.Contracts.Enums;
 using Shared.Contracts.Models;
 
@@ -11,15 +12,20 @@ public record MarkBillPaidCommand(Guid UserId, Guid BillId, decimal Amount) : IR
 public class MarkBillPaidCommandHandler(
     IBillRepository billRepository,
     IRewardRepository rewardRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ILogger<MarkBillPaidCommandHandler> logger)
     : IRequestHandler<MarkBillPaidCommand, ApiResponse<Bill>>
 {
     public async Task<ApiResponse<Bill>> Handle(MarkBillPaidCommand request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("MarkBillPaidCommand: BillId={BillId} UserId={UserId} Amount={Amount}", 
+            request.BillId, request.UserId, request.Amount);
+        
         var bill = await billRepository.GetByIdAndUserIdAsync(request.BillId, request.UserId, cancellationToken);
 
         if (bill is null)
         {
+            logger.LogWarning("Bill not found: BillId={BillId} UserId={UserId}", request.BillId, request.UserId);
             return new ApiResponse<Bill> { Success = false, Message = "Bill not found." };
         }
 
@@ -39,8 +45,11 @@ public class MarkBillPaidCommandHandler(
         bill.PaidAtUtc = now;
         bill.UpdatedAtUtc = now;
 
-        // Rewards logic
-        var tier = await rewardRepository.GetBestMatchingTierAsync(bill.CardNetwork, bill.IssuerId, bill.Amount, now, cancellationToken);
+        // Rewards logic - use actual payment amount, not bill total
+        var paymentAmount = request.Amount;
+        var tier = await rewardRepository.GetBestMatchingTierAsync(bill.CardNetwork, bill.IssuerId, paymentAmount, now, cancellationToken);
+        logger.LogInformation("Rewards: Bill={BillId} PaymentAmount={PaymentAmount} Network={Network} IssuerId={IssuerId} Tier={TierFound}", 
+            bill.Id, paymentAmount, bill.CardNetwork, bill.IssuerId, tier is not null);
         if (tier is not null)
         {
             var account = await rewardRepository.GetAccountByUserIdAsync(request.UserId, cancellationToken);
@@ -56,7 +65,7 @@ public class MarkBillPaidCommandHandler(
                 await rewardRepository.UpdateAccountAsync(account, cancellationToken);
             }
 
-            var points = Math.Round(bill.Amount * tier.RewardRate, 2, MidpointRounding.AwayFromZero);
+            var points = Math.Round(paymentAmount * tier.RewardRate, 2, MidpointRounding.AwayFromZero);
             if (points > 0)
             {
                 account.PointsBalance += points;

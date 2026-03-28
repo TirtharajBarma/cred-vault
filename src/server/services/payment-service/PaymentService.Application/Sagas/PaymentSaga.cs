@@ -7,6 +7,7 @@ namespace PaymentService.Application.Sagas;
 
 public class PaymentSaga : MassTransitStateMachine<PaymentSagaState>
 {
+    public State Initial { get; private set; } = null!;
     public State Initiated { get; private set; } = null!;
     public State RiskCheckPassed { get; private set; } = null!;
     public State Processing { get; private set; } = null!;
@@ -41,7 +42,16 @@ public class PaymentSaga : MassTransitStateMachine<PaymentSagaState>
                     ctx.Saga.PaymentType = ctx.Message.PaymentType;
                     ctx.Saga.CreatedAtUtc  = DateTime.UtcNow;
                     ctx.Saga.UpdatedAtUtc  = DateTime.UtcNow;
-                    ctx.Saga.RiskScore   = PaymentService.Application.Services.RiskCalculator.Calculate(ctx.Message.Amount);
+                    ctx.Saga.RiskScore   = ctx.Message.RiskScore;
+                })
+                .TransitionTo(Initiated)
+        );
+
+        During(Initiated,
+            When(PaymentInitiated)
+                .Then(ctx =>
+                {
+                    ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 // 1. BLOCKED — high risk
                 .If(ctx => ctx.Saga.RiskScore >= 75,
@@ -105,7 +115,6 @@ public class PaymentSaga : MassTransitStateMachine<PaymentSagaState>
                             RiskDecision = RiskDecision.AutoApproved.ToString(),
                             CompletedAt  = DateTime.UtcNow
                         })))
-                .Then(ctx => ctx.Saga.UpdatedAtUtc = DateTime.UtcNow)
         );
 
         // Waiting for OTP — score was 50-74

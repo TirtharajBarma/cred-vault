@@ -17,7 +17,8 @@ public class PaymentCompletedConsumer(
     public async Task Consume(ConsumeContext<IPaymentCompleted> context)
     {
         var msg = context.Message;
-        logger.LogInformation("PaymentCompleted received: PaymentId={PaymentId} BillId={BillId}", msg.PaymentId, msg.BillId);
+        logger.LogInformation("PaymentCompleted received: PaymentId={PaymentId} BillId={BillId} UserId={UserId} Amount={Amount}", 
+            msg.PaymentId, msg.BillId, msg.UserId, msg.Amount);
 
         var command = new MarkBillPaidCommand(msg.UserId, msg.BillId, msg.Amount);
         var result = await mediator.Send(command);
