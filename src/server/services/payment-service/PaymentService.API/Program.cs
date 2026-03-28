@@ -30,7 +30,16 @@ builder.Services.AddDbContext<PaymentDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("PaymentDb")));
 
 // External Clients
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("BillingServiceClient", client =>
+{
+    var baseUrl = builder.Configuration["Services:BillingService"] ?? "http://localhost:5003";
+    client.BaseAddress = new Uri(baseUrl);
+});
+builder.Services.AddHttpClient("IdentityServiceClient", client =>
+{
+    var baseUrl = builder.Configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
+    client.BaseAddress = new Uri(baseUrl);
+});
 
 // Repositories
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();

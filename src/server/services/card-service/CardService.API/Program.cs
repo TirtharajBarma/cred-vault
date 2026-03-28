@@ -16,7 +16,13 @@ builder.Services.AddControllers();
 builder.Services.AddStandardApi();
 builder.Services.AddStandardCors();
 builder.Services.AddStandardAuth(builder.Configuration);
-builder.Services.AddHttpClient();
+
+// External Clients
+builder.Services.AddHttpClient("IdentityServiceClient", client =>
+{
+    var baseUrl = builder.Configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
+    client.BaseAddress = new Uri(baseUrl);
+});
 
 // Service Specifics
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<CreateCardCommand>());
