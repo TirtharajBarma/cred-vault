@@ -4,7 +4,6 @@ using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
 using IdentityService.Application.Abstractions.Persistence;
 using IdentityService.Application.Commands.Auth;
-using IdentityService.Application.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,17 +21,16 @@ builder.Services.AddDbContext<IdentityDbContext>(options =>
 });
 builder.Services.AddScoped<IUserRepository, SqlUserRepository>();
 
-// Messaging
-builder.Services.AddStandardMessaging(builder.Configuration);
+// Messaging - SIMPLE with dedicated queue
+builder.Services.AddStandardMessaging(builder.Configuration, configure: null, serviceName: "identity");
 
 var app = builder.Build();
 
-// Database Migration & Seeding
+// Database Migration
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
     await dbContext.Database.MigrateAsync();
-    await IdentityDataSeeder.SeedAsync(dbContext);
 }
 
 // Standard Pipeline
@@ -45,4 +43,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-

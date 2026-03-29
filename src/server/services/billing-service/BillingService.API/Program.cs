@@ -1,16 +1,16 @@
 using BillingService.Infrastructure.Persistence.Sql;
 using BillingService.API.Messaging;
 using BillingService.Application.Abstractions.Persistence;
+using BillingService.Application.Commands.Bills;
+using BillingService.Application.Queries.Bills;
 using BillingService.Infrastructure.Persistence.Sql.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
-using BillingService.Domain.Entities;
-using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// MassTransit License (Free tier for development)
+// MassTransit License
 Environment.SetEnvironmentVariable("MT_LICENSE", "free");
 
 // Standard Services
@@ -22,47 +22,24 @@ builder.Services.AddStandardAuth(builder.Configuration);
 // Service Specifics
 builder.Services.AddMediatR(cfg => 
 {
-    cfg.RegisterServicesFromAssemblyContaining<Program>();
-    cfg.RegisterServicesFromAssemblyContaining<BillingService.Application.Commands.Bills.GenerateAdminBillCommand>();
-    cfg.RegisterServicesFromAssemblyContaining<BillingService.Application.Commands.Bills.MarkBillPaidCommand>();
-    cfg.RegisterServicesFromAssemblyContaining<BillingService.Application.Queries.Bills.GetMyBillsQuery>();
+    cfg.RegisterServicesFromAssemblyContaining<MarkBillPaidCommandHandler>();
+    cfg.RegisterServicesFromAssemblyContaining<GetMyBillsQueryHandler>();
 });
-
 builder.Services.AddDbContext<BillingDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("BillingDb"));
 });
-
 builder.Services.AddScoped<IBillRepository, SqlBillRepository>();
 builder.Services.AddScoped<IRewardRepository, SqlRewardRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-// External Clients
 builder.Services.AddHttpClient();
 
-// Messaging
-builder.Services.AddMassTransit(x =>
+// Messaging - SIMPLE with dedicated queue
+builder.Services.AddStandardMessaging(builder.Configuration, x =>
 {
-    x.SetKebabCaseEndpointNameFormatter();
     x.AddConsumer<PaymentCompletedConsumer>();
-
-    x.UsingRabbitMq((context, cfg) =>
-    {
-        cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq", "/", h =>
-        {
-            h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
-            h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
-        });
-
-        cfg.ReceiveEndpoint("billing-payment-completed", e =>
-        {
-            e.ConfigureConsumer<PaymentCompletedConsumer>(context);
-            e.UseMessageRetry(r => r.Intervals(1000, 2000, 5000));
-        });
-
-        cfg.ConfigureEndpoints(context);
-    });
-});
+    x.AddConsumer<PaymentReversedConsumer>();
+}, "billing");
 
 var app = builder.Build();
 
@@ -71,22 +48,6 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
     await dbContext.Database.MigrateAsync();
-    
-        // Seed Reward Tiers if none exist
-    if (!await dbContext.RewardTiers.AnyAsync())
-    {
-        var now = DateTime.UtcNow;
-        var tiers = new List<BillingService.Domain.Entities.RewardTier>
-        {
-            new() { Id = Guid.NewGuid(), CardNetwork = Shared.Contracts.Enums.CardNetwork.Visa, IssuerId = null, MinSpend = 0, RewardRate = 0.02m, EffectiveFromUtc = now.AddDays(-30), EffectiveToUtc = null, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new() { Id = Guid.NewGuid(), CardNetwork = Shared.Contracts.Enums.CardNetwork.Visa, IssuerId = null, MinSpend = 1000, RewardRate = 0.03m, EffectiveFromUtc = now.AddDays(-30), EffectiveToUtc = null, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new() { Id = Guid.NewGuid(), CardNetwork = Shared.Contracts.Enums.CardNetwork.Visa, IssuerId = null, MinSpend = 5000, RewardRate = 0.05m, EffectiveFromUtc = now.AddDays(-30), EffectiveToUtc = null, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new() { Id = Guid.NewGuid(), CardNetwork = Shared.Contracts.Enums.CardNetwork.Mastercard, IssuerId = null, MinSpend = 0, RewardRate = 0.015m, EffectiveFromUtc = now.AddDays(-30), EffectiveToUtc = null, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new() { Id = Guid.NewGuid(), CardNetwork = Shared.Contracts.Enums.CardNetwork.Mastercard, IssuerId = null, MinSpend = 1000, RewardRate = 0.025m, EffectiveFromUtc = now.AddDays(-30), EffectiveToUtc = null, CreatedAtUtc = now, UpdatedAtUtc = now },
-        };
-        await dbContext.RewardTiers.AddRangeAsync(tiers);
-        await dbContext.SaveChangesAsync();
-    }
 }
 
 // Standard Pipeline
@@ -99,4 +60,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-

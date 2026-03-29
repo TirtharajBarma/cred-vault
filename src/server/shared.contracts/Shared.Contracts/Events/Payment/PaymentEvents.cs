@@ -39,6 +39,17 @@ public interface IPaymentFailed
     DateTime FailedAt { get; }
 }
 
+public interface IPaymentReversed
+{
+    Guid PaymentId { get; }
+    Guid UserId { get; }
+    Guid BillId { get; }
+    Guid CardId { get; }
+    decimal Amount { get; }
+    decimal PointsDeducted { get; }
+    DateTime ReversedAt { get; }
+}
+
 public interface IFraudDetected
 {
     Guid PaymentId { get; }

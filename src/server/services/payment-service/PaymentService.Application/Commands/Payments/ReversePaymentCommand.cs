@@ -42,13 +42,16 @@ public class ReversePaymentCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Publish event
-        await publishEndpoint.Publish<IPaymentFailed>(new
+        // Publish IPaymentReversed event for BillingService to handle bill revert and rewards deduction
+        await publishEndpoint.Publish<IPaymentReversed>(new
         {
             PaymentId = payment.Id,
             UserId = payment.UserId,
-            Reason = "Payment Reversed",
-            FailedAt = DateTime.UtcNow
+            BillId = payment.BillId,
+            CardId = payment.CardId,
+            Amount = payment.Amount,
+            PointsDeducted = 0, // BillingService will calculate from reward transactions
+            ReversedAt = DateTime.UtcNow
         }, cancellationToken);
 
         return true;

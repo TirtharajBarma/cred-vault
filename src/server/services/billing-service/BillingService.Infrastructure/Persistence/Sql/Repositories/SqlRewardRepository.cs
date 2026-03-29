@@ -71,4 +71,16 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
         return await dbContext.RewardTransactions
             .AnyAsync(x => x.BillId == billId, cancellationToken);
     }
+
+    public async Task<RewardTransaction?> GetTransactionByBillIdAsync(Guid billId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RewardTransactions
+            .FirstOrDefaultAsync(x => x.BillId == billId && x.Type == RewardTransactionType.Earned, cancellationToken);
+    }
+
+    public Task UpdateTransactionAsync(RewardTransaction transaction, CancellationToken cancellationToken = default)
+    {
+        dbContext.RewardTransactions.Update(transaction);
+        return Task.CompletedTask;
+    }
 }

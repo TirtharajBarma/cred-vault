@@ -76,12 +76,16 @@ public static class ServiceCollectionExtensions
         return app;
     }
 
-    public static IServiceCollection AddStandardMessaging(this IServiceCollection services, IConfiguration configuration, Action<IBusRegistrationConfigurator>? configure = null)
+    public static IServiceCollection AddStandardMessaging(
+        this IServiceCollection services, 
+        IConfiguration configuration, 
+        Action<IBusRegistrationConfigurator>? configure = null,
+        string? serviceName = null)
     {
         services.AddMassTransit(x =>
         {
             x.SetKebabCaseEndpointNameFormatter();
-
+            
             configure?.Invoke(x);
 
             x.UsingRabbitMq((context, cfg) =>
@@ -92,11 +96,18 @@ public static class ServiceCollectionExtensions
                     h.Password(configuration["RabbitMQ:Password"] ?? "guest");
                 });
 
-                cfg.ConfigureEndpoints(context);
+                // Auto-configure endpoints with service name prefix if provided
+                if (!string.IsNullOrEmpty(serviceName))
+                {
+                    cfg.ConfigureEndpoints(context, new KebabCaseEndpointNameFormatter(serviceName + "-", false));
+                }
+                else
+                {
+                    cfg.ConfigureEndpoints(context);
+                }
             });
         });
 
         return services;
     }
 }
-

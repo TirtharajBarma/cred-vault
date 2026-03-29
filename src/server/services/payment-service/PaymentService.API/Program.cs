@@ -11,12 +11,10 @@ using FluentValidation;
 using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
 using MediatR;
-using MassTransit;
-using MassTransit.EntityFrameworkCoreIntegration;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// MassTransit License (Free tier for development)
+// MassTransit License
 Environment.SetEnvironmentVariable("MT_LICENSE", "free");
 
 // Standard Services
@@ -47,13 +45,13 @@ builder.Services.AddMediatR(cfg =>
 });
 builder.Services.AddValidatorsFromAssemblyContaining<InitiatePaymentCommand>();
 
-// Messaging (Saga removed - using direct event publishing for reliability)
+// Messaging - SIMPLE with dedicated queue
 builder.Services.AddStandardMessaging(builder.Configuration, x =>
 {
     x.AddConsumer<PaymentCompletedConsumer>();
     x.AddConsumer<PaymentFailedConsumer>();
     x.AddConsumer<FraudDetectedConsumer>();
-});
+}, "payment");
 
 var app = builder.Build();
 
@@ -74,4 +72,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-

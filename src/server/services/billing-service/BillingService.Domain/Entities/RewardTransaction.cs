@@ -11,4 +11,5 @@ public sealed class RewardTransaction
     public RewardTransactionType Type { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime? ReversedAtUtc { get; set; }
 }

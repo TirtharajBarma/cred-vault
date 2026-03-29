@@ -12,6 +12,7 @@ public enum RewardTransactionType
 {
     Earned = 1,
     Adjusted = 2,
-    Redeemed = 3
+    Redeemed = 3,
+    Reversed = 4
 }
 

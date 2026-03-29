@@ -4,7 +4,7 @@
       "DownstreamPathTemplate": "/api/v1/identity",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "identity-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5001 }
       ],
       "UpstreamPathTemplate": "/api/v1/identity",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -13,7 +13,7 @@
       "DownstreamPathTemplate": "/api/v1/identity/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "identity-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5001 }
       ],
       "UpstreamPathTemplate": "/api/v1/identity/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -23,7 +23,7 @@
       "DownstreamPathTemplate": "/api/v1/cards",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "card-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5002 }
       ],
       "UpstreamPathTemplate": "/api/v1/cards",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -32,7 +32,7 @@
       "DownstreamPathTemplate": "/api/v1/cards/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "card-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5002 }
       ],
       "UpstreamPathTemplate": "/api/v1/cards/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -42,7 +42,7 @@
       "DownstreamPathTemplate": "/api/v1/cards/{cardId}/transactions",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "card-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5002 }
       ],
       "UpstreamPathTemplate": "/api/v1/cards/{cardId}/transactions",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -51,7 +51,7 @@
       "DownstreamPathTemplate": "/api/v1/cards/{cardId}/transactions/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "card-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5002 }
       ],
       "UpstreamPathTemplate": "/api/v1/cards/{cardId}/transactions/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -60,7 +60,7 @@
       "DownstreamPathTemplate": "/api/v1/issuers",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "card-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5002 }
       ],
       "UpstreamPathTemplate": "/api/v1/issuers",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -69,7 +69,7 @@
       "DownstreamPathTemplate": "/api/v1/issuers/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "card-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5002 }
       ],
       "UpstreamPathTemplate": "/api/v1/issuers/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -79,7 +79,7 @@
       "DownstreamPathTemplate": "/api/v1/billing/bills",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "billing-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5003 }
       ],
       "UpstreamPathTemplate": "/api/v1/billing/bills",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -88,7 +88,7 @@
       "DownstreamPathTemplate": "/api/v1/billing/bills/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "billing-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5003 }
       ],
       "UpstreamPathTemplate": "/api/v1/billing/bills/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -98,7 +98,7 @@
       "DownstreamPathTemplate": "/api/v1/billing/rewards",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "billing-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5003 }
       ],
       "UpstreamPathTemplate": "/api/v1/billing/rewards",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -107,7 +107,7 @@
       "DownstreamPathTemplate": "/api/v1/billing/rewards/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "billing-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5003 }
       ],
       "UpstreamPathTemplate": "/api/v1/billing/rewards/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -117,7 +117,7 @@
       "DownstreamPathTemplate": "/api/v1/payments",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "payment-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5004 }
       ],
       "UpstreamPathTemplate": "/api/v1/payments",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -126,7 +126,7 @@
       "DownstreamPathTemplate": "/api/v1/payments/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "payment-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5004 }
       ],
       "UpstreamPathTemplate": "/api/v1/payments/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -136,7 +136,7 @@
       "DownstreamPathTemplate": "/api/v1/notifications",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "notification-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5005 }
       ],
       "UpstreamPathTemplate": "/api/v1/notifications",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
@@ -145,7 +145,7 @@
       "DownstreamPathTemplate": "/api/v1/notifications/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "notification-service", "Port": 80 }
+        { "Host": "localhost", "Port": 5005 }
       ],
       "UpstreamPathTemplate": "/api/v1/notifications/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
