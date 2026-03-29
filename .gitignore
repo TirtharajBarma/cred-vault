@@ -50,3 +50,6 @@ appsettings.Development.json
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
+
+.qoder
+walkthrough.md

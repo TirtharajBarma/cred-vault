@@ -1,0 +1,29 @@
+@CardService.API_HostAddress = http://localhost:5002
+@AccessToken = REPLACE_WITH_JWT
+
+GET {{CardService.API_HostAddress}}/api/v1/cards/health
+Accept: application/json
+
+###
+
+GET {{CardService.API_HostAddress}}/api/v1/cards
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+POST {{CardService.API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+Authorization: Bearer {{AccessToken}}
+
+{
+	"label": "Personal Visa",
+	"brand": "visa",
+	"cardholderName": "Normal User",
+	"expMonth": 12,
+	"expYear": 2030,
+	"cardNumber": "4111111111111111",
+	"isDefault": true
+}
+
+###
