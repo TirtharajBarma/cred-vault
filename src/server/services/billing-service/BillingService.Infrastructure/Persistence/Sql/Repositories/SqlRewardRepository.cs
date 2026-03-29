@@ -65,4 +65,10 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
     {
         await dbContext.RewardTransactions.AddAsync(transaction, cancellationToken);
     }
+
+    public async Task<bool> HasTransactionForBillAsync(Guid billId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RewardTransactions
+            .AnyAsync(x => x.BillId == billId, cancellationToken);
+    }
 }

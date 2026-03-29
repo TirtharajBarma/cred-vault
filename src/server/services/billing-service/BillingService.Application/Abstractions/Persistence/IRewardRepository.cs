@@ -15,4 +15,5 @@ public interface IRewardRepository
 
     Task<List<RewardTransaction>> GetTransactionsByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default);
     Task AddTransactionAsync(RewardTransaction transaction, CancellationToken cancellationToken = default);
+    Task<bool> HasTransactionForBillAsync(Guid billId, CancellationToken cancellationToken = default);
 }

@@ -16,20 +16,28 @@ public class PaymentCompletedConsumer(
 {
     public async Task Consume(ConsumeContext<IPaymentCompleted> context)
     {
-        var msg = context.Message;
-        logger.LogInformation("PaymentCompleted received: PaymentId={PaymentId} BillId={BillId} UserId={UserId} Amount={Amount}", 
-            msg.PaymentId, msg.BillId, msg.UserId, msg.Amount);
-
-        var command = new MarkBillPaidCommand(msg.UserId, msg.BillId, msg.Amount);
-        var result = await mediator.Send(command);
-
-        if (result.Success)
+        try
         {
-            logger.LogInformation("Bill {BillId} marked Paid via RabbitMQ. Rewards processed.", msg.BillId);
+            var msg = context.Message;
+            logger.LogInformation("PaymentCompleted received: PaymentId={PaymentId} BillId={BillId} UserId={UserId} Amount={Amount}", 
+                msg.PaymentId, msg.BillId, msg.UserId, msg.Amount);
+
+            var command = new MarkBillPaidCommand(msg.UserId, msg.BillId, msg.Amount);
+            var result = await mediator.Send(command);
+
+            if (result.Success)
+            {
+                logger.LogInformation("Bill {BillId} marked Paid via RabbitMQ. Rewards processed.", msg.BillId);
+            }
+            else
+            {
+                logger.LogWarning("Failed to mark Bill {BillId} as paid via RabbitMQ: {Message}", msg.BillId, result.Message);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            logger.LogWarning("Failed to mark Bill {BillId} as paid via RabbitMQ: {Message}", msg.BillId, result.Message);
+            logger.LogError(ex, "Error processing PaymentCompleted: {Message}", ex.Message);
+            throw;
         }
     }
 }

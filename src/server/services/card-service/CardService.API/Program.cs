@@ -6,6 +6,7 @@ using CardService.Application.Queries.Cards;
 using CardService.API.Messaging;
 using CardService.Infrastructure.Persistence.Sql;
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,9 +33,27 @@ builder.Services.AddDbContext<CardDbContext>(options =>
 builder.Services.AddScoped<ICardRepository, SqlCardRepository>();
 
 // Messaging
-builder.Services.AddStandardMessaging(builder.Configuration, x =>
+builder.Services.AddMassTransit(x =>
 {
+    x.SetKebabCaseEndpointNameFormatter();
     x.AddConsumer<PaymentCompletedConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq", "/", h =>
+        {
+            h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
+            h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
+        });
+
+        cfg.ReceiveEndpoint("card-payment-completed", e =>
+        {
+            e.ConfigureConsumer<PaymentCompletedConsumer>(context);
+            e.UseMessageRetry(r => r.Intervals(1000, 2000, 5000));
+        });
+
+        cfg.ConfigureEndpoints(context);
+    });
 });
 
 var app = builder.Build();

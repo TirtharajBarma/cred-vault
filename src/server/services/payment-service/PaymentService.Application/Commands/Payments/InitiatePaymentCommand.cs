@@ -66,6 +66,8 @@ public class InitiatePaymentCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var (userSuccess, user, _) = await FetchUserDetailsAsync(payment.UserId, request.AuthorizationHeader, cancellationToken);
+        logger.LogInformation("User fetch result: Success={Success}, Email={Email}, FullName={FullName}", 
+            userSuccess, user?.Email ?? "NULL", user?.FullName ?? "NULL");
         var riskScore = RiskCalculator.Calculate(payment.Amount);
         var otpRequired = riskScore >= 50 && riskScore < 75;
         var isBlocked = riskScore >= 75;
@@ -94,6 +96,8 @@ public class InitiatePaymentCommandHandler(
         {
             PaymentId    = payment.Id,
             UserId       = payment.UserId,
+            Email        = user?.Email ?? string.Empty,
+            FullName     = user?.FullName ?? "User",
             CardId       = payment.CardId,
             BillId       = payment.BillId,
             Amount       = payment.Amount,
@@ -141,13 +145,39 @@ public class InitiatePaymentCommandHandler(
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
             var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode) return (false, null, $"Failed to fetch user: {response.ReasonPhrase}");
+            logger.LogInformation("Identity service response: StatusCode={StatusCode}", response.StatusCode);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(ct);
+                logger.LogWarning("Identity service error: {Error}", errorContent);
+                return (false, null, $"Failed to fetch user: {response.ReasonPhrase}");
+            }
 
             var content = await response.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<Shared.Contracts.Models.ApiResponse<UserDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            logger.LogInformation("Identity service response body: {Body}", content);
             
-            return (result?.Success ?? false, result?.Data, result?.Message);
+            var result = JsonSerializer.Deserialize<UserResponseWrapper>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            logger.LogInformation("Deserialized: Success={Success}, Data={HasData}", result?.Success, result?.Data?.User != null);
+            
+            return (result?.Success ?? false, result?.Data?.User, result?.Message);
         }
-        catch (Exception ex) { return (false, null, ex.Message); }
+        catch (Exception ex) 
+        { 
+            logger.LogError(ex, "Exception fetching user details");
+            return (false, null, ex.Message); 
+        }
+    }
+
+    private class UserResponseWrapper
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public UserDataWrapper? Data { get; set; }
+    }
+
+    private class UserDataWrapper
+    {
+        public UserDto? User { get; set; }
     }
 }

@@ -74,6 +74,9 @@ public class PaymentSaga : MassTransitStateMachine<PaymentSagaState>
                         {
                             PaymentId = ctx.Saga.PaymentId,
                             UserId = ctx.Saga.UserId,
+                            Email = ctx.Saga.Email ?? string.Empty,
+                            FullName = ctx.Saga.FullName ?? "User",
+                            Amount = ctx.Saga.Amount,
                             Reason = "Payment blocked by risk management."
                         })))
                 // 2. OTP REQUIRED — medium risk
@@ -108,6 +111,8 @@ public class PaymentSaga : MassTransitStateMachine<PaymentSagaState>
                         {
                             PaymentId    = ctx.Saga.PaymentId,
                             UserId       = ctx.Saga.UserId,
+                            Email        = ctx.Saga.Email ?? string.Empty,
+                            FullName     = ctx.Saga.FullName ?? "User",
                             CardId       = ctx.Saga.CardId,
                             BillId       = ctx.Saga.BillId,
                             Amount       = ctx.Saga.Amount,
@@ -126,6 +131,8 @@ public class PaymentSaga : MassTransitStateMachine<PaymentSagaState>
                 {
                     PaymentId    = ctx.Saga.PaymentId,
                     UserId       = ctx.Saga.UserId,
+                    Email        = ctx.Saga.Email ?? string.Empty,
+                    FullName     = ctx.Saga.FullName ?? "User",
                     CardId       = ctx.Saga.CardId,
                     BillId       = ctx.Saga.BillId,
                     Amount       = ctx.Saga.Amount,

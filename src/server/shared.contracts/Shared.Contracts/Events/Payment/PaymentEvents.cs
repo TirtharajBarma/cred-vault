@@ -18,6 +18,8 @@ public interface IPaymentCompleted
 {
     Guid PaymentId { get; }
     Guid UserId { get; }
+    string Email { get; }
+    string FullName { get; }
     Guid CardId { get; }
     Guid BillId { get; }
     decimal Amount { get; }
@@ -30,6 +32,9 @@ public interface IPaymentFailed
 {
     Guid PaymentId { get; }
     Guid UserId { get; }
+    string Email { get; }
+    string FullName { get; }
+    decimal Amount { get; }
     string Reason { get; }
     DateTime FailedAt { get; }
 }

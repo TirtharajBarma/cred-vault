@@ -65,8 +65,8 @@ public class DomainEventConsumer(IMediator mediator) :
     public async Task Consume(ConsumeContext<IPaymentCompleted> context) =>
         await mediator.Send(new ProcessNotificationCommand(
             "PaymentCompleted",
-            "system@credvault.com", // System audit usually doesn't need email recipient
-            "System",
+            context.Message.Email,
+            context.Message.FullName,
             new { context.Message.PaymentId, context.Message.UserId, context.Message.Amount, context.Message.RiskScore, context.Message.RiskDecision },
             context.CorrelationId?.ToString()
         ));
@@ -74,9 +74,9 @@ public class DomainEventConsumer(IMediator mediator) :
     public async Task Consume(ConsumeContext<IPaymentFailed> context) =>
         await mediator.Send(new ProcessNotificationCommand(
             "PaymentFailed",
-            "system@credvault.com",
-            "System",
-            new { context.Message.PaymentId, context.Message.UserId, context.Message.Reason },
+            context.Message.Email,
+            context.Message.FullName,
+            new { context.Message.PaymentId, context.Message.UserId, context.Message.Amount, context.Message.Reason },
             context.CorrelationId?.ToString()
         ));
 

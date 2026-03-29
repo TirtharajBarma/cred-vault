@@ -31,6 +31,11 @@ public class MarkBillPaidCommandHandler(
 
         if (bill.Status == BillStatus.Paid)
         {
+            var alreadyProcessed = await rewardRepository.HasTransactionForBillAsync(request.BillId, cancellationToken);
+            if (alreadyProcessed)
+            {
+                logger.LogInformation("Bill {BillId} already paid and rewards processed, skipping", request.BillId);
+            }
             return new ApiResponse<Bill> { Success = true, Message = "Bill is already paid.", Data = bill };
         }
 
