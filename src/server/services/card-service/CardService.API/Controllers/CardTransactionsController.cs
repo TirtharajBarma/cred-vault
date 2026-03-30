@@ -12,23 +12,40 @@ using Shared.Contracts.Models;
 namespace CardService.API.Controllers;
 
 [ApiController]
-[Route("api/v1/cards/{cardId:guid}/transactions")]
+[Route("api/v1/cards")]
 [Authorize]
-public class CardTransactionsController : BaseApiController
+public class CardTransactionsController(IMediator mediator) : BaseApiController
 {
-    private readonly IMediator _mediator;
-
-    public CardTransactionsController(IMediator mediator)
+    [HttpGet("{cardId:guid}/transactions")]
+    public async Task<IActionResult> ListTransactions(Guid cardId, CancellationToken cancellationToken)
     {
-        _mediator = mediator;
+        var userId = GetUserIdFromToken();
+        if (userId is null)
+            return UnauthorizedResponse("User identity is missing from token.");
+
+        var query = new ListCardTransactionsQuery(UserId: userId.Value, CardId: cardId);
+        var result = await mediator.Send(query, cancellationToken);
+        return Ok(result);
     }
 
-    [HttpPost]
+    [HttpGet("transactions")]
+    public async Task<IActionResult> ListAllUserTransactions(CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId is null)
+            return UnauthorizedResponse("User identity is missing from token.");
+
+        var query = new ListUserTransactionsQuery(userId.Value);
+        var result = await mediator.Send(query, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{cardId:guid}/transactions")]
     public async Task<IActionResult> AddTransaction(Guid cardId, [FromBody] AddTransactionRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(new ApiResponse<object> { Success = false, Message = "User identity is missing from token.", TraceId = HttpContext.TraceIdentifier });
+             return UnauthorizedResponse("User identity is missing from token.");
 
         var isAdmin = User.IsInRole("admin");
 
@@ -42,30 +59,17 @@ public class CardTransactionsController : BaseApiController
             IsAdmin: isAdmin
         );
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)
         {
             if (result.Message == "Card not found.")
-                return NotFound(new ApiResponse<object> { Success = false, Message = result.Message, TraceId = HttpContext.TraceIdentifier });
+                return NotFoundResponse(result.Message);
             
-            return BadRequest(new ApiResponse<object> { Success = false, Message = result.Message, TraceId = HttpContext.TraceIdentifier });
+            return BadRequestResponse(result.Message);
         }
 
         return StatusCode(StatusCodes.Status201Created, result);
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> ListTransactions(Guid cardId, CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null)
-            return Unauthorized(new ApiResponse<object> { Success = false, Message = "User identity is missing from token.", TraceId = HttpContext.TraceIdentifier });
-
-        var query = new ListCardTransactionsQuery(UserId: userId.Value, CardId: cardId);
-        var result = await _mediator.Send(query, cancellationToken);
-
-        return Ok(result);
     }
 
     public class AddTransactionRequest

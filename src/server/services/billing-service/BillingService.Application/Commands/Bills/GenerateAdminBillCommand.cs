@@ -71,9 +71,9 @@ public class GenerateAdminBillCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Fetch User Details for Notification
-        var (userSuccess, user, _) = await FetchUserDetailsAsync(request.UserId, request.AuthorizationHeader, cancellationToken);
+        var (userSuccess, user, userError) = await FetchUserDetailsAsync(request.UserId, request.AuthorizationHeader, cancellationToken);
 
-        if (userSuccess && user is not null)
+        if (userSuccess && user is not null && !string.IsNullOrWhiteSpace(user.Email))
         {
             await publishEndpoint.Publish<IBillGenerated>(new
             {
@@ -86,6 +86,10 @@ public class GenerateAdminBillCommandHandler(
                 DueDate = bill.DueDateUtc,
                 GeneratedAt = bill.CreatedAtUtc
             }, cancellationToken);
+        }
+        else
+        {
+            Console.WriteLine($"[BillGenerator] Skipping notification - user fetch failed or email missing. UserId: {request.UserId}, Success: {userSuccess}, Error: {userError}");
         }
         
         return new ApiResponse<Bill> { Success = true, Message = "Bill generated.", Data = bill };

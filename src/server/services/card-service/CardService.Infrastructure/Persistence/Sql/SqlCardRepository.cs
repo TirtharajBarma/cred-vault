@@ -125,6 +125,15 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<CardTransaction>> GetTransactionsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardTransactions
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.DateUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<bool> HasDuplicateTransactionAsync(Guid cardId, TransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default)
     {
         var tolerance = TimeSpan.FromMinutes(1);

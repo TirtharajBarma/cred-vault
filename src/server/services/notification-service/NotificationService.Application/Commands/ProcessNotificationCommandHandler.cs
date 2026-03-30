@@ -18,21 +18,46 @@ public class ProcessNotificationCommandHandler(
 {
     public async Task Handle(ProcessNotificationCommand request, CancellationToken cancellationToken)
     {
-        // 1. Audit the Business Event
+        logger.LogInformation("Processing notification: {EventType} for {Email}", request.EventType, request.Email ?? "NO_EMAIL");
+
+        // 1. Audit the Business Event (use fallback for UserId if email is null)
         var audit = new AuditLog
         {
             Id = Guid.NewGuid(),
             EntityName = request.EventType,
             EntityId = "Event",
             Action = "Consumed",
-            UserId = request.Email, // Store email as UserId if real ID isn't available
+            UserId = request.Email ?? $"unknown-{request.EventType}",
             Changes = JsonConvert.SerializeObject(request.Payload),
             TraceId = request.TraceId,
             CreatedAtUtc = DateTime.UtcNow
         };
         dbContext.AuditLogs.Add(audit);
 
-        // 2. Fetch Notification Template
+        // 2. Skip email if email is not provided
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            logger.LogWarning("No email provided for event {EventType}. Skipping email notification.", request.EventType);
+            
+            var skippedLog = new NotificationLog
+            {
+                Id = Guid.NewGuid(),
+                Recipient = "N/A",
+                Subject = $"Skipped: {request.EventType}",
+                Body = "Email not provided in event payload",
+                Type = "Email",
+                IsSuccess = false,
+                ErrorMessage = "Email was null or empty in the event",
+                TraceId = request.TraceId,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            dbContext.NotificationLogs.Add(skippedLog);
+            
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        // 3. Fetch Notification Template
         var template = await dbContext.EmailTemplates
             .FirstOrDefaultAsync(t => t.Name == request.EventType, cancellationToken);
 
@@ -43,15 +68,15 @@ public class ProcessNotificationCommandHandler(
             return;
         }
 
-        // 3. Render Template
-        var subject = RenderTemplate(template.SubjectTemplate, request.FullName, request.Payload);
-        var body = RenderTemplate(template.BodyTemplate, request.FullName, request.Payload);
+        // 4. Render Template
+        var subject = RenderTemplate(template.SubjectTemplate, request.FullName ?? "User", request.Payload);
+        var body = RenderTemplate(template.BodyTemplate, request.FullName ?? "User", request.Payload);
 
-        // 4. Send Email
+        // 5. Send Email
         var (success, error) = await emailSender.SendEmailAsync(request.Email, subject, body, cancellationToken);
 
-        // 5. Log Notification
-        var log = new NotificationLog
+        // 6. Log Notification
+        var notifLog = new NotificationLog
         {
             Id = Guid.NewGuid(),
             Recipient = request.Email,
@@ -63,7 +88,7 @@ public class ProcessNotificationCommandHandler(
             TraceId = request.TraceId,
             CreatedAtUtc = DateTime.UtcNow
         };
-        dbContext.NotificationLogs.Add(log);
+        dbContext.NotificationLogs.Add(notifLog);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

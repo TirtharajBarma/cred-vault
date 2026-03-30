@@ -70,7 +70,7 @@ public sealed class CreateCardCommandHandler(
 
         // Fetch user details for notification
         var (userSuccess, user, _) = await FetchUserDetailsAsync(request.UserId, request.AuthorizationHeader, cancellationToken);
-        if (userSuccess && user is not null)
+        if (userSuccess && user is not null && !string.IsNullOrWhiteSpace(user.Email))
         {
             await publishEndpoint.Publish<ICardAdded>(new
             {
