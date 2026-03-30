@@ -25,7 +25,7 @@ builder.Services.AddDbContext<NotificationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("NotificationDb"));
 });
 builder.Services.AddScoped<INotificationDbContext>(sp => sp.GetRequiredService<NotificationDbContext>());
-builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
+builder.Services.AddScoped<IEmailSender, GmailSmtpEmailSender>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<ProcessNotificationCommandHandler>());
 
 // Messaging - SIMPLE with dedicated queue
