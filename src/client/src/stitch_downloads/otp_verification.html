@@ -1,0 +1,18 @@
+# CredVault OTP Flow Specification
+
+## OTP Verification Page
+- **Route**: /verify-otp
+- **Context**: Shown immediately after a user submits the registration form.
+- **Goal**: Securely verify the user's email/phone with a one-time password.
+- **UI Elements**:
+    - Heading: "Verify Your Identity"
+    - Subtext: "We've sent a 6-digit code to your email."
+    - Input: 6 separate digit boxes for the OTP.
+    - Actions: "Verify & Secure Access" button.
+    - Footer: "Didn't receive the code? Resend OTP" (with a countdown timer).
+- **Style**: Soft Morning Mist 2.0 (Glassmorphic card, split-screen layout).
+
+## Updated Flow
+1. **Register Page** -> Click "Create Account" -> Redirect to **OTP Verification Page**.
+2. **OTP Verification Page** -> Successful verification -> Redirect to **Login Page**.
+3. **Login Page** -> Successful login -> Redirect to **Dashboard**.

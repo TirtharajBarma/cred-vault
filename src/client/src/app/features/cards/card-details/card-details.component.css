@@ -1,0 +1,91 @@
+/* Premium Sidebar Form Styling (Glassmorphism Rebirth) */
+.glass-sidebar {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.05);
+}
+
+input[type="number"], input[type="text"] {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+input:focus {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(var(--primary-color-rgb), 0.3);
+    box-shadow: 0 8px 16px -4px rgba(var(--primary-color-rgb), 0.1);
+    transform: translateY(-1px);
+}
+
+/* Chrome, Safari, Edge, Opera - Remove arrows for number inputs */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+/* Firefox - Remove arrows for number inputs */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Animation for the authorization button */
+button:active {
+    transform: scale(0.98) translateY(0);
+}
+
+@keyframes slideDownFade {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.submit-feedback {
+    animation: slideDownFade 0.4s ease-out forwards;
+}
+
+/* Custom shadow for the primary button */
+.shadow-primary-lg {
+    box-shadow: 0 12px 24px -6px rgba(var(--primary-color-rgb), 0.3);
+}
+
+/* Sidebar structure */
+.lg\:col-span-12.xl\:col-span-4 {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Refined spending analysis interaction */
+.group .flex {
+    /* Removed scale-105 hover effect */
+    transition: color 0.3s ease;
+}
+
+.group:hover .text-charcoal {
+    color: var(--primary-color);
+}
+
+/* 3D Tilt Effect */
+.perspective {
+    perspective: 1000px;
+}
+
+/* Hover rotation (Tailwind-like utility definition) */
+.group:hover .group-hover\:rotate-y-12 {
+    transform: rotateY(12deg); /* Switched to opposite tilt */
+}
+
+/* Basic smooth transition for all cards */
+.group .aspect-\[1\.6\/1\] {
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}

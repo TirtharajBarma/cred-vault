@@ -583,14 +583,14 @@ Service publishes event:
     
     PaymentService                    RabbitMQ
          │                               │
-         │  await publishEndpoint.Publish<IPaymentCompleted>(new {...}) │
+         │  await publishEndpoint.Publish<IPaymentCompleted>(new {...})   │
          │ ─────────────────────────────────────────────────────────────► │
-         │                               │                               │
+         │                               │                                │
          │                               │ Message stored in queue        │
-         │                               │ "billing-payment-completed"     │
-         │                               │                               │
-         │                               ▼                               │
-         │                         Queue Message                         │
+         │                               │ "billing-payment-completed"    │
+         │                               │                                │
+         │                               ▼                                │
+         │                         Queue Message                          │
 
 
 CODE EXAMPLE (C#):

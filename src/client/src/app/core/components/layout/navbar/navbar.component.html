@@ -1,0 +1,97 @@
+<!-- Premium Navbar (Symmetrical 3-Column Layout) -->
+<nav class="sticky top-0 z-50 w-full bg-white/70 backdrop-blur-2xl border-b border-charcoal/5 px-6 md:px-12 py-3.5 grid grid-cols-3 items-center">
+  
+  <!-- Left: Brand -->
+  <div class="flex items-center justify-start">
+    <div class="flex items-center gap-3 cursor-pointer group" routerLink="/dashboard">
+      <div class="w-10 h-10 bg-gradient-to-br from-honey-amber to-[#d4a820] rounded-xl flex items-center justify-center shadow-lg shadow-honey-amber/20 transform group-hover:scale-105 transition-transform duration-300">
+        <span class="material-symbols-outlined text-charcoal font-bold">account_balance_wallet</span>
+      </div>
+      <span class="text-xl font-black tracking-tighter text-charcoal">CredVault</span>
+    </div>
+  </div>
+
+  <!-- Center: Tabs (Perfectly Centered) -->
+  <div class="flex items-center justify-center gap-2">
+    <a routerLink="/dashboard" routerLinkActive="nav-pill-active" [routerLinkActiveOptions]="{exact: true}" 
+       class="nav-pill nav-pill-hover text-charcoal/60">Dashboard</a>
+    <a routerLink="/bills" routerLinkActive="nav-pill-active" 
+       class="nav-pill nav-pill-hover text-charcoal/60">Bills</a>
+    <a routerLink="/analytics" routerLinkActive="nav-pill-active" 
+       class="nav-pill nav-pill-hover text-charcoal/60">Analytics</a>
+  </div>
+
+  <!-- Right Side: Tools & Profile -->
+  <div class="flex items-center justify-end gap-5">
+    <!-- Search Bar -->
+    <div class="relative hidden xl:block group">
+      <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-misty-gray text-xl group-focus-within:text-honey-amber transition-colors">search</span>
+      <input type="text" 
+             placeholder="Search transactions..." 
+             class="premium-input w-64 group-focus-within:w-80 pl-12 pr-4 text-sm font-semibold transition-all duration-500">
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex items-center gap-2">
+      <button class="w-10 h-10 flex items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all relative">
+        <span class="material-symbols-outlined">notifications</span>
+        <span class="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+      </button>
+      
+      <button class="w-10 h-10 flex items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all">
+        <span class="material-symbols-outlined">settings</span>
+      </button>
+
+      <!-- Profile Avatar with Click-to-Toggle Dropdown -->
+      <div class="relative ml-2">
+        <button (click)="toggleProfile()" 
+                class="w-10 h-10 rounded-full bg-mist-ivory border-2 border-white shadow-sm overflow-hidden flex items-center justify-center hover:ring-4 hover:ring-honey-amber/10 transition-all active:scale-95">
+          @if (user()) {
+            <img class="w-full h-full object-cover" 
+                 [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=e5e1da&color=181611'" 
+                 alt="User Profile">
+          } @else {
+            <span class="text-xs font-bold text-misty-gray">??</span>
+          }
+        </button>
+        
+        <!-- Enhanced Premium Dropdown -->
+        @if (isProfileOpen()) {
+          <div class="absolute right-0 top-full mt-4 w-72 glass-card-premium rounded-3xl p-2 animate-scale-in z-50 overflow-hidden shadow-2xl">
+            <!-- User Info Header -->
+            <div class="px-5 py-5 bg-charcoal/[0.02] rounded-2xl mb-2">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-white border-2 border-honey-amber/20 shadow-sm flex items-center justify-center overflow-hidden">
+                   <img class="w-full h-full object-cover" 
+                        [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=fdfbf7&color=181611'" 
+                        alt="User Profile Large">
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-black text-charcoal truncate">{{ user()?.fullName }}</p>
+                  <p class="text-xs font-medium text-charcoal/60 truncate tracking-tight lowercase mt-0.5">{{ user()?.email }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Menu Sections -->
+            <div class="space-y-1">
+              <button class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
+                <span class="material-symbols-outlined text-lg">person_outline</span>
+                Account Settings
+              </button>
+              <button class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
+                <span class="material-symbols-outlined text-lg">shield_with_heart</span>
+                Privacy & Security
+              </button>
+              <div class="h-px bg-charcoal/5 my-2 mx-4"></div>
+              <button (click)="logout()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-red-500 hover:bg-red-50 rounded-xl transition-all group">
+                <span class="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">logout</span>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</nav>

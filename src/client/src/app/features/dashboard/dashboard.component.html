@@ -1,0 +1,257 @@
+<!-- Main Dashboard Content -->
+<div class="relative w-full overflow-x-hidden bg-mist-cream/20 font-display">
+  
+  <!-- Backdrop Atmospheric Glows -->
+  <div class="glow-cloud-amber top-[-10%] left-[-5%] opacity-30"></div>
+  <div class="glow-cloud-blue bottom-[10%] right-[-5%] opacity-20"></div>
+
+  <div class="px-6 md:px-12 py-10 max-w-7xl mx-auto w-full relative z-10">
+    
+    <!-- Hero / Action Bar -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+      <div>
+        <h1 class="text-5xl font-black tracking-tight text-charcoal mb-3">My Cards</h1>
+        <p class="text-misty-gray font-medium text-lg max-w-lg leading-relaxed">
+          Manage your premium assets, monitor spending, and configure security limits.
+        </p>
+      </div>
+      <button (click)="toggleAddCardModal()" class="h-14 px-8 bg-primary hover:bg-primary/90 text-charcoal font-bold rounded-2xl shadow-xl shadow-primary/20 flex items-center gap-3 transition-all transform hover:-translate-y-1 active:scale-95">
+        <span class="material-symbols-outlined font-bold">add_card</span>
+        Add New Card
+      </button>
+    </div>
+
+    <!-- Category Filters -->
+    <div class="flex items-center gap-6 mb-10 border-b border-charcoal/5 overflow-x-auto no-scrollbar">
+      <button class="pb-4 text-sm font-bold text-primary border-b-2 border-primary whitespace-nowrap">All Cards ({{isLoading() ? '...' : cards().length}})</button>
+      <button class="pb-4 text-sm font-semibold text-misty-gray hover:text-charcoal transition-colors whitespace-nowrap">Credit Cards</button>
+      <button class="pb-4 text-sm font-semibold text-misty-gray hover:text-charcoal transition-colors whitespace-nowrap">Debit Cards</button>
+      <button class="pb-4 text-sm font-semibold text-misty-gray hover:text-charcoal transition-colors whitespace-nowrap">Virtual Cards</button>
+    </div>
+
+    <!-- Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+      
+      @if (isLoading()) {
+        <!-- Premium Skeletons -->
+        @for (i of [1,2,3]; track i) {
+          <div class="space-y-4">
+            <div class="w-full aspect-[1.6/1] skeleton rounded-[2rem]"></div>
+            <div class="h-6 w-1/2 skeleton mx-1"></div>
+          </div>
+        }
+      } @else {
+        <!-- Real Cards -->
+        @for (card of cards(); track card.id; let i = $index) {
+          <div [routerLink]="['/cards', card.id]" class="group relative transition-all duration-500 hover:-translate-y-2 cursor-pointer perspective">
+            <!-- Glass/Gradient Card Visual -->
+            <div [class]="'w-full aspect-[1.6/1] rounded-[2rem] p-8 flex flex-col justify-between text-white shadow-2xl relative overflow-hidden group-hover:rotate-y-12 ' + getCardGradient(i)">
+              
+              <div class="relative z-10 flex justify-between items-start">
+                <div class="space-y-3 flex flex-col">
+                  <span class="text-[8px] uppercase tracking-[0.2em] font-black opacity-40 block">{{ card.issuerName || 'PLATINUM' }}</span>
+                  <div class="w-10 h-7 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20">
+                    <span class="material-symbols-outlined text-white/40 text-xl">contactless</span>
+                  </div>
+                </div>
+                <div class="w-14 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20 px-2">
+                  @if (card.network === 'Visa') {
+                    <span class="text-white font-bold text-xs tracking-wider">VISA</span>
+                  } @else if (card.network === 'Mastercard') {
+                    <span class="text-white font-bold text-xs tracking-wider">MC</span>
+                  } @else {
+                    <span class="material-symbols-outlined text-white/40 text-xl">credit_card</span>
+                  }
+                </div>
+              </div>
+
+              <div class="relative z-10">
+                <p class="text-2xl font-display font-medium tracking-[0.3em] mb-4">
+                  •••• •••• •••• {{ card.last4 }}
+                </p>
+                <div class="flex justify-between items-end">
+                  <div>
+                    <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Card Holder</p>
+                    <p class="text-xs font-bold tracking-wider uppercase">{{ card.cardholderName }}</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Expires</p>
+                    <p class="text-xs font-bold tracking-wider">{{ card.expMonth | number:'2.0' }}/{{ card.expYear.toString().slice(-2) }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Atmospheric Card Blur -->
+              <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-10 -translate-y-10 blur-3xl"></div>
+            </div>
+
+            <!-- Card Footer Info -->
+            <div class="mt-5 flex justify-between items-start px-2">
+              <div>
+                <h3 class="font-bold text-charcoal">{{ card.issuerName || 'Premium Asset' }}</h3>
+                <p class="text-2xl font-black text-charcoal mt-1">
+                  {{ (card.creditLimit - card.outstandingBalance) | currency:'USD' }}
+                  <span class="text-[10px] font-bold text-misty-gray uppercase tracking-[0.2em] ml-1">Available</span>
+                </p>
+              </div>
+              <button class="p-2 hover:bg-mist-ivory rounded-full transition-colors">
+                <span class="material-symbols-outlined text-charcoal/30">more_vert</span>
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Add Generic Card Button -->
+        <button (click)="toggleAddCardModal()" 
+                class="w-full aspect-[1.6/1] rounded-[2rem] border-2 border-dashed border-charcoal/10 flex flex-col items-center justify-center gap-4 group hover:bg-white hover:border-primary/40 hover:shadow-xl transition-all duration-500">
+          <div class="w-14 h-14 bg-mist-ivory rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/10 transition-all">
+            <span class="material-symbols-outlined text-charcoal/30 group-hover:text-primary font-bold">add</span>
+          </div>
+          <span class="text-sm font-bold text-misty-gray group-hover:text-charcoal">Connect Another Card</span>
+        </button>
+      }
+    </div>
+
+    <!-- Activity Section -->
+    <section>
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h2 class="text-3xl font-black tracking-tight text-charcoal mb-1">Card Activity</h2>
+          <p class="text-misty-gray font-medium">Consolidated feed from all your CredVault accounts</p>
+        </div>
+        <a href="#" class="flex items-center gap-2 text-sm font-bold text-primary group">
+          View All Statements
+          <span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+        </a>
+      </div>
+
+      <!-- Transaction List -->
+      <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2.5rem] p-4 md:p-8 space-y-2 shadow-sm">
+        @if (isLoading()) {
+          @for (i of [1,2,3,4,5]; track i) {
+            <div class="flex items-center gap-5 p-4">
+              <div class="w-14 h-14 skeleton rounded-2xl shrink-0 opacity-30"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 w-1/4 skeleton"></div>
+                <div class="h-3 w-1/3 skeleton"></div>
+              </div>
+              <div class="h-6 w-20 skeleton"></div>
+            </div>
+          }
+        } @else if (transactions().length > 0) {
+          @for (tx of transactions(); track tx.id) {
+            <div class="flex items-center gap-5 p-5 hover:bg-mist-cream rounded-3xl transition-all duration-300 group cursor-pointer border border-transparent hover:border-charcoal/5">
+              <!-- Icon Container -->
+              <div class="w-14 h-14 bg-mist-ivory rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:bg-white transition-colors">
+                <span class="material-symbols-outlined text-misty-gray group-hover:text-primary transition-colors">
+                  {{ getTransactionIcon(tx.type) }}
+                </span>
+              </div>
+              <!-- Text Info -->
+              <div class="flex-1 min-w-0">
+                <h4 class="font-bold text-charcoal truncate text-lg">{{ tx.description }}</h4>
+                <p class="text-xs font-semibold text-misty-gray mt-1">
+                  {{ tx.dateUtc | date:'EEEE, hh:mm a' }}
+                </p>
+              </div>
+              <!-- Amount -->
+              <div class="text-right shrink-0">
+                <p [class]="'font-black text-xl ' + (tx.type === 1 ? 'text-red-500' : 'text-emerald-500')">
+                  {{ tx.type === 1 ? '-' : '+' }}{{ tx.amount | currency:'USD' }}
+                </p>
+                <p class="text-[10px] font-bold text-misty-gray uppercase tracking-widest mt-1">
+                  {{ tx.type === 1 ? 'Purchase' : (tx.type === 2 ? 'Payment' : 'Refund') }}
+                </p>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="flex flex-col items-center justify-center py-20 text-center">
+            <div class="size-20 bg-mist-ivory rounded-full flex items-center justify-center mb-6">
+              <span class="material-symbols-outlined text-misty-gray text-4xl">history_toggle_off</span>
+            </div>
+            <p class="text-lg font-bold text-charcoal/40">No card activity found yet.</p>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Add Card Modal -->
+@if (showAddCardModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-charcoal/60 backdrop-blur-xl animate-in fade-in duration-300">
+    <div class="bg-mist-cream w-full max-w-xl rounded-[3rem] p-10 relative overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.3)] border border-white">
+      <!-- Modal Accent Glow -->
+      <div class="absolute top-0 right-0 w-48 h-48 bg-primary/10 blur-[80px]"></div>
+
+      <div class="flex justify-between items-start mb-10 relative z-10">
+        <div>
+          <h2 class="text-3xl font-black tracking-tight text-charcoal mb-2">Connect New Card</h2>
+          <p class="text-misty-gray font-medium">Add your premium credit or virtual cards</p>
+        </div>
+        <button (click)="toggleAddCardModal()" class="p-3 hover:bg-mist-ivory rounded-2xl transition-colors">
+          <span class="material-symbols-outlined text-charcoal/40">close</span>
+        </button>
+      </div>
+
+      @if (errorMessage()) {
+        <div class="mb-8 p-4 bg-white/40 backdrop-blur-md border border-red-200/50 rounded-2xl flex items-center gap-4 animate-in slide-in-from-top-2 duration-300">
+          <div class="w-8 h-8 bg-red-500/10 rounded-xl flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-red-500 text-lg font-bold">warning_amber</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-[12px] font-black text-red-900/80 uppercase tracking-widest mb-0.5">Authorization Error</p>
+            <p class="text-[13px] font-bold text-red-700/70 truncate">{{ errorMessage() }}</p>
+          </div>
+        </div>
+      }
+
+      <div class="mb-4 text-[10px] font-mono text-charcoal/20 opacity-0 hover:opacity-100 transition-opacity">
+        Debug Session ID: {{ user()?.id }}
+      </div>
+
+      <form [formGroup]="addCardForm" (ngSubmit)="onSubmitCard()" class="space-y-8 relative z-10">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-2">
+            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Cardholder Name</label>
+            <input type="text" formControlName="cardholderName" class="premium-input px-6 h-14" placeholder="ALEXANDER VANCE">
+          </div>
+          <div class="space-y-2">
+            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Card Number</label>
+            <input type="text" formControlName="cardNumber" class="premium-input px-6 h-14" placeholder="•••• •••• •••• 1234">
+          </div>
+          <div class="space-y-2">
+            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Card Issuer</label>
+            <select formControlName="issuerId" class="premium-input px-6 h-14 appearance-none">
+              <option value="" disabled>Select Network</option>
+              @for (issuer of issuers(); track issuer.id) {
+                <option [value]="issuer.id">{{ issuer.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">MM</label>
+                <input type="number" formControlName="expMonth" class="premium-input px-4 h-14">
+              </div>
+              <div class="space-y-2">
+                <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">YYYY</label>
+                <input type="number" formControlName="expYear" class="premium-input px-4 h-14">
+              </div>
+          </div>
+        </div>
+
+        <button type="submit" [disabled]="addCardForm.invalid || isSubmitting()" class="premium-button shadow-2xl shadow-primary/30 h-16 text-lg mt-4">
+          @if (isSubmitting()) {
+            <span class="animate-spin material-symbols-outlined">refresh</span>
+            Authenticating...
+          } @else {
+            <span class="material-symbols-outlined font-black">verified</span>
+            Securely Connect Card
+          }
+        </button>
+      </form>
+    </div>
+  </div>
+}
