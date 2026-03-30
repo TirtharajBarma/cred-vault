@@ -1,6 +1,6 @@
 using Shared.Contracts.Controllers;
+using Shared.Contracts.DTOs.Identity.Requests;
 using IdentityService.Application.Commands.Auth;
-using IdentityService.Application.DTOs.Requests;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CardService.Domain\CardService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\shared.contracts\Shared.Contracts\Shared.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

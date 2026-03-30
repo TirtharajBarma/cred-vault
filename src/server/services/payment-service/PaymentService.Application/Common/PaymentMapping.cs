@@ -1,4 +1,4 @@
-using PaymentService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Payment.Responses;
 using PaymentService.Domain.Entities;
 
 namespace PaymentService.Application.Common;

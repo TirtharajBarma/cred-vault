@@ -72,5 +72,25 @@ public abstract class BaseApiController : ControllerBase
         Message = message,
         TraceId = HttpContext.TraceIdentifier
     });
+
+    protected IActionResult NotFoundResponse(string message)
+    {
+        return NotFound(new ApiResponse<object>
+        {
+            Success = false,
+            Message = message,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
+    protected IActionResult BadRequestResponse(string message)
+    {
+        return BadRequest(new ApiResponse<object>
+        {
+            Success = false,
+            Message = message,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
 }
 

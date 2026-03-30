@@ -1,8 +1,9 @@
 using System.Security.Claims;
-using IdentityService.Application.DTOs.Requests;
-using IdentityService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Identity.Requests;
+using Shared.Contracts.DTOs.Identity.Responses;
 using Shared.Contracts.Controllers;
 using Shared.Contracts.Models;
+using Shared.Contracts.DTOs;
 using IdentityService.Application.Commands.Users;
 using IdentityService.Application.Queries.Users;
 using MediatR;

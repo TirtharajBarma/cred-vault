@@ -1,4 +1,4 @@
-using CardService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Card.Responses;
 using CardService.Domain.Entities;
 using Shared.Contracts.Enums;
 
@@ -22,11 +22,26 @@ public static class CardMapping
             MaskedNumber = card.MaskedNumber,
             CreditLimit = card.CreditLimit,
             OutstandingBalance = card.OutstandingBalance,
+            AvailableCredit = card.CreditLimit - card.OutstandingBalance,
             BillingCycleStartDay = card.BillingCycleStartDay,
             IsDefault = card.IsDefault,
             IsVerified = card.IsVerified,
             CreatedAtUtc = card.CreatedAtUtc,
             UpdatedAtUtc = card.UpdatedAtUtc
+        };
+    }
+
+    public static CardTransactionDto ToDto(CardTransaction transaction)
+    {
+        return new CardTransactionDto
+        {
+            Id = transaction.Id,
+            CardId = transaction.CardId,
+            UserId = transaction.UserId,
+            Type = transaction.Type.ToString(),
+            Amount = transaction.Amount,
+            Description = transaction.Description,
+            DateUtc = transaction.DateUtc
         };
     }
 }

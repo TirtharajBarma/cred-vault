@@ -1,6 +1,6 @@
 using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Common;
-using CardService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Card.Responses;
 using CardService.Domain.Entities;
 using Shared.Contracts.Enums;
 using Shared.Contracts.Events.Card;

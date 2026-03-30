@@ -1,6 +1,7 @@
 using IdentityService.Application.Abstractions.Persistence;
 using IdentityService.Application.Common;
-using IdentityService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs;
+using Shared.Contracts.DTOs.Identity.Responses;
 using IdentityService.Domain.Entities;
 using IdentityService.Domain.Enums;
 using MediatR;

@@ -1,5 +1,5 @@
 using CardService.Application.Abstractions.Persistence;
-using CardService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Card.Responses;
 using MediatR;
 
 namespace CardService.Application.Queries.Cards;
@@ -17,11 +17,14 @@ public sealed class ListIssuersQueryHandler(ICardRepository cardRepository)
         {
             Success = true,
             Message = "Issuers fetched successfully.",
-            Issuers = issuers.Select(i => new IssuerDto
+            Issuers = issuers.Select(i => new CardIssuerDto
             {
                 Id = i.Id,
                 Name = i.Name,
-                Network = i.Network.ToString()
+                Network = i.Network.ToString(),
+                IsActive = i.IsActive,
+                CreatedAtUtc = i.CreatedAtUtc,
+                UpdatedAtUtc = i.UpdatedAtUtc
             }).ToList()
         };
     }

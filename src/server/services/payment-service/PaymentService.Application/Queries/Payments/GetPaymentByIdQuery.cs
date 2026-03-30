@@ -1,6 +1,6 @@
 using MediatR;
 using PaymentService.Application.Common;
-using PaymentService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Payment.Responses;
 using PaymentService.Domain.Interfaces;
 
 namespace PaymentService.Application.Queries.Payments;

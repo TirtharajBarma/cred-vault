@@ -11,4 +11,8 @@
     <PackageReference Include="Ocelot" Version="24.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared.contracts\Shared.Contracts\Shared.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

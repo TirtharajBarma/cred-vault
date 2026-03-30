@@ -1,5 +1,5 @@
 using IdentityService.Application.Abstractions.Persistence;
-using IdentityService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Identity.Responses;
 using IdentityService.Domain.Enums;
 using IdentityService.Application.Common;
 using Shared.Contracts.Configuration;

@@ -39,18 +39,25 @@ builder.Services.AddStandardMessaging(builder.Configuration, x =>
 
 var app = builder.Build();
 
-// Database Migration
+// 1. Database Migration
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<CardDbContext>();
     await dbContext.Database.MigrateAsync();
 }
 
-// Standard Pipeline
-app.UseStandardApi("Card Service API");
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseHttpsRedirection();
+// 2. Routing FIRST (required for CORS to work properly)
+app.UseRouting();
+
+// 3. CORS - must be after UseRouting
 app.UseCors("AllowWebClients");
+
+// 4. Exception Handling
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// 5. Rest of Pipeline
+app.UseStandardApi("Card Service API");
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

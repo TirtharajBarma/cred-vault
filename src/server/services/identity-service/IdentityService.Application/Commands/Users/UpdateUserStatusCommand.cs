@@ -1,5 +1,5 @@
 using IdentityService.Application.Abstractions.Persistence;
-using IdentityService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs;
 using IdentityService.Domain.Enums;
 using MediatR;
 
