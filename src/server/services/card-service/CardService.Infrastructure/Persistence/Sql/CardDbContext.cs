@@ -57,6 +57,10 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
         {
             entity.ToTable("CardTransactions");
             entity.HasKey(x => x.Id);
+            entity.HasOne(x => x.Card)
+                .WithMany()
+                .HasForeignKey(x => x.CardId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.CardId).IsRequired();
             entity.Property(x => x.UserId).IsRequired();
             entity.Property(x => x.Type).IsRequired().HasConversion<int>();

@@ -1,42 +1,70 @@
-using BillingService.Application.Commands.Bills;
 using MassTransit;
+using Microsoft.Extensions.Logging;
+using BillingService.Application.Commands.Bills;
 using MediatR;
 using Shared.Contracts.Events.Payment;
 
 namespace BillingService.API.Messaging;
 
-/// <summary>
-/// Consumes PaymentCompleted events from PaymentService via RabbitMQ.
-/// Marks the bill as Paid and calculates reward points.
-/// This replaces the user-facing mark-paid HTTP call for event-driven payments.
-/// </summary>
-public class PaymentCompletedConsumer(
-    IMediator mediator,
-    ILogger<PaymentCompletedConsumer> logger) : IConsumer<IPaymentCompleted>
+public class PaymentCompletedConsumer(IMediator mediator, ILogger<PaymentCompletedConsumer> logger) : IConsumer<IPaymentCompleted>
 {
     public async Task Consume(ConsumeContext<IPaymentCompleted> context)
     {
+        var paymentId = context.Message.PaymentId;
+        var billId = context.Message.BillId;
+        var amount = context.Message.Amount;
+
+        logger.LogInformation("PaymentCompleted received: PaymentId={PaymentId}, BillId={BillId}, Amount={Amount}",
+            paymentId, billId, amount);
+
         try
         {
-            var msg = context.Message;
-            logger.LogInformation("PaymentCompleted received: PaymentId={PaymentId} BillId={BillId} UserId={UserId} Amount={Amount}", 
-                msg.PaymentId, msg.BillId, msg.UserId, msg.Amount);
-
-            var command = new MarkBillPaidCommand(msg.UserId, msg.BillId, msg.Amount);
-            var result = await mediator.Send(command);
-
+            var result = await mediator.Send(new MarkBillPaidCommand(context.Message.UserId, billId, amount));
             if (result.Success)
             {
-                logger.LogInformation("Bill {BillId} marked Paid via RabbitMQ. Rewards processed.", msg.BillId);
+                logger.LogInformation("Bill {BillId} marked as paid via RabbitMQ", billId);
             }
             else
             {
-                logger.LogWarning("Failed to mark Bill {BillId} as paid via RabbitMQ: {Message}", msg.BillId, result.Message);
+                logger.LogError("Failed to mark bill {BillId} as paid: {Message}", billId, result.Message);
+                throw new InvalidOperationException($"Bill update failed: {result.Message}");
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error processing PaymentCompleted: {Message}", ex.Message);
+            logger.LogError(ex, "Error processing PaymentCompleted: PaymentId={PaymentId}", paymentId);
+            throw;
+        }
+    }
+}
+
+public class PaymentReversedConsumer(IMediator mediator, ILogger<PaymentReversedConsumer> logger) : IConsumer<IPaymentReversed>
+{
+    public async Task Consume(ConsumeContext<IPaymentReversed> context)
+    {
+        var paymentId = context.Message.PaymentId;
+        var billId = context.Message.BillId;
+        var amount = context.Message.Amount;
+
+        logger.LogInformation("PaymentReversed received: PaymentId={PaymentId}, BillId={BillId}, Amount={Amount}",
+            paymentId, billId, amount);
+
+        try
+        {
+            var result = await mediator.Send(new RevertBillPaidCommand(context.Message.UserId, billId, amount));
+            if (result.Success)
+            {
+                logger.LogInformation("Bill {BillId} reverted to pending via RabbitMQ", billId);
+            }
+            else
+            {
+                logger.LogError("Failed to revert bill {BillId}: {Message}", billId, result.Message);
+                throw new InvalidOperationException($"Bill revert failed: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error processing PaymentReversed: PaymentId={PaymentId}", paymentId);
             throw;
         }
     }

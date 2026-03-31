@@ -50,12 +50,4 @@ public class NotificationsController(NotificationDbContext dbContext) : BaseApiC
 
         return CreateResponse(true, new { total, page, pageSize, logs }, "Audit logs fetched.");
     }
-
-    [HttpGet("templates")]
-    [Authorize(Roles = "admin")]
-    public async Task<IActionResult> GetTemplates()
-    {
-        var templates = await dbContext.EmailTemplates.ToListAsync();
-        return CreateResponse(true, templates, "Email templates fetched.");
-    }
 }

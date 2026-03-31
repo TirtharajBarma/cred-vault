@@ -13,6 +13,7 @@ public class CardTransaction
 {
     public Guid Id { get; set; }
     public Guid CardId { get; set; }
+    public CreditCard? Card { get; set; }
     public Guid UserId { get; set; }
     public TransactionType Type { get; set; }
     public decimal Amount { get; set; }

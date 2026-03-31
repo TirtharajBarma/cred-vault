@@ -31,6 +31,17 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<RewardTier?> GetTierByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RewardTiers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    }
+
+    public async Task DeleteTierAsync(RewardTier tier, CancellationToken cancellationToken = default)
+    {
+        dbContext.RewardTiers.Remove(tier);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task AddTierAsync(RewardTier tier, CancellationToken cancellationToken = default)
     {
         await dbContext.RewardTiers.AddAsync(tier, cancellationToken);
@@ -82,5 +93,10 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
     {
         dbContext.RewardTransactions.Update(transaction);
         return Task.CompletedTask;
+    }
+
+    public Task<bool> HasAccountsByTierAsync(Guid tierId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.RewardAccounts.AnyAsync(x => x.RewardTierId == tierId, cancellationToken);
     }
 }

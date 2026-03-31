@@ -13,73 +13,74 @@ public class GmailSmtpEmailSender : IEmailSender
     private readonly string _fromEmail;
     private readonly string _fromName;
     private readonly ILogger<GmailSmtpEmailSender> _logger;
+    private readonly bool _configured;
 
     public GmailSmtpEmailSender(IConfiguration configuration, ILogger<GmailSmtpEmailSender> logger)
     {
         _logger = logger;
-        var host = configuration["Gmail:Host"];
-        var port = configuration.GetValue<int>("Gmail:Port", 587);
-        var username = configuration["Gmail:Username"];
-        var appPassword = configuration["Gmail:AppPassword"];
-        _fromEmail = configuration["Gmail:FromEmail"] ?? username;
-        _fromName = configuration["Gmail:FromName"] ?? "CredVault Notifications";
+        _fromEmail = configuration["Gmail:FromEmail"] ?? configuration["Gmail:Username"] ?? "noreply@credvault.com";
+        _fromName = configuration["Gmail:FromName"] ?? "CredVault";
 
-        if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(appPassword))
+        if (!string.IsNullOrEmpty(configuration["Gmail:AppPassword"]) && !string.IsNullOrEmpty(configuration["Gmail:Username"]))
         {
+            _configured = true;
             try
             {
                 _client = new SmtpClient();
-                _client.Connect(host, port, SecureSocketOptions.StartTls);
-                _client.Authenticate(username, appPassword);
-                _logger.LogInformation("Gmail SMTP connected successfully");
+                _client.Connect(configuration["Gmail:Host"], configuration.GetValue<int>("Gmail:Port", 587), SecureSocketOptions.StartTls);
+                _client.Authenticate(configuration["Gmail:Username"], configuration["Gmail:AppPassword"]);
+                _logger.LogInformation("SMTP connected successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to connect to Gmail SMTP");
+                _logger.LogWarning(ex, "SMTP connection failed");
                 _client?.Dispose();
                 _client = null;
+                _configured = false;
             }
         }
         else
         {
-            _logger.LogWarning("Gmail configuration is incomplete. Email sender will only log emails to console.");
+            _configured = false;
+            _logger.LogWarning("Gmail not configured - emails will be logged only (not sent)");
         }
     }
 
     public async Task<(bool Success, string? Error)> SendEmailAsync(string to, string subject, string body, CancellationToken ct = default)
     {
-        if (_client == null)
+        _logger.LogInformation("Email attempt: To={To}, Subject={Subject}", to, subject);
+
+        if (!_configured)
         {
-            _logger.LogInformation("SIMULATED EMAIL to {To}: {Subject}\n{Body}", to, subject, body);
-            return (true, null);
+            _logger.LogWarning("Email NOT SENT (Gmail not configured): To={To}, Subject={Subject}", to, subject);
+            return (false, "Gmail not configured - email simulated only");
         }
 
         try
         {
-            var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(_fromName, _fromEmail));
-            message.To.Add(MailboxAddress.Parse(to));
-            message.Subject = subject;
+            var msg = new MimeMessage();
+            msg.From.Add(new MailboxAddress(_fromName, _fromEmail));
+            msg.To.Add(MailboxAddress.Parse(to));
+            msg.Subject = subject;
+            msg.Body = new TextPart("html") { Text = body.Replace("\n", "<br>") };
 
-            message.Body = new TextPart("html")
-            {
-                Text = body.Replace("\n", "<br>")
-            };
-
-            await _client.SendAsync(message, ct);
-            _logger.LogInformation("Email sent successfully to {To}", to);
+            await _client!.SendAsync(msg, ct);
+            _logger.LogInformation("Email SENT: To={To}, Subject={Subject}", to, subject);
             return (true, null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send email to {To}", to);
+            _logger.LogError(ex, "Email FAILED: To={To}, Subject={Subject}, Error={Error}", to, subject, ex.Message);
             return (false, ex.Message);
         }
     }
 
     public void Dispose()
     {
-        _client?.Disconnect(true);
-        _client?.Dispose();
+        if (_client != null)
+        {
+            _client.Disconnect(true);
+            _client.Dispose();
+        }
     }
 }

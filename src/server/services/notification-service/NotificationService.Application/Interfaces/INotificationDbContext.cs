@@ -7,7 +7,6 @@ public interface INotificationDbContext
 {
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<NotificationLog> NotificationLogs { get; }
-    DbSet<EmailTemplate> EmailTemplates { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

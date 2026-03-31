@@ -19,7 +19,7 @@ public record InitiatePaymentCommand(
     PaymentType PaymentType,
     string AuthorizationHeader) : IRequest<InitiatePaymentResult>;
 
-public record InitiatePaymentResult(bool Success, Guid? PaymentId, string? Error, bool OtpRequired = false);
+public record InitiatePaymentResult(bool Success, Guid? PaymentId, string? Error, bool OtpRequired = false, bool UserVerified = false);
 
 public record UserDto(Guid Id, string Email, string FullName);
 
@@ -35,20 +35,30 @@ public class InitiatePaymentCommandHandler(
 
     public async Task<InitiatePaymentResult> Handle(InitiatePaymentCommand request, CancellationToken cancellationToken)
     {
-        // 1. Secure Cross-Service Validation (FETCH FROM BILLING SERVICE)
+        logger.LogInformation("InitiatePayment: UserId={UserId}, BillId={BillId}, Amount={Amount}",
+            request.UserId, request.BillId, request.Amount);
+
+        if (request.Amount <= 0)
+        {
+            logger.LogWarning("Payment rejected: invalid amount {Amount}", request.Amount);
+            return new InitiatePaymentResult(false, null, "Amount must be greater than zero");
+        }
+
         var bill = await FetchBillAsync(request.BillId, request.AuthorizationHeader, cancellationToken);
         
         if (bill is null)
         {
-            return new InitiatePaymentResult(false, null, "Could not verify bill with Billing Service.");
+            logger.LogWarning("Payment rejected: could not verify bill {BillId}", request.BillId);
+            return new InitiatePaymentResult(false, null, "Could not verify bill with Billing Service");
         }
 
         if (bill.UserId != request.UserId)
         {
-            return new InitiatePaymentResult(false, null, "Bill does not belong to the user.");
+            logger.LogWarning("Payment rejected: IDOR attempt - Bill {BillId} belongs to {ActualUserId}, not {RequestUserId}",
+                request.BillId, bill.UserId, request.UserId);
+            return new InitiatePaymentResult(false, null, "Bill does not belong to the user");
         }
 
-        // 2. Simplified Initiation (Risk logic moved to Saga to keep handler simple and linear)
         var payment = new Payment
         {
             Id = Guid.NewGuid(),
@@ -64,23 +74,38 @@ public class InitiatePaymentCommandHandler(
 
         await paymentRepository.AddAsync(payment);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Payment record created: PaymentId={PaymentId}", payment.Id);
 
         var (userSuccess, user, _) = await FetchUserDetailsAsync(payment.UserId, request.AuthorizationHeader, cancellationToken);
-        logger.LogInformation("User fetch result: Success={Success}, Email={Email}, FullName={FullName}", 
-            userSuccess, user?.Email ?? "NULL", user?.FullName ?? "NULL");
+        
+        if (!userSuccess || user == null)
+        {
+            logger.LogWarning("Payment {PaymentId}: User verification failed - proceeding but flagging", payment.Id);
+        }
+
         var riskScore = RiskCalculator.Calculate(payment.Amount);
         var otpRequired = riskScore >= 50 && riskScore < 75;
         var isBlocked = riskScore >= 75;
 
-        if (isBlocked || otpRequired)
+        if (isBlocked)
         {
-            logger.LogInformation("Publishing IPaymentInitiated for PaymentId={PaymentId}, RiskScore={RiskScore}", payment.Id, riskScore);
+            logger.LogError("Payment {PaymentId} BLOCKED: RiskScore={RiskScore} exceeds threshold", payment.Id, riskScore);
+            payment.Status = PaymentStatus.Failed;
+            payment.FailureReason = "Risk score exceeded threshold";
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return new InitiatePaymentResult(false, payment.Id, "Payment blocked due to high risk score");
+        }
+
+        if (otpRequired)
+        {
+            logger.LogInformation("Publishing IPaymentInitiated for PaymentId={PaymentId}, RiskScore={RiskScore}, OTP required",
+                payment.Id, riskScore);
             await publishEndpoint.Publish<IPaymentInitiated>(new
             {
                 PaymentId   = payment.Id,
                 UserId      = payment.UserId,
                 Email       = user?.Email ?? string.Empty,
-                FullName    = user?.FullName ?? "User",
+                FullName    = user?.FullName ?? "Unknown",
                 CardId      = payment.CardId,
                 BillId      = payment.BillId,
                 Amount      = payment.Amount,
@@ -88,16 +113,17 @@ public class InitiatePaymentCommandHandler(
                 CreatedAt   = payment.CreatedAtUtc,
                 RiskScore   = riskScore
             }, cancellationToken);
-            return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: otpRequired);
+            return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: true, UserVerified: userSuccess);
         }
 
-        logger.LogInformation("Publishing IPaymentCompleted for PaymentId={PaymentId}, Amount={Amount}", payment.Id, payment.Amount);
+        logger.LogInformation("Publishing IPaymentCompleted for PaymentId={PaymentId}, Amount={Amount}, RiskScore={RiskScore}",
+            payment.Id, payment.Amount, riskScore);
         await publishEndpoint.Publish<IPaymentCompleted>(new
         {
             PaymentId    = payment.Id,
             UserId       = payment.UserId,
             Email        = user?.Email ?? string.Empty,
-            FullName     = user?.FullName ?? "User",
+            FullName     = user?.FullName ?? "Unknown",
             CardId       = payment.CardId,
             BillId       = payment.BillId,
             Amount       = payment.Amount,
@@ -106,7 +132,7 @@ public class InitiatePaymentCommandHandler(
             CompletedAt  = DateTime.UtcNow
         }, cancellationToken);
 
-        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: false);
+        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: false, UserVerified: userSuccess);
     }
 
     private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
@@ -122,14 +148,22 @@ public class InitiatePaymentCommandHandler(
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
             var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode) return null;
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Billing service returned {Status} for Bill {BillId}", response.StatusCode, billId);
+                return null;
+            }
 
             var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<Shared.Contracts.Models.ApiResponse<BillDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
             return result?.Data;
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception fetching bill {BillId} from Billing Service", billId);
+            return null;
+        }
     }
 
     private async Task<(bool Success, UserDto? User, string? Error)> FetchUserDetailsAsync(Guid userId, string authHeader, CancellationToken ct)
@@ -145,27 +179,28 @@ public class InitiatePaymentCommandHandler(
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
             var response = await client.SendAsync(request, ct);
-            logger.LogInformation("Identity service response: StatusCode={StatusCode}", response.StatusCode);
             
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync(ct);
-                logger.LogWarning("Identity service error: {Error}", errorContent);
-                return (false, null, $"Failed to fetch user: {response.ReasonPhrase}");
+                logger.LogWarning("Identity service returned {Status} for User {UserId}", response.StatusCode, userId);
+                return (false, null, $"Identity service error: {response.StatusCode}");
             }
 
             var content = await response.Content.ReadAsStringAsync(ct);
-            logger.LogInformation("Identity service response body: {Body}", content);
-            
             var result = JsonSerializer.Deserialize<UserResponseWrapper>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            logger.LogInformation("Deserialized: Success={Success}, Data={HasData}", result?.Success, result?.Data?.User != null);
             
-            return (result?.Success ?? false, result?.Data?.User, result?.Message);
+            if (result?.Data?.User == null)
+            {
+                logger.LogWarning("Identity service returned null user for {UserId}", userId);
+                return (false, null, "User not found");
+            }
+            
+            return (true, result.Data.User, null);
         }
-        catch (Exception ex) 
-        { 
-            logger.LogError(ex, "Exception fetching user details");
-            return (false, null, ex.Message); 
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception fetching user {UserId}", userId);
+            return (false, null, "External service error");
         }
     }
 

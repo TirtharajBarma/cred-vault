@@ -99,6 +99,27 @@ public class UsersController : BaseApiController
         return FromOperationResult(result);
     }
 
+    [HttpGet]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> ListAllUsers(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _mediator.Send(new ListAllUsersQuery(page, pageSize, search, status), cancellationToken);
+        return FromOperationResult(result);
+    }
+
+    [HttpGet("stats")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> GetUserStats(CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new GetUserStatsQuery(), cancellationToken);
+        return FromOperationResult(result);
+    }
+
     private IActionResult FromUserResult(UserResult result)
     {
         var response = BuildResponse(result.Success, result.User, result.Message);

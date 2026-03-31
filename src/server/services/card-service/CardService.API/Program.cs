@@ -6,60 +6,92 @@ using CardService.Application.Queries.Cards;
 using CardService.API.Messaging;
 using CardService.Infrastructure.Persistence.Sql;
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
+using Serilog;
+using Serilog.Events;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("MassTransit", LogEventLevel.Debug)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "CardService")
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File("logs/card-service-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7)
+    .CreateLogger();
 
-// MassTransit License
-Environment.SetEnvironmentVariable("MT_LICENSE", "free");
-
-// Standard Services
-builder.Services.AddControllers();
-builder.Services.AddStandardApi();
-builder.Services.AddStandardCors();
-builder.Services.AddStandardAuth(builder.Configuration);
-builder.Services.AddHttpClient();
-
-// Service Specifics
-builder.Services.AddMediatR(cfg => 
+try
 {
-    cfg.RegisterServicesFromAssemblyContaining<CreateCardCommand>();
-    cfg.RegisterServicesFromAssemblyContaining<ListMyCardsQuery>();
-});
-builder.Services.AddDbContext<CardDbContext>(options =>
-{
-    options.UseSqlServer(builder.Configuration.GetConnectionString("CardDb"));
-});
-builder.Services.AddScoped<ICardRepository, SqlCardRepository>();
+    Environment.SetEnvironmentVariable("MT_LICENSE", "free");
 
-// Messaging - SIMPLE with dedicated queue
-builder.Services.AddStandardMessaging(builder.Configuration, x =>
-{
-    x.AddConsumer<PaymentCompletedConsumer>();
-}, "card");
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Host.UseSerilog();
 
-var app = builder.Build();
+    builder.Services.AddControllers();
+    builder.Services.AddStandardApi();
+    builder.Services.AddStandardCors();
+    builder.Services.AddStandardAuth(builder.Configuration);
+    builder.Services.AddHttpClient();
 
-// 1. Database Migration
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<CardDbContext>();
-    await dbContext.Database.MigrateAsync();
+    builder.Services.AddMediatR(cfg => 
+    {
+        cfg.RegisterServicesFromAssemblyContaining<CreateCardCommand>();
+        cfg.RegisterServicesFromAssemblyContaining<ListMyCardsQuery>();
+    });
+    builder.Services.AddDbContext<CardDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("CardDb")));
+    builder.Services.AddScoped<ICardRepository, SqlCardRepository>();
+
+    builder.Services.AddMassTransit(x =>
+    {
+        x.SetKebabCaseEndpointNameFormatter();
+        x.AddConsumer<PaymentCompletedConsumer>();
+        x.AddConsumer<UserDeletedConsumer>();
+
+        x.UsingRabbitMq((ctx, cfg) =>
+        {
+            cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "localhost", "/", h =>
+            {
+                h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
+                h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
+            });
+
+            cfg.ReceiveEndpoint("card-domain-event", e =>
+            {
+                e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
+                e.UseInMemoryOutbox();
+                e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
+                e.ConfigureConsumer<UserDeletedConsumer>(ctx);
+            });
+        });
+    });
+
+    var app = builder.Build();
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<CardDbContext>();
+        await db.Database.MigrateAsync();
+    }
+
+    app.UseRouting();
+    app.UseCors("AllowWebClients");
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseStandardApi("Card Service API");
+    app.UseHttpsRedirection();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+
+    Log.Information("CardService started");
+    app.Run();
 }
-
-// 2. Routing FIRST (required for CORS to work properly)
-app.UseRouting();
-
-// 3. CORS - must be after UseRouting
-app.UseCors("AllowWebClients");
-
-// 4. Exception Handling
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-
-// 5. Rest of Pipeline
-app.UseStandardApi("Card Service API");
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "CardService terminated");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}

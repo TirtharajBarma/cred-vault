@@ -2,9 +2,8 @@ using IdentityService.Application.Abstractions.Persistence;
 using IdentityService.Application.Common;
 using Shared.Contracts.DTOs;
 using Shared.Contracts.DTOs.Identity.Responses;
-using IdentityService.Domain.Entities;
-using IdentityService.Domain.Enums;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using MassTransit;
 using Shared.Contracts.Events.Identity;
 
@@ -12,58 +11,40 @@ namespace IdentityService.Application.Commands.Auth;
 
 public record ForgotPasswordCommand(string Email) : IRequest<OperationResult>;
 
-public sealed class ForgotPasswordCommandHandler(
-    IUserRepository userRepository,
-    IPublishEndpoint publishEndpoint)
-    : IRequestHandler<ForgotPasswordCommand, OperationResult>
+public sealed class ForgotPasswordCommandHandler(IUserRepository users, IPublishEndpoint publisher, ILogger<ForgotPasswordCommandHandler> logger) : IRequestHandler<ForgotPasswordCommand, OperationResult>
 {
-    public async Task<OperationResult> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)
+    public async Task<OperationResult> Handle(ForgotPasswordCommand request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Email))
-        {
-            return new OperationResult
-            {
-                Success = false,
-                ErrorCode = ErrorCodes.ValidationError,
-                Message = "Email is required."
-            };
-        }
+        var email = request.Email?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(email))
+            return new() { Success = false, ErrorCode = ErrorCodes.ValidationError, Message = "Email required" };
 
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-        var user = await userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
-
-        if (user is null)
+        var user = await users.GetByEmailAsync(email, ct);
+        if (user == null)
         {
-            return new OperationResult
-            {
-                Success = true,
-                Message = "If an account exists with this email, a password reset OTP has been sent."
-            };
+            logger.LogWarning("Password reset requested for non-existent email: {Email}", email);
+            return new() { Success = true, Message = "If exists, OTP sent" };
         }
 
         var otp = IdentityHelpers.GenerateOtpCode();
-        var now = DateTime.UtcNow;
-
         user.PasswordResetOtp = otp;
-        user.PasswordResetOtpExpiresAtUtc = now.AddMinutes(10);
-        user.UpdatedAtUtc = now;
+        user.PasswordResetOtpExpiresAtUtc = DateTime.UtcNow.AddMinutes(10);
+        user.UpdatedAtUtc = DateTime.UtcNow;
 
-        await userRepository.UpdateAsync(user, cancellationToken);
-
-        await publishEndpoint.Publish<IUserOtpGenerated>(new
+        try
         {
-            user.Id,
-            user.Email,
-            user.FullName,
-            OtpCode = otp,
-            Purpose = "PasswordReset",
-            ExpiresAtUtc = user.PasswordResetOtpExpiresAtUtc
-        }, cancellationToken);
+            await users.UpdateAsync(user, ct);
+            logger.LogInformation("Password reset OTP generated for {UserId}: {Email}", user.Id, email);
 
-        return new OperationResult
+            await publisher.Publish(new { user.Id, user.Email, user.FullName, OtpCode = otp, Purpose = "PasswordReset", ExpiresAtUtc = user.PasswordResetOtpExpiresAtUtc }, ct);
+            logger.LogInformation("Published IUserOtpGenerated for {UserId}", user.Id);
+
+            return new() { Success = true, Message = "If exists, OTP sent" };
+        }
+        catch (Exception ex)
         {
-            Success = true,
-            Message = "If an account exists with this email, a password reset OTP has been sent."
-        };
+            logger.LogError(ex, "Failed to process password reset for {Email}", email);
+            return new() { Success = false, ErrorCode = "InternalError", Message = "Password reset failed. Please try again." };
+        }
     }
 }

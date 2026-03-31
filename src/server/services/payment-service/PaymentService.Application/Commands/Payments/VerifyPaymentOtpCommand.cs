@@ -1,5 +1,6 @@
 using MassTransit;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Shared.Contracts.Events.Payment;
 
 namespace PaymentService.Application.Commands.Payments;
@@ -8,21 +9,29 @@ public record VerifyPaymentOtpCommand(Guid PaymentId, string OtpCode) : IRequest
 
 public record VerifyOtpResult(bool Success, string? Error);
 
-// NOTE: The actual OTP validation happens in the controller (API layer) before this command is sent,
-// because the controller has access to PaymentDbContext to look up the saga state.
-// This command only publishes the OTPVerified event to the saga.
-public class VerifyPaymentOtpCommandHandler(IPublishEndpoint publishEndpoint)
+public class VerifyPaymentOtpCommandHandler(IPublishEndpoint publishEndpoint, ILogger<VerifyPaymentOtpCommandHandler> logger)
     : IRequestHandler<VerifyPaymentOtpCommand, VerifyOtpResult>
 {
     public async Task<VerifyOtpResult> Handle(VerifyPaymentOtpCommand request, CancellationToken cancellationToken)
     {
-        await publishEndpoint.Publish<IOTPVerified>(new
-        {
-            PaymentId  = request.PaymentId,
-            OtpCode    = request.OtpCode,
-            VerifiedAt = DateTime.UtcNow
-        }, cancellationToken);
+        logger.LogInformation("Publishing IOTPVerified: PaymentId={PaymentId}", request.PaymentId);
 
-        return new VerifyOtpResult(true, null);
+        try
+        {
+            await publishEndpoint.Publish<IOTPVerified>(new
+            {
+                PaymentId  = request.PaymentId,
+                OtpCode    = request.OtpCode,
+                VerifiedAt = DateTime.UtcNow
+            }, cancellationToken);
+
+            logger.LogInformation("IOTPVerified published for PaymentId={PaymentId}", request.PaymentId);
+            return new VerifyOtpResult(true, null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to publish IOTPVerified for PaymentId={PaymentId}", request.PaymentId);
+            return new VerifyOtpResult(false, "Failed to verify OTP");
+        }
     }
 }

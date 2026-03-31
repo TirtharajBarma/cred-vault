@@ -52,6 +52,24 @@ public class RewardsController(IMediator mediator) : BaseApiController
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    [HttpDelete("tiers/{id:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> DeleteRewardTier(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new DeleteRewardTierCommand(id), cancellationToken);
+        
+        if (!result.Success) return NotFoundResponse(result.Message);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = result.Message,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
     [HttpGet("account")]
     public async Task<IActionResult> GetMyRewardAccount(CancellationToken cancellationToken)
     {

@@ -12,7 +12,8 @@ public enum PaymentStatus
     
     Completed,
     Failed,
-    Reversed
+    Reversed,
+    Cancelled
 }
 
 public enum PaymentType

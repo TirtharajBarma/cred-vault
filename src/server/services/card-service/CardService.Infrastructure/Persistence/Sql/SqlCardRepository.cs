@@ -109,6 +109,14 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task DeleteIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default)
+    {
+        issuer.IsActive = false;
+        issuer.UpdatedAtUtc = DateTime.UtcNow;
+        dbContext.CardIssuers.Update(issuer);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public Task<bool> HasDuplicateCardAsync(Guid userId, CardNetwork network, string last4, CancellationToken cancellationToken = default)
     {
         return dbContext.CreditCards
@@ -160,5 +168,11 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
                 && x.DateUtc >= minDate 
                 && x.DateUtc <= maxDate,
                 cancellationToken);
+    }
+
+    public Task<bool> HasCardsByIssuerAsync(Guid issuerId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CreditCards
+            .AnyAsync(x => x.IssuerId == issuerId && !x.IsDeleted, cancellationToken);
     }
 }

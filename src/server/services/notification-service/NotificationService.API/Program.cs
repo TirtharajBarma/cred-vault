@@ -7,50 +7,87 @@ using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
 using Microsoft.EntityFrameworkCore;
 using MediatR;
+using Serilog;
+using Serilog.Events;
+using MassTransit;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("MassTransit", LogEventLevel.Debug)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .Enrich.WithProperty("Application", "NotificationService")
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File("logs/notification-service-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7)
+    .CreateLogger();
 
-// MassTransit License
-Environment.SetEnvironmentVariable("MT_LICENSE", "free");
-
-// Standard Services
-builder.Services.AddControllers();
-builder.Services.AddStandardApi();
-builder.Services.AddStandardCors();
-builder.Services.AddStandardAuth(builder.Configuration);
-
-// Service Specifics
-builder.Services.AddDbContext<NotificationDbContext>(options =>
+try
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("NotificationDb"));
-});
-builder.Services.AddScoped<INotificationDbContext>(sp => sp.GetRequiredService<NotificationDbContext>());
-builder.Services.AddScoped<IEmailSender, GmailSmtpEmailSender>();
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<ProcessNotificationCommandHandler>());
+    Environment.SetEnvironmentVariable("MT_LICENSE", "free");
 
-// Messaging - SIMPLE with dedicated queue
-builder.Services.AddStandardMessaging(builder.Configuration, x =>
-{
-    x.AddConsumer<DomainEventConsumer>();
-}, "notification");
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Host.UseSerilog();
 
-var app = builder.Build();
+    builder.Services.AddControllers();
+    builder.Services.AddStandardApi();
+    builder.Services.AddStandardCors();
+    builder.Services.AddStandardAuth(builder.Configuration);
 
-// Database Migration
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    var context = services.GetRequiredService<NotificationDbContext>();
-    await context.Database.MigrateAsync();
+    builder.Services.AddDbContext<NotificationDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("NotificationDb")));
+    builder.Services.AddScoped<INotificationDbContext>(sp => sp.GetRequiredService<NotificationDbContext>());
+    builder.Services.AddScoped<IEmailSender, GmailSmtpEmailSender>();
+    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<ProcessNotificationCommandHandler>());
+
+    builder.Services.AddMassTransit(x =>
+    {
+        x.SetKebabCaseEndpointNameFormatter();
+        x.AddConsumer<DomainEventConsumer>();
+
+        x.UsingRabbitMq((ctx, cfg) =>
+        {
+            cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "localhost", "/", h =>
+            {
+                h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
+                h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
+            });
+
+            cfg.ReceiveEndpoint("notification-domain-event", e =>
+            {
+                e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
+                e.UseInMemoryOutbox();
+                e.ConfigureConsumer<DomainEventConsumer>(ctx);
+            });
+        });
+    });
+
+    var app = builder.Build();
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
+        await db.Database.MigrateAsync();
+    }
+
+    app.UseStandardApi("Notification Service API");
+    app.UseSerilogRequestLogging();
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseHttpsRedirection();
+    app.UseCors("AllowWebClients");
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+
+    Log.Information("NotificationService started on port 5005");
+    app.Run();
 }
-
-// Standard Pipeline
-app.UseStandardApi("Notification Service API");
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseHttpsRedirection();
-app.UseCors("AllowWebClients");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Service terminated");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}

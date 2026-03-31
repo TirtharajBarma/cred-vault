@@ -6,6 +6,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shared.Contracts.Models;
+using CardService.Application.Abstractions.Persistence;
 
 namespace CardService.API.Controllers;
 
@@ -54,6 +55,44 @@ public class IssuersController(IMediator mediator) : ControllerBase
             Success = true,
             Message = result.Message,
             Data = issuer,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> DeleteIssuer(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var issuer = await mediator.Send(new GetIssuerByIdQuery(id), cancellationToken);
+        
+        if (issuer == null || issuer.Id == Guid.Empty)
+        {
+            return NotFound(new ApiResponse<object>
+            {
+                Success = false,
+                Message = "Issuer not found.",
+                TraceId = HttpContext.TraceIdentifier
+            });
+        }
+
+        var deleteResult = await mediator.Send(new DeleteIssuerCommand(id), cancellationToken);
+
+        if (!deleteResult.Success)
+        {
+            return BadRequest(new ApiResponse<object>
+            {
+                Success = false,
+                Message = deleteResult.Message,
+                TraceId = HttpContext.TraceIdentifier
+            });
+        }
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Issuer deleted successfully.",
             TraceId = HttpContext.TraceIdentifier
         });
     }

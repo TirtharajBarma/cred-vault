@@ -1,65 +1,62 @@
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using CardService.Application.Abstractions.Persistence;
 using CardService.Domain.Entities;
 using Shared.Contracts.Enums;
 using CardService.Infrastructure.Persistence.Sql;
-using MassTransit;
-using Microsoft.EntityFrameworkCore;
 using Shared.Contracts.Events.Payment;
 
 namespace CardService.API.Messaging;
 
-/// <summary>
-/// Consumes PaymentCompleted events from PaymentService via RabbitMQ.
-/// Reduces the card's OutstandingBalance and records a Payment transaction.
-/// </summary>
-public class PaymentCompletedConsumer(
-    ICardRepository cardRepository,
-    CardDbContext db,
-    ILogger<PaymentCompletedConsumer> logger) : IConsumer<IPaymentCompleted>
+public class PaymentCompletedConsumer(ICardRepository cards, CardDbContext db, ILogger<PaymentCompletedConsumer> logger) : IConsumer<IPaymentCompleted>
 {
     public async Task Consume(ConsumeContext<IPaymentCompleted> context)
     {
-        var msg = context.Message;
-        logger.LogInformation("PaymentCompleted received: PaymentId={PaymentId} CardId={CardId}", msg.PaymentId, msg.CardId);
+        var paymentId = context.Message.PaymentId;
+        var cardId = context.Message.CardId;
+        var amount = context.Message.Amount;
 
-        // Idempotency — check if already processed
-        var alreadyProcessed = await db.CardTransactions
-            .AnyAsync(x => x.Description == $"PaymentService:{msg.PaymentId}");
+        logger.LogInformation("Payment completed received: PaymentId={PaymentId}, CardId={CardId}, Amount={Amount}",
+            paymentId, cardId, amount);
 
-        if (alreadyProcessed)
+        try
         {
-            logger.LogInformation("Payment {PaymentId} already processed for card, skipping", msg.PaymentId);
-            return;
+            if (await db.CardTransactions.AnyAsync(x => x.Description == $"PaymentService:{paymentId}"))
+            {
+                logger.LogInformation("Payment {PaymentId} already processed (idempotency check)", paymentId);
+                return;
+            }
+
+            var card = await cards.GetByIdAsync(cardId);
+            if (card == null)
+            {
+                logger.LogError("Card {CardId} not found for payment {PaymentId}", cardId, paymentId);
+                throw new InvalidOperationException($"Card {cardId} not found");
+            }
+
+            var oldBalance = card.OutstandingBalance;
+            card.OutstandingBalance = Math.Max(card.OutstandingBalance - amount, 0);
+            card.UpdatedAtUtc = DateTime.UtcNow;
+
+            logger.LogInformation("Card {CardId}: Balance updated from {OldBalance} to {NewBalance}",
+                card.Id, oldBalance, card.OutstandingBalance);
+
+            db.CardTransactions.Add(new CardTransaction
+            {
+                Id = Guid.NewGuid(), CardId = card.Id, UserId = card.UserId,
+                Type = TransactionType.Payment, Amount = amount,
+                Description = $"PaymentService:{paymentId}", DateUtc = DateTime.UtcNow
+            });
+
+            await cards.UpdateAsync(card);
+            await db.SaveChangesAsync(context.CancellationToken);
+            logger.LogInformation("Card balance updated successfully: CardId={CardId}", card.Id);
         }
-
-        var card = await cardRepository.GetByIdAsync(msg.CardId);
-        if (card is null)
+        catch (Exception ex)
         {
-            logger.LogWarning("Card {CardId} not found for PaymentCompleted event", msg.CardId);
-            return;
+            logger.LogError(ex, "Failed to process payment {PaymentId} for card {CardId}", paymentId, cardId);
+            throw;
         }
-
-        var oldBalance = card.OutstandingBalance;
-        logger.LogInformation("Card {CardId}: OldBalance={OldBalance}, PaymentAmount={Amount}", card.Id, oldBalance, msg.Amount);
-        
-        card.OutstandingBalance = Math.Max(card.OutstandingBalance - msg.Amount, 0);
-        
-        logger.LogInformation("Card {CardId}: NewBalance={NewBalance}", card.Id, card.OutstandingBalance);
-        card.UpdatedAtUtc = DateTime.UtcNow;
-
-        db.CardTransactions.Add(new CardTransaction
-        {
-            Id = Guid.NewGuid(),
-            CardId = card.Id,
-            UserId = card.UserId,
-            Type = TransactionType.Payment,
-            Amount = msg.Amount,
-            Description = $"PaymentService:{msg.PaymentId}",
-            DateUtc = DateTime.UtcNow
-        });
-
-        await cardRepository.UpdateAsync(card);
-        await db.SaveChangesAsync(context.CancellationToken);
-        logger.LogInformation("Card {CardId} balance reduced by {Amount}.", card.Id, msg.Amount);
     }
 }

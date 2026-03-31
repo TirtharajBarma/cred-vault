@@ -217,5 +217,17 @@ public class CardsController(IMediator mediator) : BaseApiController
 
         return CreateResponse(true, CardMapping.ToDto(card), "Card updated successfully.");
     }
+
+    [HttpGet("user/{userId:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> GetCardsByUserId(
+        Guid userId,
+        [FromServices] ICardRepository cardRepository,
+        CancellationToken cancellationToken)
+    {
+        var cards = await cardRepository.ListByUserIdAsync(userId, cancellationToken);
+        var dtos = cards.Select(CardMapping.ToDto).ToList();
+        return CreateResponse(true, dtos, "Cards fetched successfully.");
+    }
 }
 

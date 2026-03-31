@@ -10,7 +10,6 @@ public class NotificationDbContext : DbContext, INotificationDbContext
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<NotificationLog> NotificationLogs => Set<NotificationLog>();
-    public DbSet<EmailTemplate> EmailTemplates => Set<EmailTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,13 +31,6 @@ public class NotificationDbContext : DbContext, INotificationDbContext
             entity.Property(e => e.Subject).IsRequired().HasMaxLength(500);
             entity.Property(e => e.Type).IsRequired().HasMaxLength(50);
             entity.Property(e => e.TraceId).HasMaxLength(128);
-        });
-
-        modelBuilder.Entity<EmailTemplate>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-            entity.HasIndex(e => e.Name).IsUnique();
         });
     }
 }
