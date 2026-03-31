@@ -48,7 +48,6 @@ export class RegisterComponent {
       next: (response) => {
         this.isLoading.set(false);
         if (response.success) {
-          console.log('[Register] Registration successful, navigating to verify...');
           this.router.navigate(['/verify-email']);
         } else {
           this.errorMessage.set(response.message || 'Registration failed');

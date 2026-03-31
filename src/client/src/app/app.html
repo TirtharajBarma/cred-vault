@@ -1,5 +1,5 @@
 <div class="flex flex-col min-h-screen bg-mist-cream text-charcoal selection:bg-primary/30">
-  @if (authService.currentUser()) {
+  @if (authService.currentUser() && !isAdminRoute()) {
     <app-navbar />
   }
   
@@ -7,7 +7,7 @@
     <router-outlet />
   </main>
 
-  @if (authService.currentUser()) {
+  @if (authService.currentUser() && !isAdminRoute()) {
     <app-footer />
   }
 </div>

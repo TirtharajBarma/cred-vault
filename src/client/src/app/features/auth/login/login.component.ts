@@ -42,8 +42,12 @@ export class LoginComponent {
       next: (response) => {
         this.isLoading.set(false);
         if (response.success) {
-          console.log('[Login] Success! Navigating to dashboard...');
-          this.router.navigate(['/dashboard']);
+          const user = this.authService.currentUser();
+          if (user?.role === 'admin') {
+            this.router.navigate(['/admin/dashboard']);
+          } else {
+            this.router.navigate(['/dashboard']);
+          }
         } else {
           this.errorMessage.set(response.message || 'Login failed');
         }

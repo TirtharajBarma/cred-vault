@@ -19,7 +19,6 @@ export class AuthService {
   pendingEmail = signal<string | null>(this.getPendingEmail());
 
   register(data: RegisterRequest): Observable<ApiResponse<any>> {
-    console.log('[AuthService] Attempting registration for:', data.email);
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/register`, data).pipe(
       tap(response => {
         if (response.success) {
@@ -30,11 +29,9 @@ export class AuthService {
   }
 
   verifyEmailOtp(data: VerifyOtpRequest): Observable<ApiResponse<any>> {
-    console.log('[AuthService] Verifying OTP for:', data.email);
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/verify-email-otp`, data).pipe(
       tap(response => {
         if (response.success && response.data?.accessToken) {
-          // Direct login flow: handle token from verification
           this.handleAuthSuccess(response.data);
           this.clearPendingEmail();
         }
@@ -43,12 +40,10 @@ export class AuthService {
   }
 
   resendVerification(data: ResendVerificationRequest): Observable<ApiResponse<any>> {
-    console.log('[AuthService] Resending verification for:', data.email);
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/resend-verification`, data);
   }
 
   forgotPassword(email: string): Observable<ApiResponse<any>> {
-    console.log('[AuthService] Forgot password request for:', email);
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/forgot-password`, { email }).pipe(
       tap(response => {
         if (response.success) {
@@ -59,12 +54,10 @@ export class AuthService {
   }
 
   resetPassword(data: { email: string, otp: string, newPassword: string }): Observable<ApiResponse<any>> {
-    console.log('[AuthService] Resetting password for:', data.email);
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/reset-password`, data);
   }
 
   login(credentials: { email: string, password: string }): Observable<ApiResponse<any>> {
-    console.log('[AuthService] Attempting login for:', credentials.email);
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/login`, credentials).pipe(
       tap(response => {
         if (response.success && response.data) {
@@ -75,7 +68,6 @@ export class AuthService {
   }
 
   logout(): void {
-    console.log('[AuthService] Logging out...');
     this.clearAuthData();
     this.router.navigate(['/login'], { replaceUrl: true });
   }
@@ -85,7 +77,6 @@ export class AuthService {
     const user = data.user || data.User;
 
     if (token && user) {
-      console.log('[AuthService] Login success for user:', user.email);
       this.currentUser.set(user);
       this.token.set(token);
       localStorage.setItem('cv_token', token);

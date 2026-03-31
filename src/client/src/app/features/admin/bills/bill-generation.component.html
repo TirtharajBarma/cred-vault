@@ -1,0 +1,133 @@
+<div class="space-y-6 lg:space-y-12 animate-in fade-in duration-700">
+  <!-- Header Info -->
+  <div>
+    <h1 class="text-3xl lg:text-5xl font-black tracking-tight text-charcoal mb-2 lg:mb-3">Billing Engine</h1>
+    <p class="text-misty-gray font-medium text-sm lg:text-lg max-w-xl">Manual ledger reconciliation and mandatory billing cycle execution for specific assets.</p>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-12">
+    <!-- Form Section -->
+    <div class="lg:col-span-3">
+      <div class="glass-card-premium p-6 lg:p-12 rounded-2xl lg:rounded-[3.5rem] relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-32 lg:w-64 h-32 lg:h-64 bg-emerald-500/5 blur-[60px] lg:blur-[80px]"></div>
+        
+        <h2 class="text-xl lg:text-3xl font-black text-charcoal mb-6 lg:mb-10 flex items-center gap-2 lg:gap-4">
+          <span class="material-symbols-outlined text-emerald-500 text-xl lg:text-3xl">point_of_sale</span>
+          Execution Parameters
+        </h2>
+
+        @if (successMessage()) {
+          <div class="mb-6 lg:mb-10 p-4 lg:p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl lg:rounded-[2rem] flex items-center gap-3 lg:gap-5 slide-in-from-top-4 animate-in duration-500">
+            <div class="w-10 lg:w-12 h-10 lg:h-12 bg-emerald-500 text-white rounded-xl lg:rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
+              <span class="material-symbols-outlined font-black text-lg lg:text-xl">check</span>
+            </div>
+            <div>
+              <p class="text-[8px] lg:text-[10px] font-black uppercase tracking-widest text-emerald-700/60 mb-0.5">Execution Successful</p>
+              <p class="text-emerald-900 font-bold text-sm lg:text-base">{{ successMessage() }}</p>
+            </div>
+          </div>
+        }
+
+        @if (errorMessage()) {
+            <div class="mb-6 lg:mb-10 p-4 lg:p-6 bg-red-500/10 border border-red-500/20 rounded-2xl lg:rounded-[2rem] flex items-center gap-3 lg:gap-5 slide-in-from-top-4 animate-in duration-500">
+              <div class="w-10 lg:w-12 h-10 lg:h-12 bg-red-500 text-white rounded-xl lg:rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-red-500/20">
+                <span class="material-symbols-outlined font-black text-lg lg:text-xl">warning</span>
+              </div>
+              <div>
+                <p class="text-[8px] lg:text-[10px] font-black uppercase tracking-widest text-red-700/60 mb-0.5">Execution Failed</p>
+                <p class="text-red-900 font-bold text-sm lg:text-base">{{ errorMessage() }}</p>
+              </div>
+            </div>
+        }
+
+        <form [formGroup]="billForm" (ngSubmit)="generateBill()" class="space-y-6 lg:space-y-10 relative z-10">
+          <div class="space-y-2 lg:space-y-4">
+            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Select User</label>
+            <div class="relative">
+              <select formControlName="userId" (change)="onUserChange($event)" class="premium-input px-4 lg:px-8 h-12 lg:h-18 text-sm lg:text-lg appearance-none cursor-pointer">
+                <option value="">-- Select User --</option>
+                @for (user of users(); track user.id) {
+                  <option [value]="user.id">{{ user.email }}</option>
+                }
+              </select>
+              <span class="material-symbols-outlined absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 pointer-events-none text-charcoal/30">unfold_more</span>
+            </div>
+          </div>
+
+          <div class="space-y-2 lg:space-y-4">
+            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Select Card</label>
+            <div class="relative">
+              <select formControlName="cardId" class="premium-input px-4 lg:px-8 h-12 lg:h-18 text-sm lg:text-lg appearance-none cursor-pointer" [disabled]="isLoadingCards()">
+                <option value="">-- Select Card --</option>
+                @for (card of cards(); track card.id) {
+                  <option [value]="card.id">{{ card.cardBrand }} ****{{ card.last4 }}</option>
+                }
+              </select>
+              <span class="material-symbols-outlined absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 pointer-events-none text-charcoal/30">unfold_more</span>
+            </div>
+          </div>
+
+          <div class="space-y-2 lg:space-y-4">
+            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Settlement Currency</label>
+            <div class="relative">
+                <select formControlName="currency" class="premium-input px-4 lg:px-8 h-12 lg:h-18 text-sm lg:text-lg appearance-none cursor-pointer">
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                </select>
+                <span class="material-symbols-outlined absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 pointer-events-none text-charcoal/30">unfold_more</span>
+            </div>
+          </div>
+
+          <button type="submit" [disabled]="billForm.invalid || isSubmitting()" 
+                  class="w-full h-14 lg:h-20 bg-charcoal text-white font-black rounded-2xl lg:rounded-3xl shadow-3xl shadow-charcoal/20 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 lg:gap-4 mt-4 lg:mt-8 disabled:opacity-50 text-sm lg:text-base">
+            @if (isSubmitting()) {
+              <span class="animate-spin material-symbols-outlined">settings_backup_restore</span>
+              EXECUTING...
+            } @else {
+              <span class="material-symbols-outlined text-emerald-500 font-black text-xl lg:text-2xl">electric_bolt</span>
+              EXECUTE BILLING CYCLE
+            }
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Info/Warning Column -->
+    <div class="lg:col-span-2 space-y-4 lg:space-y-8">
+      <div class="glass-card-premium p-6 lg:p-10 rounded-2xl lg:rounded-[3rem] border-amber-500/20 bg-amber-500/5">
+        <h3 class="text-lg lg:text-xl font-black text-charcoal mb-3 lg:mb-4 flex items-center gap-2 lg:gap-3">
+          <span class="material-symbols-outlined text-amber-500 text-lg lg:text-xl">error</span>
+          Critical Warning
+        </h3>
+        <p class="text-xs lg:text-sm font-medium text-charcoal/60 leading-relaxed">
+          Generating a bill will immediately consolidate all outstanding transactions for the selected card since the last billing cycle. This action cannot be reversed.
+        </p>
+      </div>
+
+      <div class="glass-card-premium p-6 lg:p-10 rounded-2xl lg:rounded-[3rem]">
+        <h3 class="text-lg lg:text-xl font-black text-charcoal mb-4 lg:mb-6">Execution Logic</h3>
+        <ul class="space-y-4 lg:space-y-6">
+          <li class="flex items-start gap-3 lg:gap-4">
+            <div class="w-6 lg:w-8 h-6 lg:h-8 bg-charcoal/5 rounded-lg flex items-center justify-center shrink-0 mt-1">
+              <span class="text-[8px] lg:text-xs font-black">01</span>
+            </div>
+            <p class="text-xs lg:text-sm font-bold text-charcoal/70">Sum all 'Purchase' transactions.</p>
+          </li>
+          <li class="flex items-start gap-3 lg:gap-4">
+            <div class="w-6 lg:w-8 h-6 lg:h-8 bg-charcoal/5 rounded-lg flex items-center justify-center shrink-0 mt-1">
+              <span class="text-[8px] lg:text-xs font-black">02</span>
+            </div>
+            <p class="text-xs lg:text-sm font-bold text-charcoal/70">Apply minimum due (10% of total).</p>
+          </li>
+          <li class="flex items-start gap-3 lg:gap-4">
+            <div class="w-6 lg:w-8 h-6 lg:h-8 bg-charcoal/5 rounded-lg flex items-center justify-center shrink-0 mt-1">
+              <span class="text-[8px] lg:text-xs font-black">03</span>
+            </div>
+            <p class="text-xs lg:text-sm font-bold text-charcoal/70">Emit 'BillGenerated' event.</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

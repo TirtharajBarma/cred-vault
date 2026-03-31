@@ -32,7 +32,6 @@ export class VerifyEmailComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.startResendTimer();
     if (!this.authService.pendingEmail()) {
-      console.warn('[Verify] No pending email found, redirecting to register...');
       this.router.navigate(['/register']);
     }
   }
@@ -95,7 +94,6 @@ export class VerifyEmailComponent implements OnInit, OnDestroy {
       next: (response) => {
         this.isLoading.set(false);
         if (response.success) {
-          console.log('[Verify] Direct login success! Navigating to dashboard...');
           this.router.navigate(['/dashboard']);
         } else {
           this.errorMessage.set(response.message || 'Invalid OTP. Please try again.');

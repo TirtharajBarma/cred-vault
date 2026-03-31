@@ -17,9 +17,16 @@ export class NavbarComponent {
   
   user = this.authService.currentUser;
   isProfileOpen = signal(false);
+  isMobileMenuOpen = signal(false);
 
   toggleProfile(): void {
     this.isProfileOpen.update(v => !v);
+    if (this.isProfileOpen()) this.isMobileMenuOpen.set(false);
+  }
+
+  toggleMobileMenu(): void {
+    this.isMobileMenuOpen.update(v => !v);
+    if (this.isMobileMenuOpen()) this.isProfileOpen.set(false);
   }
 
   @HostListener('document:click', ['$event'])

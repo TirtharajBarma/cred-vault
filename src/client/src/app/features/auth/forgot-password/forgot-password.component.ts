@@ -37,7 +37,6 @@ export class ForgotPasswordComponent {
       next: (response) => {
         this.isLoading.set(false);
         if (response.success) {
-          console.log('[ForgotPassword] Success, navigating to reset-password...');
           this.router.navigate(['/reset-password']);
         } else {
           this.errorMessage.set(response.message || 'Failed to process request');

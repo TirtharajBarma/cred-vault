@@ -1,0 +1,155 @@
+<div class="space-y-12">
+  <!-- Header Info -->
+  <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div>
+      <h1 class="text-5xl font-black tracking-tight text-charcoal mb-3">System Archives</h1>
+      <p class="text-misty-gray font-medium text-lg max-w-xl">Comprehensive audit trail and activity logs for all business events and system notifications.</p>
+    </div>
+    
+    <!-- Tab Switcher -->
+    <div class="bg-white/40 p-2 rounded-[2rem] border border-white flex gap-2">
+      <button 
+        (click)="switchTab('audit')"
+        [class]="activeTab() === 'audit' ? 'bg-charcoal text-white shadow-xl' : 'text-misty-gray hover:text-charcoal'"
+        class="px-8 py-3.5 rounded-[1.5rem] text-sm font-black transition-all flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">history</span>
+        AUDIT LOGS
+      </button>
+      <button 
+        (click)="switchTab('activity')"
+        [class]="activeTab() === 'activity' ? 'bg-charcoal text-white shadow-xl' : 'text-misty-gray hover:text-charcoal'"
+        class="px-8 py-3.5 rounded-[1.5rem] text-sm font-black transition-all flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">bolt</span>
+        ACTIVITY
+      </button>
+    </div>
+  </div>
+
+  @if (activeTab() === 'audit') {
+    <!-- Audit Logs Section (Business Events) -->
+    <div class="glass-card-premium rounded-[3rem] overflow-hidden animate-in slide-in-from-left-6 duration-500">
+      <div class="overflow-x-auto no-scrollbar">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-charcoal/5">
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Event</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Time</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Action</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">User</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Trace ID</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-charcoal/5">
+            @if (isLoading()) {
+              @for (i of [1,2,3,4,5]; track i) {
+                <tr class="animate-pulse">
+                  @for (j of [1,2,3,4,5]; track j) {
+                    <td class="px-10 py-8"><div class="h-4 bg-charcoal/5 rounded w-full"></div></td>
+                  }
+                </tr>
+              }
+            } @else if (auditLogs().length > 0) {
+              @for (log of auditLogs(); track log.id) {
+                <tr class="hover:bg-charcoal/2 transition-colors">
+                  <td class="px-10 py-8">
+                    <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 bg-charcoal/5 rounded-xl flex items-center justify-center text-charcoal/40 font-black">
+                        <span class="material-symbols-outlined text-xl">{{ log.action === 'Consumed' ? 'download' : 'settings' }}</span>
+                      </div>
+                      <div>
+                        <p class="font-black text-charcoal">{{ log.entityName }}</p>
+                        <p class="text-[9px] font-bold text-misty-gray uppercase tracking-widest">ID: {{ log.entityId.slice(0,8) }}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-10 py-8 font-bold text-charcoal/60 text-sm">{{ log.createdAtUtc | date:'MMM dd, HH:mm:ss' }}</td>
+                  <td class="px-10 py-8">
+                    <span class="px-3 py-1 rounded-lg text-[10px] font-black tracking-widest border border-emerald-500/20 bg-emerald-500/10 text-emerald-600">
+                      {{ log.action | uppercase }}
+                    </span>
+                  </td>
+                  <td class="px-10 py-8 text-charcoal/60 text-sm font-mono">{{ log.userId || '--' }}</td>
+                  <td class="px-10 py-8 font-mono text-[10px] text-misty-gray truncate max-w-[120px]">{{ log.traceId || '--' }}</td>
+                </tr>
+              }
+            } @else {
+              <tr>
+                <td colspan="5" class="px-10 py-20 text-center">
+                  <div class="flex flex-col items-center">
+                    <span class="material-symbols-outlined text-5xl text-charcoal/20 mb-4">history_toggle_off</span>
+                    <p class="text-lg font-bold text-charcoal/40">No audit events recorded yet</p>
+                    <p class="text-sm text-charcoal/30 mt-2">Business events will appear here when triggered</p>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  } @else {
+    <!-- Activity/Notification Logs Section -->
+    <div class="glass-card-premium rounded-[3rem] overflow-hidden animate-in slide-in-from-right-6 duration-500">
+      <div class="overflow-x-auto no-scrollbar">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-charcoal/5">
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Event</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Time</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Status</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Recipient</th>
+              <th class="px-10 py-8 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Trace ID</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-charcoal/5">
+            @if (isLoading()) {
+              @for (i of [1,2,3,4,5]; track i) {
+                <tr class="animate-pulse">
+                  @for (j of [1,2,3,4,5]; track j) {
+                    <td class="px-10 py-8"><div class="h-4 bg-charcoal/5 rounded w-full"></div></td>
+                  }
+                </tr>
+              }
+            } @else if (notificationLogs().length > 0) {
+              @for (log of notificationLogs(); track log.id) {
+                <tr class="hover:bg-charcoal/2 transition-colors">
+                  <td class="px-10 py-8">
+                    <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 rounded-xl flex items-center justify-center font-black" 
+                           [class]="log.isSuccess ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'">
+                        <span class="material-symbols-outlined text-xl">{{ log.isSuccess ? 'check_circle' : 'error' }}</span>
+                      </div>
+                      <div>
+                        <p class="font-black text-charcoal">{{ log.subject }}</p>
+                        <p class="text-[9px] font-bold text-misty-gray uppercase tracking-widest">Type: {{ log.type }}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-10 py-8 font-bold text-charcoal/60 text-sm">{{ log.createdAtUtc | date:'MMM dd, HH:mm:ss' }}</td>
+                  <td class="px-10 py-8">
+                    <span [class]="log.isSuccess ? 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' : 'text-red-600 bg-red-500/10 border-red-500/20'" 
+                          class="px-3 py-1 rounded-lg text-[10px] font-black tracking-widest border">
+                      {{ log.isSuccess ? 'SUCCESS' : 'FAILED' }}
+                    </span>
+                  </td>
+                  <td class="px-10 py-8 text-charcoal/60 text-sm font-mono">{{ log.recipient }}</td>
+                  <td class="px-10 py-8 font-mono text-[10px] text-misty-gray truncate max-w-[120px]">{{ log.traceId || '--' }}</td>
+                </tr>
+              }
+            } @else {
+              <tr>
+                <td colspan="5" class="px-10 py-20 text-center">
+                  <div class="flex flex-col items-center">
+                    <span class="material-symbols-outlined text-5xl text-charcoal/20 mb-4">bolt</span>
+                    <p class="text-lg font-bold text-charcoal/40">No activity logs yet</p>
+                    <p class="text-sm text-charcoal/30 mt-2">System events and notifications will appear here</p>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>

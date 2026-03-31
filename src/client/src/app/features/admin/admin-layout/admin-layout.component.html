@@ -1,0 +1,96 @@
+<div class="flex h-screen bg-mist-cream overflow-hidden font-display relative">
+  <!-- Sidebar Glows -->
+  <div class="glow-cloud-amber top-[-5%] left-[-5%] opacity-15 hidden lg:block"></div>
+  <div class="glow-cloud-blue bottom-[-5%] right-[-5%] opacity-10 hidden lg:block"></div>
+
+  <!-- Mobile Overlay -->
+  @if (isSidebarOpen()) {
+    <div 
+      (click)="toggleSidebar()"
+      class="fixed inset-0 bg-black/50 z-40 lg:hidden"
+    ></div>
+  }
+
+  <!-- Sidebar -->
+  <aside 
+    [class.translate-x-0]="isSidebarOpen()"
+    [class.-translate-x-full]="!isSidebarOpen()"
+    class="fixed lg:relative z-50 bg-charcoal text-white flex flex-col transition-transform duration-500 ease-in-out border-r border-charcoal/20 h-screen w-72 lg:w-72
+           -translate-x-full lg:translate-x-0">
+    
+    <!-- Sidebar Header -->
+    <div class="h-20 lg:h-24 flex items-center justify-between px-4 lg:px-6 border-b border-white/5 shrink-0">
+      <div class="flex items-center gap-3 overflow-hidden">
+        <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
+          <span class="material-symbols-outlined text-charcoal font-black">shield_person</span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xl font-black tracking-tighter text-white">CredVault</span>
+          <span class="text-[8px] font-black uppercase tracking-[0.2em] text-primary/80 -mt-1">Control Center</span>
+        </div>
+      </div>
+      <button (click)="toggleSidebar()" class="p-2 hover:bg-white/5 rounded-xl transition-colors lg:hidden">
+        <span class="material-symbols-outlined text-white/40">close</span>
+      </button>
+    </div>
+
+    <!-- Navigation Links -->
+    <nav class="flex-1 overflow-y-auto py-6 px-3 lg:px-4 space-y-2 no-scrollbar">
+      @for (link of adminLinks; track link.path) {
+        <a [routerLink]="link.path" 
+           routerLinkActive="bg-primary/10 text-primary !border-primary"
+           (click)="closeSidebarOnMobile()"
+           class="flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-transparent text-white/50 hover:bg-white/5 hover:text-white transition-all duration-300 group">
+          <span class="material-symbols-outlined shrink-0 transition-colors group-hover:text-primary">{{ link.icon }}</span>
+          <div class="flex flex-col overflow-hidden whitespace-nowrap">
+            <span class="text-sm font-bold">{{ link.label }}</span>
+            <span class="text-[9px] font-medium text-white/30">{{ link.description }}</span>
+          </div>
+        </a>
+      }
+    </nav>
+
+    <!-- Sidebar Footer -->
+    <div class="p-4 border-t border-white/5 space-y-2 shrink-0">
+      <button (click)="logout()"
+              class="w-full h-12 flex items-center gap-3 px-4 rounded-xl hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all overflow-hidden group">
+        <span class="material-symbols-outlined shrink-0 group-hover:rotate-12 transition-transform">logout</span>
+        <span class="text-sm font-bold whitespace-nowrap">Sign Out</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 flex flex-col min-w-0 transition-all duration-500 overflow-hidden relative z-10">
+    <!-- Top Bar -->
+    <header class="h-16 lg:h-20 bg-white/40 backdrop-blur-3xl border-b border-charcoal/5 flex items-center justify-between px-4 lg:px-8 shrink-0">
+      <div class="flex items-center gap-3 lg:gap-4">
+        <button (click)="toggleSidebar()" class="p-2 hover:bg-charcoal/5 rounded-xl transition-colors lg:hidden">
+          <span class="material-symbols-outlined text-charcoal">menu</span>
+        </button>
+        <h2 class="text-lg lg:text-xl font-bold text-charcoal">Control Console</h2>
+        <div class="hidden md:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+          <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+          <span class="text-[10px] font-black text-emerald-700 uppercase tracking-widest">System Operational</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 lg:gap-6">
+        <div class="flex items-center gap-2 lg:gap-3 px-2 lg:px-4 py-1.5 lg:py-2 bg-white/40 rounded-xl border border-white">
+          <div class="text-right hidden sm:block">
+            <p class="text-xs font-black text-charcoal">{{ user()?.fullName }}</p>
+            <p class="text-[9px] font-bold text-primary uppercase tracking-widest">{{ user()?.role }}</p>
+          </div>
+          <div class="w-8 lg:w-10 h-8 lg:h-10 bg-gradient-to-br from-charcoal to-slate-800 rounded-lg lg:rounded-xl flex items-center justify-center text-white font-black text-xs lg:text-sm border border-white/20 shadow-lg">
+            {{ user()?.fullName?.charAt(0) }}
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content Container -->
+    <div class="flex-1 overflow-y-auto p-4 lg:p-8 xl:p-12 no-scrollbar bg-transparent">
+        <router-outlet></router-outlet>
+    </div>
+  </main>
+</div>

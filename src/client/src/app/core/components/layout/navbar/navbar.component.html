@@ -1,29 +1,44 @@
-<!-- Premium Navbar (Symmetrical 3-Column Layout) -->
-<nav class="sticky top-0 z-50 w-full bg-white/70 backdrop-blur-2xl border-b border-charcoal/5 px-6 md:px-12 py-3.5 grid grid-cols-3 items-center">
+<!-- Premium Navbar -->
+<nav class="sticky top-0 z-50 w-full bg-white/70 backdrop-blur-2xl border-b border-charcoal/5 px-4 md:px-12 py-3.5 flex items-center justify-between">
   
-  <!-- Left: Brand -->
-  <div class="flex items-center justify-start">
+  <!-- Left Side: Hamburger & Brand -->
+  <div class="flex items-center gap-4">
+    <!-- Mobile Menu Toggle (Hamburger) -->
+    <button (click)="toggleMobileMenu()" 
+            class="flex lg:hidden w-10 h-10 items-center justify-center text-charcoal/60 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
+      <span class="material-symbols-outlined">{{ isMobileMenuOpen() ? 'close' : 'menu' }}</span>
+    </button>
+
+    <!-- Brand -->
     <div class="flex items-center gap-3 cursor-pointer group" routerLink="/dashboard">
-      <div class="w-10 h-10 bg-gradient-to-br from-honey-amber to-[#d4a820] rounded-xl flex items-center justify-center shadow-lg shadow-honey-amber/20 transform group-hover:scale-105 transition-transform duration-300">
+      <div class="w-10 h-10 bg-gradient-to-br from-honey-amber to-[#d4a820] rounded-xl flex items-center justify-center shadow-lg shadow-honey-amber/20 transform group-hover:scale-105 transition-transform duration-300 shrink-0">
         <span class="material-symbols-outlined text-charcoal font-bold">account_balance_wallet</span>
       </div>
-      <span class="text-xl font-black tracking-tighter text-charcoal">CredVault</span>
+      <span class="text-xl font-black tracking-tighter text-charcoal md:block">CredVault</span>
     </div>
   </div>
 
-  <!-- Center: Tabs (Perfectly Centered) -->
-  <div class="flex items-center justify-center gap-2">
-    <a routerLink="/dashboard" routerLinkActive="nav-pill-active" [routerLinkActiveOptions]="{exact: true}" 
-       class="nav-pill nav-pill-hover text-charcoal/60">Dashboard</a>
-    <a routerLink="/bills" routerLinkActive="nav-pill-active" 
-       class="nav-pill nav-pill-hover text-charcoal/60">Bills</a>
-    <a routerLink="/analytics" routerLinkActive="nav-pill-active" 
-       class="nav-pill nav-pill-hover text-charcoal/60">Analytics</a>
+  <!-- Center Side: Desktop Tabs (Hidden on mobile) -->
+  <div class="hidden lg:flex items-center gap-2">
+    @if (user()?.role !== 'admin') {
+      <a routerLink="/dashboard" routerLinkActive="nav-pill-active" [routerLinkActiveOptions]="{exact: true}" 
+         class="nav-pill nav-pill-hover text-charcoal/60">Dashboard</a>
+      <a routerLink="/bills" routerLinkActive="nav-pill-active" 
+         class="nav-pill nav-pill-hover text-charcoal/60">Bills</a>
+      <a routerLink="/analytics" routerLinkActive="nav-pill-active" 
+         class="nav-pill nav-pill-hover text-charcoal/60">Analytics</a>
+    } @else {
+      <a routerLink="/admin/dashboard" routerLinkActive="nav-pill-active" 
+         class="nav-pill nav-pill-hover !text-primary !bg-primary/5 font-black flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">shield_person</span>
+        Admin Console
+      </a>
+    }
   </div>
 
   <!-- Right Side: Tools & Profile -->
-  <div class="flex items-center justify-end gap-5">
-    <!-- Search Bar -->
+  <div class="flex items-center gap-2 md:gap-5">
+    <!-- Search Bar (Hidden on smaller screens) -->
     <div class="relative hidden xl:block group">
       <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-misty-gray text-xl group-focus-within:text-honey-amber transition-colors">search</span>
       <input type="text" 
@@ -32,20 +47,20 @@
     </div>
 
     <!-- Quick Actions -->
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1 md:gap-2">
       <button class="w-10 h-10 flex items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all relative">
         <span class="material-symbols-outlined">notifications</span>
         <span class="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
       </button>
       
-      <button class="w-10 h-10 flex items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all">
+      <button class="hidden sm:flex w-10 h-10 items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all">
         <span class="material-symbols-outlined">settings</span>
       </button>
 
-      <!-- Profile Avatar with Click-to-Toggle Dropdown -->
-      <div class="relative ml-2">
+      <!-- Profile Avatar -->
+      <div class="relative ml-1 md:ml-2">
         <button (click)="toggleProfile()" 
-                class="w-10 h-10 rounded-full bg-mist-ivory border-2 border-white shadow-sm overflow-hidden flex items-center justify-center hover:ring-4 hover:ring-honey-amber/10 transition-all active:scale-95">
+                class="w-10 h-10 rounded-full bg-mist-ivory border-2 border-white shadow-sm overflow-hidden flex items-center justify-center hover:ring-4 hover:ring-honey-amber/10 transition-all active:scale-95 shrink-0">
           @if (user()) {
             <img class="w-full h-full object-cover" 
                  [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=e5e1da&color=181611'" 
@@ -55,7 +70,7 @@
           }
         </button>
         
-        <!-- Enhanced Premium Dropdown -->
+        <!-- Dropdown Menu -->
         @if (isProfileOpen()) {
           <div class="absolute right-0 top-full mt-4 w-72 glass-card-premium rounded-3xl p-2 animate-scale-in z-50 overflow-hidden shadow-2xl">
             <!-- User Info Header -->
@@ -75,13 +90,15 @@
 
             <!-- Menu Sections -->
             <div class="space-y-1">
+              @if (user()?.role === 'admin') {
+                <button routerLink="/admin/dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-primary hover:bg-primary/5 rounded-xl transition-all">
+                  <span class="material-symbols-outlined text-lg">admin_panel_settings</span>
+                  Admin Control Center
+                </button>
+              }
               <button class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
                 <span class="material-symbols-outlined text-lg">person_outline</span>
                 Account Settings
-              </button>
-              <button class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
-                <span class="material-symbols-outlined text-lg">shield_with_heart</span>
-                Privacy & Security
               </button>
               <div class="h-px bg-charcoal/5 my-2 mx-4"></div>
               <button (click)="logout()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-red-500 hover:bg-red-50 rounded-xl transition-all group">
@@ -95,3 +112,60 @@
     </div>
   </div>
 </nav>
+
+<!-- Mobile Menu Drawer Overlay -->
+@if (isMobileMenuOpen()) {
+  <div class="fixed inset-0 z-[100] lg:hidden animate-fade-in">
+    <div (click)="toggleMobileMenu()" class="absolute inset-0 bg-charcoal/40 backdrop-blur-sm"></div>
+    
+    <div class="absolute inset-y-0 left-0 w-[80%] max-w-sm bg-mist-cream shadow-2xl p-6 flex flex-col transform animate-scale-in">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-8">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+            <span class="material-symbols-outlined text-charcoal font-black">shield_with_heart</span>
+          </div>
+          <span class="text-xl font-black text-charcoal">Menu</span>
+        </div>
+        <button (click)="toggleMobileMenu()" class="p-2 text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-xl">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Links -->
+      <nav class="flex-1 space-y-2">
+        @if (user()?.role !== 'admin') {
+          <a routerLink="/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary" 
+             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
+            <span class="material-symbols-outlined">dashboard</span>
+            Dashboard
+          </a>
+          <a routerLink="/bills" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
+            <span class="material-symbols-outlined">receipt_long</span>
+            Bills
+          </a>
+          <a routerLink="/analytics" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
+            <span class="material-symbols-outlined">analytics</span>
+            Analytics
+          </a>
+        } @else {
+          <a routerLink="/admin/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-primary hover:bg-primary/5 transition-all">
+            <span class="material-symbols-outlined">admin_panel_settings</span>
+            Admin Console
+          </a>
+        }
+      </nav>
+
+      <!-- Footer -->
+      <div class="pt-6 border-t border-charcoal/5">
+        <button (click)="logout(); toggleMobileMenu()" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-red-500 hover:bg-red-50 transition-all">
+          <span class="material-symbols-outlined">logout</span>
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+}
