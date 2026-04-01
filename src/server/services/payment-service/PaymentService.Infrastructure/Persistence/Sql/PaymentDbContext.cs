@@ -11,7 +11,6 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<RiskScore> RiskScores => Set<RiskScore>();
     public DbSet<FraudAlert> FraudAlerts => Set<FraudAlert>();
-    public DbSet<PaymentSagaState> PaymentSagas => Set<PaymentSagaState>();
     public DbSet<PaymentOrchestrationSagaState> PaymentOrchestrationSagas => Set<PaymentOrchestrationSagaState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -91,22 +90,6 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
 
             entity.HasIndex(x => x.UserId);
             entity.HasIndex(x => x.PaymentId);
-        });
-
-        // MassTransit Saga Configuration
-        modelBuilder.Entity<PaymentSagaState>(entity =>
-        {
-            entity.ToTable("PaymentSagas");
-            entity.HasKey(x => x.CorrelationId);
-
-            entity.Property(x => x.CurrentState).HasMaxLength(64);
-            entity.Property(x => x.PaymentType).HasMaxLength(32);
-            entity.Property(x => x.RiskDecision).HasMaxLength(32);
-            entity.Property(x => x.CompensationReason).HasMaxLength(500);
-            entity.Property(x => x.OtpCode).HasMaxLength(8);
-            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
-            entity.Property(x => x.RiskScore).HasColumnType("decimal(5,2)");
-            entity.Property(x => x.RewardPointsGranted).HasColumnType("decimal(18,2)");
         });
 
         // Orchestration Saga Configuration

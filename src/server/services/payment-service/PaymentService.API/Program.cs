@@ -5,6 +5,7 @@ using PaymentService.Domain.Interfaces;
 using PaymentService.Domain.Entities;
 using PaymentService.Infrastructure.Persistence.Sql.Repositories;
 using PaymentService.Infrastructure.Messaging.Consumers;
+using PaymentService.Infrastructure.Messaging;
 using PaymentService.Application.Common;
 using PaymentService.Application.Commands.Payments;
 using FluentValidation;
@@ -57,6 +58,8 @@ try
         cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
     });
     builder.Services.AddValidatorsFromAssemblyContaining<InitiatePaymentCommand>();
+
+    builder.Services.AddRabbitMqBindings();
 
     builder.Services.AddMassTransit(x =>
     {
