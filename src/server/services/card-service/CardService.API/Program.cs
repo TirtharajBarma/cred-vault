@@ -52,6 +52,7 @@ try
     {
         x.SetKebabCaseEndpointNameFormatter();
         x.AddConsumer<PaymentReversedConsumer>();
+        x.AddConsumer<PaymentCompletedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<CardDeductionSagaConsumer>();
         x.AddConsumer<BillPaidConsumer>();
@@ -70,6 +71,7 @@ try
                 e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
                 e.UseInMemoryOutbox();
                 e.ConfigureConsumer<PaymentReversedConsumer>(ctx);
+                e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<CardDeductionSagaConsumer>(ctx);
                 e.ConfigureConsumer<BillPaidConsumer>(ctx);

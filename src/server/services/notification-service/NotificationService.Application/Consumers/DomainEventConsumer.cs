@@ -66,15 +66,12 @@ public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer
 
     public async Task Consume(ConsumeContext<IOtpFailed> context)
     {
-        logger.LogWarning("OtpFailed: CorrelationId={CorrelationId}, Reason={Reason}", context.Message.CorrelationId, context.Message.Reason);
-        await mediator.Send(new ProcessNotificationCommand("OtpFailed", "user@example.com", "User",
-            new { context.Message.CorrelationId, context.Message.Reason }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
+        logger.LogWarning("OtpFailed: CorrelationId={CorrelationId}, PaymentId={PaymentId}, Reason={Reason}", 
+            context.Message.CorrelationId, context.Message.PaymentId, context.Message.Reason);
     }
 
     public async Task Consume(ConsumeContext<IUserDeleted> context)
     {
         logger.LogInformation("UserDeleted: {UserId}", context.Message.UserId);
-        await mediator.Send(new ProcessNotificationCommand("UserDeleted", "tirtharajbarma3@gmail.com", "Admin",
-            new { context.Message.UserId, context.Message.DeletedAtUtc }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 }

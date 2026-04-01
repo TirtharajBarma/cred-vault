@@ -59,6 +59,9 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, "Bill does not belong to the user");
         }
 
+        var otpCode = GenerateOtp();
+        var otpExpires = DateTime.UtcNow.AddMinutes(10);
+
         var payment = new Payment
         {
             Id = Guid.NewGuid(),
@@ -68,6 +71,8 @@ public class InitiatePaymentCommandHandler(
             Amount = request.Amount,
             PaymentType = request.PaymentType,
             Status = PaymentStatus.Initiated,
+            OtpCode = otpCode,
+            OtpExpiresAtUtc = otpExpires,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -84,8 +89,6 @@ public class InitiatePaymentCommandHandler(
         }
 
         var riskScore = payment.Amount > 10000 ? 85m : payment.Amount > 5000 ? 60m : 20m;
-        var otpCode = GenerateOtp();
-        var otpExpires = DateTime.UtcNow.AddMinutes(10);
 
         logger.LogInformation("Starting SAGA orchestration for PaymentId={PaymentId}, Amount={Amount}, RiskScore={RiskScore}, OTP={OtpCode}",
             payment.Id, payment.Amount, riskScore, otpCode);

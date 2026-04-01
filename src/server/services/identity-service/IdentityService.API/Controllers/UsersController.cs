@@ -141,25 +141,6 @@ public class UsersController : BaseApiController
         return FromOperationResult(result);
     }
 
-    private IActionResult FromUserResult(UserResult result)
-    {
-        var response = BuildResponse(result.Success, result.User, result.Message);
-
-        if (result.Success)
-        {
-            return Ok(response);
-        }
-
-        return result.ErrorCode switch
-        {
-            ErrorCodes.UserNotFound => NotFound(response),
-            ErrorCodes.InvalidStatus => BadRequest(response),
-            ErrorCodes.ValidationError => BadRequest(response),
-            ErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, response),
-            _ => BadRequest(response)
-        };
-    }
-
     private IActionResult FromAuthResult(AuthResult result)
     {
         var response = BuildResponse(result.Success, new { result.User, result.AccessToken }, result.Message);

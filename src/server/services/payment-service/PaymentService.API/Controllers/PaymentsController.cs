@@ -55,7 +55,11 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         [FromBody] VerifyOtpRequest request,
         CancellationToken cancellationToken)
     {
-        var command = new VerifyOtpCommand(paymentId, request.OtpCode);
+        var userId = GetUserIdFromToken();
+        if (userId is null)
+            return Unauthorized(Fail("User identity is missing from token."));
+
+        var command = new VerifyOtpCommand(paymentId, userId.Value, request.OtpCode);
         var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)

@@ -28,7 +28,18 @@ public sealed class LoginCommandHandler(IUserRepository userRepository, IOptions
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
         var user = await userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
-        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user is null)
+        {
+            BCrypt.Net.BCrypt.Verify(request.Password, "$2a$12$000000000000000000000u.Yl7H7vqzNdKdH8R3O.RKQ3fJx5y"); // Dummy hash to prevent timing attack
+            return new AuthResult
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.InvalidCredentials,
+                Message = "Invalid email or password."
+            };
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
             return new AuthResult
             {

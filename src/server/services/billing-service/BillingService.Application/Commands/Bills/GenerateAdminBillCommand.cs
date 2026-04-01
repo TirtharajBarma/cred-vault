@@ -22,7 +22,7 @@ public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientF
         if (request.UserId == Guid.Empty || request.CardId == Guid.Empty)
         {
             logger.LogWarning("GenerateBill rejected: UserId or CardId is empty");
-            return new() { Success = false, Message = "UserId and CardId required" };
+            return new() { Success = false, Message = "UserId and CardId are required." };
         }
 
         var (ok, card, err) = await GetCardAsync(request.CardId, request.AuthorizationHeader, ct);

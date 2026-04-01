@@ -76,7 +76,7 @@ public class RefundCardBalanceCommandHandler(
                 DateUtc = DateTime.UtcNow
             });
 
-            await cardRepository.UpdateAsync(card);
+            await cardRepository.UpdateAsync(card, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation("Refund successful: CardId={CardId}, OldBalance={OldBalance}, NewBalance={NewBalance}",
