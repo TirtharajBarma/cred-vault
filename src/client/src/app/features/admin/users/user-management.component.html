@@ -1,200 +1,314 @@
-<div class="space-y-6 lg:space-y-12 animate-in fade-in duration-700">
-  <!-- Header Section -->
-  <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 lg:gap-6">
-    <div>
-      <h1 class="text-3xl lg:text-5xl font-black tracking-tight text-charcoal mb-2 lg:mb-3">User Registry</h1>
-      <p class="text-misty-gray font-medium text-sm lg:text-lg max-w-xl">Supervise credential security and monitor platform activity for all CredVault users.</p>
-    </div>
-  </div>
-
-  <!-- Tabs -->
-  <div class="flex flex-wrap gap-3 lg:gap-4">
-    <button 
-      (click)="switchTab('list')"
-      [class]="activeTab() === 'list' ? 'bg-charcoal text-white' : 'bg-white text-charcoal border border-charcoal/10'"
-      class="px-5 lg:px-8 py-3 lg:py-4 rounded-xl lg:rounded-2xl font-black flex items-center gap-2 lg:gap-3 transition-all text-sm lg:text-base">
-      <span class="material-symbols-outlined text-lg lg:text-xl">group</span>
-      All Users
-    </button>
-    <button 
-      (click)="switchTab('search')"
-      [class]="activeTab() === 'search' ? 'bg-charcoal text-white' : 'bg-white text-charcoal border border-charcoal/10'"
-      class="px-5 lg:px-8 py-3 lg:py-4 rounded-xl lg:rounded-2xl font-black flex items-center gap-2 lg:gap-3 transition-all text-sm lg:text-base">
-      <span class="material-symbols-outlined text-lg lg:text-xl">search</span>
-      Search by ID
-    </button>
-  </div>
-
-  @if (activeTab() === 'list') {
-    <!-- User List -->
-    <div class="glass-card-premium p-4 lg:p-8 rounded-2xl lg:rounded-[3rem]">
-      @if (isLoading()) {
-        <div class="flex items-center justify-center py-12 lg:py-20">
-          <span class="animate-spin text-3xl lg:text-4xl material-symbols-outlined text-primary">refresh</span>
-        </div>
-      } @else if (users().length > 0) {
-        <div class="overflow-x-auto">
-          <table class="w-full min-w-[600px]">
-            <thead>
-              <tr class="border-b border-charcoal/10">
-                <th class="text-left py-3 lg:py-4 px-3 lg:px-4 text-[10px] font-black uppercase tracking-widest text-misty-gray">User</th>
-                <th class="text-left py-3 lg:py-4 px-3 lg:px-4 text-[10px] font-black uppercase tracking-widest text-misty-gray">Email</th>
-                <th class="text-left py-3 lg:py-4 px-3 lg:px-4 text-[10px] font-black uppercase tracking-widest text-misty-gray">Role</th>
-                <th class="text-left py-3 lg:py-4 px-3 lg:px-4 text-[10px] font-black uppercase tracking-widest text-misty-gray">Status</th>
-                <th class="text-left py-3 lg:py-4 px-3 lg:px-4 text-[10px] font-black uppercase tracking-widest text-misty-gray hidden md:table-cell">Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (user of users(); track user.id) {
-                <tr class="border-b border-charcoal/5 hover:bg-mist-cream/50 transition-colors">
-                  <td class="py-3 lg:py-4 px-3 lg:px-4">
-                    <div class="flex items-center gap-2 lg:gap-3">
-                      <div class="w-8 lg:w-10 h-8 lg:h-10 bg-charcoal rounded-lg lg:rounded-xl flex items-center justify-center text-white font-black text-xs lg:text-sm">
-                        {{ user.fullName?.charAt(0) || '?' }}
-                      </div>
-                      <span class="font-bold text-charcoal text-sm lg:text-base">{{ user.fullName }}</span>
-                    </div>
-                  </td>
-                  <td class="py-3 lg:py-4 px-3 lg:px-4 text-misty-gray font-medium text-sm">{{ user.email }}</td>
-                  <td class="py-3 lg:py-4 px-3 lg:px-4">
-                    <span [class]="user.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600'"
-                          class="px-2 lg:px-3 py-1 rounded-lg text-[8px] lg:text-[10px] font-black uppercase tracking-widest">
-                      {{ user.role }}
-                    </span>
-                  </td>
-                  <td class="py-3 lg:py-4 px-3 lg:px-4">
-                    <span [class]="user.status === 'active' ? 'bg-emerald-500/10 text-emerald-600' : 
-                                     user.status === 'suspended' ? 'bg-red-500/10 text-red-600' : 
-                                     'bg-amber-500/10 text-amber-600'"
-                          class="px-2 lg:px-3 py-1 rounded-lg text-[8px] lg:text-[10px] font-black uppercase tracking-widest">
-                      {{ user.status }}
-                    </span>
-                  </td>
-                  <td class="py-3 lg:py-4 px-3 lg:px-4 text-misty-gray text-xs lg:text-sm hidden md:table-cell">{{ user.createdAtUtc | date:'mediumDate' }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- Pagination -->
-        <div class="flex flex-col sm:flex-row items-center justify-between mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-charcoal/10 gap-4">
-          <span class="text-xs lg:text-sm font-bold text-misty-gray">Showing {{ users().length }} of {{ totalUsers() }} users</span>
-          <div class="flex gap-2 lg:gap-3">
-            <button 
-              (click)="prevPage()" 
-              [disabled]="currentPage() === 1"
-              class="px-4 lg:px-6 py-2 lg:py-3 bg-white border border-charcoal/10 rounded-xl font-bold text-charcoal hover:bg-mist-cream transition-all disabled:opacity-30 text-sm">
-              Previous
-            </button>
-            <button 
-              (click)="nextPage()" 
-              [disabled]="currentPage() >= Math.ceil(totalUsers() / pageSize)"
-              class="px-4 lg:px-6 py-2 lg:py-3 bg-charcoal text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-30 text-sm">
-              Next
-            </button>
-          </div>
-        </div>
-      } @else {
-        <div class="flex flex-col items-center justify-center py-12 lg:py-20 text-center">
-          <span class="material-symbols-outlined text-5xl lg:text-6xl text-misty-gray mb-3 lg:mb-4">group_off</span>
-          <p class="text-lg lg:text-xl font-bold text-charcoal">No users found</p>
-        </div>
-      }
+<div class="p-6">
+  @if (toastMessage()) {
+    <div class="fixed top-20 right-6 z-[3200] px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold shadow-xl">
+      {{ toastMessage() }}
     </div>
   }
 
-  @if (activeTab() === 'search') {
-    <!-- Search Section -->
-    <div class="glass-card-premium p-6 lg:p-10 rounded-2xl lg:rounded-[3rem] relative overflow-hidden">
-      <div class="absolute top-0 right-0 w-32 lg:w-64 h-32 lg:h-64 bg-primary/5 blur-[60px] lg:blur-[80px]"></div>
-      <div class="relative z-10 max-w-xl lg:max-w-2xl">
-        <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1 mb-3 block">User Lookup Protocol</label>
-        <div class="flex flex-col sm:flex-row gap-3 lg:gap-4">
-          <input 
-            [(ngModel)]="searchQuery" 
-            (keyup.enter)="searchUser()"
-            placeholder="Enter User ID or Email..." 
-            class="premium-input px-4 lg:px-8 h-12 lg:h-16 text-sm lg:text-lg flex-1">
-          <button 
-            (click)="searchUser()" 
-            [disabled]="!searchQuery || isLoading()"
-            class="h-12 lg:h-16 px-6 lg:px-10 bg-charcoal text-white font-bold rounded-xl lg:rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 lg:gap-3 shrink-0 text-sm lg:text-base">
-            @if (isLoading()) {
-              <span class="animate-spin material-symbols-outlined">refresh</span>
-            } @else {
-              <span class="material-symbols-outlined">search</span>
-              Search
-            }
-          </button>
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Users</h1>
+    <p class="text-gray-500 text-sm">Manage user accounts and roles</p>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex gap-2 mb-4">
+    @for (filter of statusFilters; track filter.value) {
+      <button 
+        (click)="setStatusFilter(filter.value)"
+        [class]="statusFilter() === filter.value ? filter.activeClass : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition-all">
+        {{ filter.label }}
+      </button>
+    }
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+    <div class="flex flex-col md:flex-row gap-3">
+      <input
+        [(ngModel)]="searchQuery"
+        (keyup.enter)="searchUser()"
+        type="text"
+        placeholder="Search by email or user ID"
+        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm"
+      />
+      <button (click)="searchUser()" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700">Search</button>
+      <button (click)="searchQuery = ''; statusFilter.set('all'); loadUsers()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100">Clear</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- User List -->
+    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
+      @if (isLoading()) {
+        <div class="p-4 space-y-3 animate-pulse">
+          @for (_ of [1,2,3,4,5,6]; track $index) {
+            <div class="grid grid-cols-12 gap-3 items-center py-2">
+              <div class="col-span-4 h-4 bg-gray-200 rounded"></div>
+              <div class="col-span-4 h-4 bg-gray-200 rounded hidden md:block"></div>
+              <div class="col-span-2 h-4 bg-gray-200 rounded"></div>
+              <div class="col-span-2 h-4 bg-gray-200 rounded"></div>
+            </div>
+          }
         </div>
-        @if (error()) {
-          <p class="text-red-500 font-bold text-xs lg:text-sm mt-3 lg:mt-4 ml-1 flex items-center gap-2">
-            <span class="material-symbols-outlined text-sm">warning</span>
-            {{ error() }}
-          </p>
-        }
-      </div>
+      } @else if (filteredUsers().length > 0) {
+        <table class="w-full">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">User</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Email</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Role</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of filteredUsers(); track user.id) {
+              <tr (click)="selectUser(user)" 
+                  [class]="selectedUser()?.id === user.id ? 'bg-blue-50' : 'hover:bg-gray-50 cursor-pointer'"
+                  class="border-b border-gray-100">
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                      {{ user.fullName?.charAt(0) || '?' }}
+                    </div>
+                    <span class="font-medium text-gray-900">{{ user.fullName }}</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ user.email }}</td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded text-xs font-semibold"
+                        [class]="user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'">
+                    {{ user.role }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded text-xs font-semibold border"
+                        [class]="getStatusColor(user.status)">
+                    {{ getStatusLabel(user.status) }}
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200">
+          <span class="text-sm text-gray-500">{{ filteredUsers().length }} of {{ totalUsers() }}</span>
+          <div class="flex gap-2">
+            <button (click)="prevPage()" [disabled]="currentPage() === 1"
+                    class="px-3 py-1 text-sm bg-white border rounded hover:bg-gray-100 disabled:opacity-50">Prev</button>
+            <button (click)="nextPage()" [disabled]="currentPage() >= Math.ceil(totalUsers() / pageSize)"
+                    class="px-3 py-1 text-sm bg-gray-800 text-white rounded hover:bg-gray-700">Next</button>
+          </div>
+        </div>
+      } @else {
+        <div class="text-center py-16 text-gray-500">
+          <p class="font-semibold">No users found</p>
+          <p class="text-sm text-gray-400 mt-1">Try resetting filters or clearing search.</p>
+          <button (click)="searchQuery=''; statusFilter.set('all'); loadUsers()" class="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-gray-800 text-white hover:bg-gray-700">Reset Filters</button>
+        </div>
+      }
     </div>
 
-    <!-- Results Section -->
+    <!-- Details Panel -->
     @if (selectedUser()) {
-      <div class="animate-in slide-in-from-bottom-6 duration-500">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          
-          <!-- User Profile Card -->
-          <div class="lg:col-span-1 glass-card-premium p-6 lg:p-10 rounded-2xl lg:rounded-[3rem] text-center relative overflow-hidden group">
-            <div class="w-16 lg:w-24 h-16 lg:h-24 bg-gradient-to-br from-charcoal to-slate-800 rounded-2xl lg:rounded-3xl mx-auto flex items-center justify-center text-white text-2xl lg:text-3xl font-black mb-4 lg:mb-8 border border-white/20 shadow-2xl relative z-10 group-hover:scale-110 transition-transform duration-500">
-              {{ selectedUser().fullName?.charAt(0) || '?' }}
-            </div>
-            <div class="relative z-10">
-              <h2 class="text-xl lg:text-3xl font-black text-charcoal mb-2">{{ selectedUser().fullName }}</h2>
-              <p class="text-misty-gray font-bold break-all mb-4 lg:mb-8 text-sm lg:text-base">{{ selectedUser().email }}</p>
-              
-              <div class="flex flex-wrap justify-center gap-2">
-                <span class="px-3 lg:px-4 py-1 lg:py-2 bg-mist-cream/50 rounded-lg lg:rounded-xl text-[8px] lg:text-[10px] font-black uppercase tracking-widest text-charcoal/40 border border-charcoal/5">UID: {{ selectedUser().id?.slice(0,8) }}...</span>
-                <span class="px-3 lg:px-4 py-1 lg:py-2 bg-primary/10 rounded-lg lg:rounded-xl text-[8px] lg:text-[10px] font-black uppercase tracking-widest text-primary border border-primary/20">{{ selectedUser().role }}</span>
-              </div>
-            </div>
-            <div class="absolute bottom-0 right-0 w-20 lg:w-32 h-20 lg:h-32 bg-primary/10 rounded-full translate-x-8 lg:translate-x-10 translate-y-8 lg:translate-y-10 blur-2xl lg:blur-3xl group-hover:scale-150 transition-all duration-700"></div>
+      <div class="bg-white rounded-xl border border-gray-200 p-6 h-fit">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+            {{ selectedUser().fullName?.charAt(0) || '?' }}
           </div>
-
-          <!-- System Controls -->
-          <div class="lg:col-span-2 glass-card-premium p-6 lg:p-10 rounded-2xl lg:rounded-[3rem] space-y-6 lg:space-y-10">
-            <div>
-              <h3 class="text-lg lg:text-2xl font-black text-charcoal mb-4 lg:mb-6 flex items-center gap-2 lg:gap-3">
-                <span class="material-symbols-outlined text-primary text-lg lg:text-xl">verified_user</span>
-                Access Rights & Status
-              </h3>
-              <div class="flex flex-wrap gap-3 lg:gap-4">
-                <button 
-                  (click)="updateStatus(2)"
-                  [class]="selectedUser().status === 'active' ? 'bg-emerald-500 text-white border-transparent' : 'bg-white border-emerald-500/30 text-emerald-700'"
-                  class="flex-1 min-w-[120px] lg:min-w-[160px] h-12 lg:h-16 border-2 rounded-xl lg:rounded-2xl font-black flex items-center justify-center gap-2 lg:gap-3 transition-all hover:shadow-xl hover:shadow-emerald-500/10 text-xs lg:text-sm">
-                  <span class="material-symbols-outlined text-lg">check_circle</span>
-                  MARK ACTIVE
-                </button>
-                
-                <button 
-                  (click)="updateStatus(3)"
-                  [class]="selectedUser().status === 'suspended' ? 'bg-red-500 text-white border-transparent' : 'bg-white border-red-500/30 text-red-700'"
-                  class="flex-1 min-w-[120px] lg:min-w-[160px] h-12 lg:h-16 border-2 rounded-xl lg:rounded-2xl font-black flex items-center justify-center gap-2 lg:gap-3 transition-all hover:shadow-xl hover:shadow-red-500/10 text-xs lg:text-sm">
-                  <span class="material-symbols-outlined text-lg">block</span>
-                  SUSPEND
-                </button>
-
-                <button 
-                  (click)="updateStatus(1)"
-                  [class]="selectedUser().status === 'pendingverification' ? 'bg-amber-500 text-white border-transparent' : 'bg-white border-amber-500/30 text-amber-700'"
-                  class="flex-1 min-w-[120px] lg:min-w-[160px] h-12 lg:h-16 border-2 rounded-xl lg:rounded-2xl font-black flex items-center justify-center gap-2 lg:gap-3 transition-all hover:shadow-xl hover:shadow-amber-500/10 text-xs lg:text-sm">
-                  <span class="material-symbols-outlined text-lg">pending</span>
-                  QUEUE
-                </button>
-              </div>
-            </div>
+          <div>
+            <h2 class="font-bold text-gray-900">{{ selectedUser().fullName }}</h2>
+            <p class="text-sm text-gray-500">{{ selectedUser().email }}</p>
           </div>
         </div>
+
+        <!-- Role Toggle -->
+        <div class="mb-6">
+          <label class="text-xs font-semibold text-gray-500 uppercase block mb-2">Role</label>
+          @if (selectedUser().role === 'admin') {
+            <div class="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <span class="text-purple-700">👑</span>
+                <span class="font-semibold text-purple-700">Admin</span>
+              </div>
+              <button (click)="updateRole('user')"
+                      class="text-sm px-3 py-1 bg-white border border-purple-300 text-purple-700 rounded hover:bg-purple-100">
+                Remove
+              </button>
+            </div>
+          } @else {
+            <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-600">👤</span>
+                <span class="font-semibold text-gray-700">User</span>
+              </div>
+              <button (click)="updateRole('admin')"
+                      class="text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">
+                Make Admin
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Status -->
+        <div class="mb-6">
+          <label class="text-xs font-semibold text-gray-500 uppercase block mb-2">Status</label>
+          <select (change)="updateStatus($any($event.target).value)"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <option value="active" [selected]="selectedUser().status === 'active'">Active</option>
+            <option value="pendingverification" [selected]="selectedUser().status === 'pendingverification'">Pending</option>
+            <option value="suspended" [selected]="selectedUser().status === 'suspended'">Suspended</option>
+            <option value="blocked" [selected]="selectedUser().status === 'blocked'">Blocked</option>
+          </select>
+        </div>
+
+        <!-- Cards -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <label class="text-xs font-semibold text-gray-500 uppercase">Cards ({{ selectedUserCards().length }})</label>
+            <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+              <button (click)="setCardListMode('pending')" [class]="cardListMode() === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-white text-gray-600'" class="px-2.5 py-1 text-[11px] font-bold">Pending First</button>
+              <button (click)="setCardListMode('all')" [class]="cardListMode() === 'all' ? 'bg-slate-200 text-slate-800' : 'bg-white text-gray-600'" class="px-2.5 py-1 text-[11px] font-bold border-l border-gray-200">All</button>
+            </div>
+          </div>
+          @if (isLoadingCards()) {
+            <div class="text-sm text-gray-400">Loading...</div>
+          } @else if (visibleCards().length > 0) {
+            <div class="space-y-2">
+              @for (card of visibleCards(); track card.id) {
+                <div (click)="showCardDetails(card)" class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-lg p-4 text-white cursor-pointer hover:from-slate-700 hover:to-slate-800 transition-all">
+                  <div class="flex justify-between items-start mb-2">
+                    <p class="font-bold">{{ card.issuerName || 'Card' }} {{ card.network }}</p>
+                    <p class="text-sm opacity-60">•••• {{ card.last4 }}</p>
+                  </div>
+                  <p class="text-sm opacity-80">{{ card.outstandingBalance | currency }} / {{ card.creditLimit | currency }}</p>
+                  @if ((card.creditLimit ?? 0) <= 0) {
+                    <p class="mt-2 text-xs font-semibold text-amber-300">Action needed: credit limit not set.</p>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="text-sm text-gray-400">No cards</div>
+          }
+        </div>
+
+        <!-- Messages -->
+        @if (successMessage()) {
+          <div class="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            ✓ {{ successMessage() }}
+          </div>
+        }
+        @if (error()) {
+          <div class="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            ✗ {{ error() }}
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="bg-white rounded-xl border border-gray-200 p-10 text-center">
+        <div class="text-4xl mb-3">👆</div>
+        <p class="text-gray-500">Select a user to view details</p>
       </div>
     }
+  </div>
+
+  <!-- Card Details Modal -->
+  @if (selectedCard()) {
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" (click)="closeCardDetails()">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" (click)="$event.stopPropagation()">
+        <!-- Card Header -->
+        <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold">{{ selectedCard().issuerName || 'Credit Card' }}</h3>
+            <button (click)="closeCardDetails()" class="text-white/60 hover:text-white">✕</button>
+          </div>
+          <p class="text-2xl tracking-widest font-mono">{{ selectedCard().maskedNumber || '•••• •••• •••• ••••' }}</p>
+        </div>
+        
+        <!-- Card Body -->
+        <div class="p-6 space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-gray-500 uppercase">Card Holder</label>
+              <p class="font-medium">{{ selectedCard().cardholderName }}</p>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase">Last 4</label>
+              <p class="font-medium">•••• {{ selectedCard().last4 }}</p>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase">Network</label>
+              <p class="font-medium">{{ selectedCard().network }}</p>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase">Expires</label>
+              <p class="font-medium">{{ selectedCard().expMonth | number:'2.0-0' }}/{{ selectedCard().expYear }}</p>
+            </div>
+          </div>
+
+          <hr class="border-gray-200">
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-gray-500 uppercase">Credit Limit</label>
+              <p class="font-bold text-lg">{{ selectedCard().creditLimit | currency }}</p>
+              @if ((selectedCard().creditLimit ?? 0) <= 0) {
+                <p class="text-xs font-semibold text-amber-600 mt-1">Action needed: set a credit limit.</p>
+              }
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase">Outstanding</label>
+              <p class="font-bold text-lg text-red-600">{{ selectedCard().outstandingBalance | currency }}</p>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase">Available</label>
+              <p class="font-bold text-lg text-green-600">{{ selectedCard().availableCredit | currency }}</p>
+            </div>
+          </div>
+
+          <hr class="border-gray-200">
+
+          <div class="space-y-3">
+            <label class="text-xs text-gray-500 uppercase">Admin Card Controls</label>
+            @if ((selectedCard().creditLimit ?? 0) <= 0) {
+              <div class="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+                This card has no credit limit configured. Set it before demos and billing flows.
+              </div>
+            }
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="text-[11px] text-gray-500">Credit Limit</label>
+                <input [(ngModel)]="editCreditLimit" type="number" min="1" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500">Outstanding</label>
+                <input [(ngModel)]="editOutstandingBalance" type="number" min="0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500">Billing Day</label>
+                <input [(ngModel)]="editBillingCycleStartDay" type="number" min="1" max="31" step="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <p class="text-[10px] text-gray-400 mt-1">Allowed range: 1 to 31</p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+              @if (cardUpdateMessage()) {
+                <p class="text-sm text-gray-600">{{ cardUpdateMessage() }}</p>
+              } @else {
+                <span></span>
+              }
+              <button (click)="updateSelectedCard()" [disabled]="isUpdatingCard()" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 disabled:opacity-60">
+                {{ isUpdatingCard() ? 'Saving...' : 'Save Card Changes' }}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
   }
 </div>

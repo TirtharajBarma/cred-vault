@@ -14,7 +14,6 @@ import { toSignal } from '@angular/core/rxjs-interop';
   styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('client');
   protected authService = inject(AuthService);
   private router = inject(Router);
 

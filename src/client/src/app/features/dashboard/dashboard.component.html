@@ -55,10 +55,8 @@
                   </div>
                 </div>
                 <div class="w-14 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20 px-2">
-                  @if (card.network === 'Visa') {
-                    <span class="text-white font-bold text-xs tracking-wider">VISA</span>
-                  } @else if (card.network === 'Mastercard') {
-                    <span class="text-white font-bold text-xs tracking-wider">MC</span>
+                  @if (getNetworkLogo(card.network); as logo) {
+                    <img [src]="logo" [alt]="card.network + ' logo'" [class]="'h-8 w-auto object-contain ' + (card.network === 'Mastercard' ? 'mix-blend-multiply' : '')" loading="lazy" />
                   } @else {
                     <span class="material-symbols-outlined text-white/40 text-xl">credit_card</span>
                   }
@@ -201,7 +199,7 @@
             <span class="material-symbols-outlined text-red-500 text-lg font-bold">warning_amber</span>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-[12px] font-black text-red-900/80 uppercase tracking-widest mb-0.5">Authorization Error</p>
+            <p class="text-[12px] font-black text-red-900/80 uppercase tracking-widest mb-0.5">Validation Error</p>
             <p class="text-[13px] font-bold text-red-700/70 truncate">{{ errorMessage() }}</p>
           </div>
         </div>
@@ -226,7 +224,7 @@
             <select formControlName="issuerId" class="premium-input px-6 h-14 appearance-none">
               <option value="" disabled>Select Network</option>
               @for (issuer of issuers(); track issuer.id) {
-                <option [value]="issuer.id">{{ issuer.name }}</option>
+                <option [value]="issuer.id">{{ getIssuerLabel(issuer) }}</option>
               }
             </select>
           </div>

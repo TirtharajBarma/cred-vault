@@ -182,6 +182,12 @@ export class CardDetailsComponent implements OnInit {
     return gradients[index % gradients.length];
   }
 
+  getNetworkLogo(network: string | null | undefined): string | null {
+    if (network === 'Visa') return '/assets/visa.png';
+    if (network === 'Mastercard') return '/assets/mastercard.png';
+    return null;
+  }
+
   getTransactionIcon(type: number): string {
     switch (type) {
       case 1: return 'shopping_cart';

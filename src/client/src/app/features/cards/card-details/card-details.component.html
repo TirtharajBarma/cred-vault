@@ -54,10 +54,8 @@
                     </div>
                     
                     <div class="w-14 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20 px-2">
-                        @if (c.network === 'Visa') {
-                          <span class="text-white font-bold text-xs tracking-wider">VISA</span>
-                        } @else if (c.network === 'Mastercard') {
-                          <span class="text-white font-bold text-xs tracking-wider">MC</span>
+                        @if (getNetworkLogo(c.network); as logo) {
+                          <img [src]="logo" [alt]="c.network + ' logo'" [class]="'h-8 w-auto object-contain ' + (c.network === 'Mastercard' ? 'mix-blend-multiply' : '')" loading="lazy" />
                         } @else {
                           <span class="material-symbols-outlined text-white/40 text-xl">credit_card</span>
                         }

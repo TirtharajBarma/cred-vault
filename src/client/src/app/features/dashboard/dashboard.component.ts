@@ -5,7 +5,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { CreditCard, CardTransaction, TransactionType } from '../../core/models/card.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
-import { delay, catchError } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
 
 import { RouterLink } from '@angular/router';
 
@@ -63,9 +63,7 @@ export class DashboardComponent implements OnInit {
     forkJoin({
       cards: cards$,
       transactions: transactions$
-    }).pipe(
-      delay(800)
-    ).subscribe({
+    }).subscribe({
       next: (res: any) => {
         if (res.cards.success) {
           this.cards.set(res.cards.data || []);
@@ -132,6 +130,25 @@ export class DashboardComponent implements OnInit {
   getCardGradient(index: number): string {
     const gradients = ['card-gradient-1', 'card-gradient-2', 'card-gradient-3'];
     return gradients[index % gradients.length];
+  }
+
+  getIssuerLabel(issuer: any): string {
+    const raw = issuer?.network;
+    const network = typeof raw === 'string'
+      ? raw
+      : raw === 1
+        ? 'Visa'
+        : raw === 2
+          ? 'Mastercard'
+          : 'Unknown';
+
+    return `${issuer?.name ?? 'Issuer'} (${network})`;
+  }
+
+  getNetworkLogo(network: string | null | undefined): string | null {
+    if (network === 'Visa') return '/assets/visa.png';
+    if (network === 'Mastercard') return '/assets/mastercard.png';
+    return null;
   }
 
   getTotalAssets(): number {

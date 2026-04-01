@@ -79,38 +79,38 @@ export class AuthService {
     if (token && user) {
       this.currentUser.set(user);
       this.token.set(token);
-      localStorage.setItem('cv_token', token);
-      localStorage.setItem('cv_user', JSON.stringify(user));
+      sessionStorage.setItem('cv_token', token);
+      sessionStorage.setItem('cv_user', JSON.stringify(user));
     }
   }
 
   private clearAuthData(): void {
     this.currentUser.set(null);
     this.token.set(null);
-    localStorage.removeItem('cv_token');
-    localStorage.removeItem('cv_user');
+    sessionStorage.removeItem('cv_token');
+    sessionStorage.removeItem('cv_user');
   }
 
   private setPendingEmail(email: string): void {
     this.pendingEmail.set(email);
-    localStorage.setItem('cv_pending_email', email);
+    sessionStorage.setItem('cv_pending_email', email);
   }
 
   private clearPendingEmail(): void {
     this.pendingEmail.set(null);
-    localStorage.removeItem('cv_pending_email');
+    sessionStorage.removeItem('cv_pending_email');
   }
 
   private getPendingEmail(): string | null {
-    return localStorage.getItem('cv_pending_email');
+    return sessionStorage.getItem('cv_pending_email');
   }
 
   private getStoredToken(): string | null {
-    return localStorage.getItem('cv_token');
+    return sessionStorage.getItem('cv_token');
   }
 
   private getStoredUser(): User | null {
-    const userStr = localStorage.getItem('cv_user');
+    const userStr = sessionStorage.getItem('cv_user');
     try {
       return userStr ? JSON.parse(userStr) : null;
     } catch {

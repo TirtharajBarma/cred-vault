@@ -5,6 +5,47 @@ import { ApiResponse } from '../models/auth.models';
 
 const API_GATEWAY = 'http://localhost:5006';
 
+export interface User {
+  id: string;
+  email: string;
+  fullName: string;
+  status: string;
+  role: string;
+  createdAtUtc: string;
+  isEmailVerified: boolean;
+  cardCount?: number;
+}
+
+export interface UserStats {
+  totalUsers: number;
+  activeUsers: number;
+  suspendedUsers: number;
+  pendingUsers: number;
+  blockedUsers: number;
+}
+
+export interface AuditLog {
+  id: string;
+  entityName: string;
+  entityId: string;
+  action: string;
+  userId: string;
+  traceId: string;
+  isSuccess: boolean;
+  createdAtUtc: string;
+}
+
+export interface NotificationLog {
+  id: string;
+  subject: string;
+  type: string;
+  recipient: string;
+  isSuccess: boolean;
+  errorMessage?: string;
+  traceId: string;
+  createdAtUtc: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -12,16 +53,20 @@ export class AdminService {
   private http = inject(HttpClient);
   
   // Identity Admin
-  getUserDetails(userId: string): Observable<ApiResponse<any>> {
-    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/identity/users/${userId}`);
+  getUserDetails(userId: string): Observable<ApiResponse<User>> {
+    return this.http.get<ApiResponse<User>>(`${API_GATEWAY}/api/v1/identity/users/${userId}`);
   }
 
-  updateUserStatus(userId: string, status: number): Observable<ApiResponse<any>> {
-    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/identity/users/${userId}/status`, { status });
+  updateUserStatus(userId: string, status: string): Observable<ApiResponse<any>> {
+    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/identity/users/${userId}/status`, { Status: status });
   }
 
-  getAllUsers(params: { page?: number; pageSize?: number; search?: string; status?: string }): Observable<ApiResponse<any>> {
-    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/identity/users`, { params });
+  updateUserRole(userId: string, role: string): Observable<ApiResponse<any>> {
+    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/identity/users/${userId}/role`, { Role: role });
+  }
+
+  getAllUsers(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/identity/users`, { params: { ...params } });
   }
 
   getUserStats(): Observable<ApiResponse<any>> {
@@ -34,20 +79,31 @@ export class AdminService {
   }
 
   createIssuer(issuer: any): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/issuers`, issuer);
+    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/issuers`, {
+      Name: issuer.name,
+      Network: issuer.network
+    });
+  }
+
+  updateIssuer(id: string, issuer: any): Observable<ApiResponse<any>> {
+    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/issuers/${id}`, {
+      Name: issuer.name,
+      Network: issuer.network
+    });
   }
 
   deleteIssuer(id: string): Observable<ApiResponse<any>> {
     return this.http.delete<ApiResponse<any>>(`${API_GATEWAY}/api/v1/issuers/${id}`);
   }
 
-  updateCardLimit(cardId: string, limitData: any): Observable<ApiResponse<any>> {
-    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/${cardId}/admin`, limitData);
-  }
 
   // Billing Admin
-  generateBill(billData: any): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/bills/admin/generate-bill`, billData);
+  generateBill(billData: { userId: string; cardId: string; currency: string }): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/bills/admin/generate-bill`, {
+      UserId: billData.userId,
+      CardId: billData.cardId,
+      Currency: billData.currency
+    });
   }
 
   getRewardTiers(): Observable<ApiResponse<any>> {
@@ -55,7 +111,14 @@ export class AdminService {
   }
 
   createRewardTier(tier: any): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/rewards/tiers`, tier);
+    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/rewards/tiers`, {
+      CardNetwork: tier.cardNetwork === 1 ? 'Visa' : 'Mastercard',
+      IssuerId: tier.issuerId || null,
+      MinSpend: tier.minSpend,
+      RewardRate: tier.rewardRate,
+      EffectiveFromUtc: tier.effectiveFromUtc ? new Date(tier.effectiveFromUtc).toISOString() : new Date().toISOString(),
+      EffectiveToUtc: tier.effectiveToUtc ? new Date(tier.effectiveToUtc).toISOString() : null
+    });
   }
 
   deleteRewardTier(id: string): Observable<ApiResponse<any>> {
@@ -63,12 +126,12 @@ export class AdminService {
   }
 
   // Notification Admin
-  getAuditLogs(params?: any): Observable<ApiResponse<any>> {
-    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/notifications/audit`, { params });
+  getAuditLogs(params: { page?: number; pageSize?: number; traceId?: string } = {}): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/notifications/audit`, { params: { ...params } });
   }
 
-  getNotificationLogs(params?: any): Observable<ApiResponse<any>> {
-    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/notifications/logs`, { params });
+  getNotificationLogs(params: { page?: number; pageSize?: number; email?: string } = {}): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/notifications/logs`, { params: { ...params } });
   }
 
   // Helper methods for dropdowns
@@ -78,5 +141,13 @@ export class AdminService {
 
   getCardsByUser(userId: string): Observable<ApiResponse<any>> {
     return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/user/${userId}`);
+  }
+
+  updateCardByAdmin(cardId: string, cardData: { creditLimit: number; outstandingBalance?: number | null; billingCycleStartDay?: number | null }): Observable<ApiResponse<any>> {
+    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/${cardId}/admin`, {
+      CreditLimit: cardData.creditLimit,
+      OutstandingBalance: cardData.outstandingBalance ?? null,
+      BillingCycleStartDay: cardData.billingCycleStartDay ?? null
+    });
   }
 }
