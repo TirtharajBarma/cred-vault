@@ -7,6 +7,7 @@ using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
 using Shared.Contracts.Events.Payment;
+using Shared.Contracts.Events.Saga;
 
 namespace PaymentService.Application.Commands.Payments;
 
@@ -18,7 +19,7 @@ public record InitiatePaymentCommand(
     PaymentType PaymentType,
     string AuthorizationHeader) : IRequest<InitiatePaymentResult>;
 
-public record InitiatePaymentResult(bool Success, Guid? PaymentId, string? Error, bool OtpRequired = false, bool UserVerified = false);
+public record InitiatePaymentResult(bool Success, Guid? PaymentId, string? Error, bool OtpRequired = true, string? OtpCode = null);
 
 public record UserDto(Guid Id, string Email, string FullName);
 
@@ -83,56 +84,34 @@ public class InitiatePaymentCommandHandler(
         }
 
         var riskScore = payment.Amount > 10000 ? 85m : payment.Amount > 5000 ? 60m : 20m;
-        var otpRequired = riskScore >= 50 && riskScore < 75;
-        var isBlocked = riskScore >= 75;
+        var otpCode = GenerateOtp();
 
-        if (isBlocked)
-        {
-            logger.LogError("Payment {PaymentId} BLOCKED: RiskScore={RiskScore} exceeds threshold", payment.Id, riskScore);
-            payment.Status = PaymentStatus.Failed;
-            payment.FailureReason = "Risk score exceeded threshold";
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            return new InitiatePaymentResult(false, payment.Id, "Payment blocked due to high risk score");
-        }
+        logger.LogInformation("Starting SAGA orchestration for PaymentId={PaymentId}, Amount={Amount}, RiskScore={RiskScore}, OTP={OtpCode}",
+            payment.Id, payment.Amount, riskScore, otpCode);
 
-        if (otpRequired)
+        await publishEndpoint.Publish<IStartPaymentOrchestration>(new
         {
-            logger.LogInformation("Publishing IPaymentInitiated for PaymentId={PaymentId}, RiskScore={RiskScore}, OTP required",
-                payment.Id, riskScore);
-            await publishEndpoint.Publish<IPaymentInitiated>(new
-            {
-                PaymentId   = payment.Id,
-                UserId      = payment.UserId,
-                Email       = user?.Email ?? string.Empty,
-                FullName    = user?.FullName ?? "Unknown",
-                CardId      = payment.CardId,
-                BillId      = payment.BillId,
-                Amount      = payment.Amount,
-                PaymentType = payment.PaymentType.ToString(),
-                CreatedAt   = payment.CreatedAtUtc,
-                RiskScore   = riskScore
-            }, cancellationToken);
-            return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: true, UserVerified: userSuccess);
-        }
-
-        logger.LogInformation("Publishing IPaymentCompleted for PaymentId={PaymentId}, Amount={Amount}, RiskScore={RiskScore}",
-            payment.Id, payment.Amount, riskScore);
-        await publishEndpoint.Publish<IPaymentCompleted>(new
-        {
-            PaymentId    = payment.Id,
-            UserId       = payment.UserId,
-            Email        = user?.Email ?? string.Empty,
-            FullName     = user?.FullName ?? "Unknown",
-            CardId       = payment.CardId,
-            BillId       = payment.BillId,
-            Amount       = payment.Amount,
-            RiskScore    = riskScore,
-            RiskDecision = RiskDecision.AutoApproved.ToString(),
-            CompletedAt  = DateTime.UtcNow
+            CorrelationId = payment.Id,
+            PaymentId = payment.Id,
+            UserId = payment.UserId,
+            Email = user?.Email ?? string.Empty,
+            FullName = user?.FullName ?? "Unknown",
+            CardId = payment.CardId,
+            BillId = payment.BillId,
+            Amount = payment.Amount,
+            PaymentType = payment.PaymentType.ToString(),
+            RiskScore = riskScore,
+            OtpCode = otpCode,
+            StartedAt = DateTime.UtcNow
         }, cancellationToken);
 
-        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: false, UserVerified: userSuccess);
+        logger.LogInformation("SAGA orchestration started: PaymentId={PaymentId}, OTP={OtpCode}", payment.Id, otpCode);
+
+        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: true, OtpCode: otpCode);
     }
+
+    private static string GenerateOtp() =>
+        Random.Shared.Next(100000, 999999).ToString();
 
     private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
     {

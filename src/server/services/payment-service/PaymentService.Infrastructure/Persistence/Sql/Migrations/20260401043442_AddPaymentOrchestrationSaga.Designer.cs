@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PaymentService.Infrastructure.Persistence.Sql;
 
 #nullable disable
 
-namespace PaymentService.Infrastructure.Migrations
+namespace PaymentService.Infrastructure.Persistence.Sql.Migrations
 {
     [DbContext(typeof(PaymentDbContext))]
-    partial class PaymentDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260401043442_AddPaymentOrchestrationSaga")]
+    partial class AddPaymentOrchestrationSaga
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -159,15 +162,6 @@ namespace PaymentService.Infrastructure.Migrations
 
                     b.Property<string>("FullName")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("OtpCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("OtpExpiresAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("OtpVerified")
-                        .HasColumnType("bit");
 
                     b.Property<string>("PaymentError")
                         .HasMaxLength(500)

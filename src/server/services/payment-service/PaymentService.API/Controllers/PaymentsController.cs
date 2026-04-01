@@ -9,6 +9,7 @@ using PaymentService.Domain.Enums;
 using PaymentService.Infrastructure.Persistence.Sql;
 using Shared.Contracts.Controllers;
 using Shared.Contracts.Models;
+
 namespace PaymentService.API.Controllers;
 
 [ApiController]
@@ -33,44 +34,16 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         if (!result.Success)
             return BadRequest(Fail(result.Error ?? "Payment initiation failed."));
 
-        // In Development, return the OTP directly so you can test without email/SMS.
-        // There is an inherent race condition here: the HTTP request publishes 'PaymentInitiated' 
-        // to RabbitMQ and returns. MassTransit processes it asynchronously, meaning the Saga 
-        // might not have generated and saved the OTP into the database *yet* when this line runs.
-        // We poll briefly to wait for the saga to complete its first step.
-        string? devOtp = null;
-        if (result.OtpRequired && env.IsDevelopment())
-        {
-            var db = HttpContext.RequestServices.GetRequiredService<PaymentDbContext>();
-            for (var i = 0; i < 10; i++)
-            {
-                await Task.Delay(200);
-                var saga = await db.PaymentSagas
-                    .AsNoTracking()
-                    .Where(x => x.PaymentId == result.PaymentId && x.OtpCode != null)
-                    .Select(x => new { x.OtpCode })
-                    .FirstOrDefaultAsync();
-                if (saga?.OtpCode is not null)
-                {
-                    devOtp = saga.OtpCode;
-                    break;
-                }
-            }
-        }
-
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
         {
             Success = true,
-            Message = result.OtpRequired
-                ? "Payment initiated. OTP required — call /verify-otp to complete."
-                : "Payment completed successfully.",
+            Message = "Payment initiated. OTP required — call /verify-otp to complete.",
             Data = new
             {
-                PaymentId   = result.PaymentId,
+                PaymentId = result.PaymentId,
                 OtpRequired = result.OtpRequired,
-                Status      = result.OtpRequired ? "Pending OTP Verification" : "Completed",
-                // Only present in Development — remove in production
-                DevOtp      = devOtp
+                Status = "Pending OTP Verification",
+                DevOtp = result.OtpCode
             },
             TraceId = HttpContext.TraceIdentifier
         });
@@ -80,39 +53,19 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
     public async Task<IActionResult> VerifyOtp(
         Guid paymentId,
         [FromBody] VerifyOtpRequest request,
-        [FromServices] PaymentDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        var saga = await dbContext.PaymentSagas
-            .FirstOrDefaultAsync(x => x.PaymentId == paymentId, cancellationToken);
+        var command = new VerifyOtpCommand(paymentId, request.OtpCode);
+        var result = await mediator.Send(command, cancellationToken);
 
-        if (saga is null)
-            return NotFound(Fail("Payment not found."));
-
-        if (saga.CurrentState != "RiskCheckPassed")
-            return BadRequest(Fail("Payment is not awaiting OTP verification."));
-
-        if (string.IsNullOrWhiteSpace(saga.OtpCode))
-            return BadRequest(Fail("No OTP was generated for this payment."));
-
-        if (saga.OtpExpiresAtUtc.HasValue && saga.OtpExpiresAtUtc.Value < DateTime.UtcNow)
-            return BadRequest(Fail("OTP has expired. Please initiate a new payment."));
-
-        if (!string.Equals(saga.OtpCode, request.OtpCode.Trim(), StringComparison.Ordinal))
-            return BadRequest(Fail("Invalid OTP."));
-
-        // Clear OTP after successful use (one-time use)
-        saga.OtpCode = null;
-        saga.OtpExpiresAtUtc = null;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var command = new VerifyPaymentOtpCommand(paymentId, request.OtpCode);
-        await mediator.Send(command, cancellationToken);
+        if (!result.Success)
+            return BadRequest(Fail(result.Error ?? "OTP verification failed."));
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
             Message = "OTP verified. Payment is processing.",
+            Data = new { PaymentId = paymentId, Status = "Processing" },
             TraceId = HttpContext.TraceIdentifier
         });
     }

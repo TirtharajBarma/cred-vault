@@ -38,7 +38,11 @@ try
     builder.Services.AddStandardCors();
     builder.Services.AddStandardAuth(builder.Configuration);
 
-    builder.Services.AddDbContext<PaymentDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("PaymentDb")));
+    builder.Services.AddDbContext<PaymentDbContext>(o =>
+    {
+        o.UseSqlServer(builder.Configuration.GetConnectionString("PaymentDb"));
+        o.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    });
 
     builder.Services.AddHttpClient();
     builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
@@ -61,8 +65,10 @@ try
         x.AddConsumer<PaymentFailedConsumer>();
         x.AddConsumer<FraudDetectedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
-        x.AddSagaStateMachine<PaymentSaga, PaymentSagaState>()
-            .InMemoryRepository();
+        x.AddConsumer<PaymentProcessConsumer>();
+        x.AddConsumer<RevertPaymentConsumer>();
+        x.AddSagaStateMachine<PaymentOrchestrationSaga, PaymentOrchestrationSagaState>()
+            .EntityFrameworkRepository(r => r.ExistingDbContext<PaymentDbContext>());
 
         x.UsingRabbitMq((ctx, cfg) =>
         {
@@ -72,15 +78,19 @@ try
                 h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
             });
 
-            cfg.ReceiveEndpoint("payment-domain-event", e =>
+            cfg.ReceiveEndpoint("payment-orchestration", e =>
             {
                 e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
                 e.UseInMemoryOutbox();
-                e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
-                e.ConfigureConsumer<PaymentFailedConsumer>(ctx);
-                e.ConfigureConsumer<FraudDetectedConsumer>(ctx);
-                e.ConfigureConsumer<UserDeletedConsumer>(ctx);
-                e.ConfigureSaga<PaymentSagaState>(ctx);
+                e.ConfigureSaga<PaymentOrchestrationSagaState>(ctx);
+            });
+
+            cfg.ReceiveEndpoint("payment-process", e =>
+            {
+                e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
+                e.UseInMemoryOutbox();
+                e.ConfigureConsumer<PaymentProcessConsumer>(ctx);
+                e.ConfigureConsumer<RevertPaymentConsumer>(ctx);
             });
         });
     });

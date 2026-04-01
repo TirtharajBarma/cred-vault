@@ -51,6 +51,8 @@ try
         x.AddConsumer<PaymentCompletedConsumer>();
         x.AddConsumer<PaymentReversedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
+        x.AddConsumer<BillUpdateSagaConsumer>();
+        x.AddConsumer<RevertBillSagaConsumer>();
 
         x.UsingRabbitMq((ctx, cfg) =>
         {
@@ -67,6 +69,8 @@ try
                 e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
                 e.ConfigureConsumer<PaymentReversedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
+                e.ConfigureConsumer<BillUpdateSagaConsumer>(ctx);
+                e.ConfigureConsumer<RevertBillSagaConsumer>(ctx);
             });
         });
     });

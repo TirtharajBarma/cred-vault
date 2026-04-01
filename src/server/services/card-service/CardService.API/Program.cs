@@ -5,6 +5,7 @@ using CardService.Application.Commands.Cards;
 using CardService.Application.Queries.Cards;
 using CardService.API.Messaging;
 using CardService.Infrastructure.Persistence.Sql;
+using CardService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using MassTransit;
 using Serilog;
@@ -41,12 +42,14 @@ try
     });
     builder.Services.AddDbContext<CardDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("CardDb")));
     builder.Services.AddScoped<ICardRepository, SqlCardRepository>();
+    builder.Services.AddScoped<ICardDbContextAccessor, CardDbContextAccessor>();
 
     builder.Services.AddMassTransit(x =>
     {
         x.SetKebabCaseEndpointNameFormatter();
-        x.AddConsumer<PaymentCompletedConsumer>();
+        x.AddConsumer<PaymentReversedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
+        x.AddConsumer<CardDeductionSagaConsumer>();
 
         x.UsingRabbitMq((ctx, cfg) =>
         {
@@ -60,8 +63,9 @@ try
             {
                 e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
                 e.UseInMemoryOutbox();
-                e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
+                e.ConfigureConsumer<PaymentReversedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
+                e.ConfigureConsumer<CardDeductionSagaConsumer>(ctx);
             });
         });
     });
