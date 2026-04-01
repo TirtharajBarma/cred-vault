@@ -41,7 +41,7 @@ public sealed class ResendVerificationCommandHandler(IUserRepository users, IPub
             await users.UpdateAsync(user, ct);
             logger.LogInformation("OTP resent for {UserId}: {Email}", user.Id, email);
 
-            await publisher.Publish(new { user.Id, user.Email, user.FullName, OtpCode = user.EmailVerificationOtp, Purpose = "EmailVerification", ExpiresAtUtc = user.EmailVerificationOtpExpiresAtUtc }, ct);
+            await publisher.Publish<IUserOtpGenerated>(new { UserId = user.Id, user.Email, user.FullName, OtpCode = user.EmailVerificationOtp, Purpose = "EmailVerification", ExpiresAtUtc = user.EmailVerificationOtpExpiresAtUtc }, ct);
             logger.LogInformation("Published IUserOtpGenerated for {UserId}", user.Id);
 
             return new() { Success = true, Message = "OTP sent" };

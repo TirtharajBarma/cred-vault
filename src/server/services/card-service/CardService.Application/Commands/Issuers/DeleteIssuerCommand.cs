@@ -1,6 +1,5 @@
 using MediatR;
 using CardService.Application.Abstractions.Persistence;
-using CardService.Domain.Entities;
 
 namespace CardService.Application.Commands.Issuers;
 
@@ -10,9 +9,9 @@ public sealed class DeleteIssuerCommandHandler(ICardRepository cardRepository) :
 {
     public async Task<DeleteIssuerResult> Handle(DeleteIssuerCommand request, CancellationToken cancellationToken)
     {
-        var issuer = await cardRepository.GetIssuerByIdAsync(request.Id, cancellationToken);
+        var issuer = await cardRepository.GetIssuerByIdRawAsync(request.Id, cancellationToken);
         
-        if (issuer == null || issuer.Id == Guid.Empty)
+        if (issuer == null)
         {
             return new DeleteIssuerResult
             {
@@ -26,7 +25,7 @@ public sealed class DeleteIssuerCommandHandler(ICardRepository cardRepository) :
             return new DeleteIssuerResult
             {
                 Success = false,
-                Message = "Cannot delete issuer with attached cards. Remove or reassign all cards first."
+                Message = "Cannot delete issuer with attached cards."
             };
         }
 

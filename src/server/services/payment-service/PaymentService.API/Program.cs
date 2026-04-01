@@ -61,6 +61,8 @@ try
         x.AddConsumer<PaymentFailedConsumer>();
         x.AddConsumer<FraudDetectedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
+        x.AddSagaStateMachine<PaymentSaga, PaymentSagaState>()
+            .InMemoryRepository();
 
         x.UsingRabbitMq((ctx, cfg) =>
         {
@@ -78,6 +80,7 @@ try
                 e.ConfigureConsumer<PaymentFailedConsumer>(ctx);
                 e.ConfigureConsumer<FraudDetectedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
+                e.ConfigureSaga<PaymentSagaState>(ctx);
             });
         });
     });

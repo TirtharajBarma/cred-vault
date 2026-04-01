@@ -15,10 +15,12 @@ public interface ICardRepository
 
     Task<CardIssuer?> GetIssuerByNetworkAsync(CardNetwork network, CancellationToken cancellationToken = default);
     Task<CardIssuer?> GetIssuerByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<CardIssuer?> GetIssuerByIdRawAsync(Guid id, CancellationToken cancellationToken = default);
     Task<List<CardIssuer>> ListIssuersAsync(CancellationToken cancellationToken = default);
     Task<bool> HasDuplicateCardAsync(Guid userId, CardNetwork network, string last4, CancellationToken cancellationToken = default);
     Task<bool> HasDuplicateIssuerAsync(string normalizedName, CancellationToken cancellationToken = default);
     Task AddIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default);
+    Task UpdateIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default);
     Task DeleteIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default);
 
     Task AddTransactionAsync(CardTransaction transaction, CancellationToken cancellationToken = default);

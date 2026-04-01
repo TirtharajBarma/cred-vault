@@ -15,6 +15,17 @@ public sealed class UpdateUserStatusCommandHandler(IUserRepository userRepositor
         var user = await userRepository.GetByIdAsync(request.UserId, cancellationToken);
         if (user is null) return new OperationResult { Success = false, Message = "User not found." };
 
+        if (request.Status == UserStatus.Active && !user.IsEmailVerified)
+        {
+            user.IsEmailVerified = true;
+            user.EmailVerificationOtp = null;
+            user.EmailVerificationOtpExpiresAtUtc = null;
+        }
+        else if (request.Status == UserStatus.PendingVerification)
+        {
+            user.IsEmailVerified = false;
+        }
+
         user.Status = request.Status;
         user.UpdatedAtUtc = DateTime.UtcNow;
         await userRepository.UpdateAsync(user, cancellationToken);

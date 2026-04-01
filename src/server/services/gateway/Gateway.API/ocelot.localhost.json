@@ -48,15 +48,6 @@
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
     },
     {
-      "DownstreamPathTemplate": "/api/v1/cards/{cardId}/transactions/{everything}",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [
-        { "Host": "localhost", "Port": 5002 }
-      ],
-      "UpstreamPathTemplate": "/api/v1/cards/{cardId}/transactions/{everything}",
-      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
-    },
-    {
       "DownstreamPathTemplate": "/api/v1/issuers",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [

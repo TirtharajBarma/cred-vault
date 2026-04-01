@@ -15,6 +15,32 @@ namespace CardService.API.Controllers;
 [Authorize]
 public class IssuersController(IMediator mediator) : ControllerBase
 {
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetIssuer(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetIssuerByIdQuery(id), cancellationToken);
+
+        if (result.Id == Guid.Empty)
+        {
+            return NotFound(new ApiResponse<object>
+            {
+                Success = false,
+                Message = "Issuer not found",
+                TraceId = HttpContext.TraceIdentifier
+            });
+        }
+
+        return Ok(new ApiResponse<CardIssuerDto>
+        {
+            Success = true,
+            Message = "Issuer retrieved successfully",
+            Data = result,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
     [HttpGet]
     public async Task<IActionResult> ListIssuers(CancellationToken cancellationToken)
     {
@@ -36,7 +62,7 @@ public class IssuersController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await mediator.Send(
-            new CreateIssuerCommand(request.Name, request.Network, request.IsActive),
+            new CreateIssuerCommand(request.Name, request.Network),
             cancellationToken);
 
         if (!result.Success)
@@ -59,40 +85,49 @@ public class IssuersController(IMediator mediator) : ControllerBase
         });
     }
 
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> UpdateIssuer(
+        [FromRoute] Guid id,
+        [FromBody] CreateIssuerRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(
+            new UpdateIssuerCommand(id, request.Name, request.Network),
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            return BadRequest(new ApiResponse<object>
+            {
+                Success = false,
+                Message = result.Message,
+                TraceId = HttpContext.TraceIdentifier
+            });
+        }
+
+        var issuer = result.Issuers.First();
+        return Ok(new ApiResponse<CardIssuerDto>
+        {
+            Success = true,
+            Message = result.Message,
+            Data = issuer,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> DeleteIssuer(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var issuer = await mediator.Send(new GetIssuerByIdQuery(id), cancellationToken);
-        
-        if (issuer == null || issuer.Id == Guid.Empty)
-        {
-            return NotFound(new ApiResponse<object>
-            {
-                Success = false,
-                Message = "Issuer not found.",
-                TraceId = HttpContext.TraceIdentifier
-            });
-        }
-
         var deleteResult = await mediator.Send(new DeleteIssuerCommand(id), cancellationToken);
 
-        if (!deleteResult.Success)
+        return StatusCode(deleteResult.Success ? 200 : 400, new ApiResponse<object>
         {
-            return BadRequest(new ApiResponse<object>
-            {
-                Success = false,
-                Message = deleteResult.Message,
-                TraceId = HttpContext.TraceIdentifier
-            });
-        }
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Message = "Issuer deleted successfully.",
+            Success = deleteResult.Success,
+            Message = deleteResult.Message,
             TraceId = HttpContext.TraceIdentifier
         });
     }

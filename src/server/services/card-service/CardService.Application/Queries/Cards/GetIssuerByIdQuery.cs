@@ -23,7 +23,6 @@ public sealed class GetIssuerByIdQueryHandler(ICardRepository cardRepository) : 
             Id = issuer.Id,
             Name = issuer.Name,
             Network = issuer.Network.ToString(),
-            IsActive = issuer.IsActive,
             CreatedAtUtc = issuer.CreatedAtUtc,
             UpdatedAtUtc = issuer.UpdatedAtUtc
         };

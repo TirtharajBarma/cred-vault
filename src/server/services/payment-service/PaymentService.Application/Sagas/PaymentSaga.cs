@@ -7,7 +7,6 @@ namespace PaymentService.Application.Sagas;
 
 public class PaymentSaga : MassTransitStateMachine<PaymentSagaState>
 {
-    public State Initial { get; private set; } = null!;
     public State Initiated { get; private set; } = null!;
     public State RiskCheckPassed { get; private set; } = null!;
     public State Processing { get; private set; } = null!;

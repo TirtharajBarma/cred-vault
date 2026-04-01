@@ -36,7 +36,7 @@ public sealed class ForgotPasswordCommandHandler(IUserRepository users, IPublish
             await users.UpdateAsync(user, ct);
             logger.LogInformation("Password reset OTP generated for {UserId}: {Email}", user.Id, email);
 
-            await publisher.Publish(new { user.Id, user.Email, user.FullName, OtpCode = otp, Purpose = "PasswordReset", ExpiresAtUtc = user.PasswordResetOtpExpiresAtUtc }, ct);
+            await publisher.Publish<IUserOtpGenerated>(new { UserId = user.Id, user.Email, user.FullName, OtpCode = otp, Purpose = "PasswordReset", ExpiresAtUtc = user.PasswordResetOtpExpiresAtUtc }, ct);
             logger.LogInformation("Published IUserOtpGenerated for {UserId}", user.Id);
 
             return new() { Success = true, Message = "If exists, OTP sent" };

@@ -22,7 +22,6 @@ public sealed class ListIssuersQueryHandler(ICardRepository cardRepository)
                 Id = i.Id,
                 Name = i.Name,
                 Network = i.Network.ToString(),
-                IsActive = i.IsActive,
                 CreatedAtUtc = i.CreatedAtUtc,
                 UpdatedAtUtc = i.UpdatedAtUtc
             }).ToList()

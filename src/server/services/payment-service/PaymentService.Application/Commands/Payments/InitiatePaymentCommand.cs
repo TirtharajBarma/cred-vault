@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
-using PaymentService.Application.Services;
 using Shared.Contracts.Events.Payment;
 
 namespace PaymentService.Application.Commands.Payments;
@@ -83,7 +82,7 @@ public class InitiatePaymentCommandHandler(
             logger.LogWarning("Payment {PaymentId}: User verification failed - proceeding but flagging", payment.Id);
         }
 
-        var riskScore = RiskCalculator.Calculate(payment.Amount);
+        var riskScore = payment.Amount > 10000 ? 85m : payment.Amount > 5000 ? 60m : 20m;
         var otpRequired = riskScore >= 50 && riskScore < 75;
         var isBlocked = riskScore >= 75;
 

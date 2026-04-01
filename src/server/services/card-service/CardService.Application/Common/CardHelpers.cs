@@ -83,7 +83,7 @@ public static class CardHelpers
         // Mastercard: length 16, IIN 51-55 or 2221-2720
         if (digits.Length == 16)
         {
-            if (digits.Length >= 2 && int.TryParse(digits[..2], out var first2) && first2 is >= 50 and <= 55)
+            if (digits.Length >= 2 && int.TryParse(digits[..2], out var first2) && first2 is >= 51 and <= 55)
             {
                 return CardNetwork.Mastercard;
             }

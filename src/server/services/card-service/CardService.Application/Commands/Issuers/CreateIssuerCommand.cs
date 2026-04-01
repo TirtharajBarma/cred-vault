@@ -9,8 +9,7 @@ namespace CardService.Application.Commands.Issuers;
 
 public sealed record CreateIssuerCommand(
     string Name,
-    string Network,
-    bool IsActive
+    string Network
 ) : IRequest<IssuersResult>;
 
 public sealed class CreateIssuerCommandHandler(
@@ -56,7 +55,6 @@ public sealed class CreateIssuerCommandHandler(
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Network = network,
-            IsActive = request.IsActive,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -74,7 +72,6 @@ public sealed class CreateIssuerCommandHandler(
                     Id = issuer.Id,
                     Name = issuer.Name,
                     Network = issuer.Network.ToString(),
-                    IsActive = issuer.IsActive,
                     CreatedAtUtc = issuer.CreatedAtUtc,
                     UpdatedAtUtc = issuer.UpdatedAtUtc
                 }

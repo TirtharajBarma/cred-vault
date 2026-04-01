@@ -51,6 +51,12 @@ public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientF
             return new() { Success = false, Message = "No balance to bill" };
         }
 
+        if (await bills.HasPendingBillAsync(request.UserId, request.CardId, ct))
+        {
+            logger.LogWarning("Duplicate bill attempt: UserId={UserId}, CardId={CardId}", request.UserId, request.CardId);
+            return new() { Success = false, Message = "A pending bill already exists for this card" };
+        }
+
         var minDue = Math.Max(Math.Round(card.OutstandingBalance * 0.10m, 2, MidpointRounding.AwayFromZero), 10.00m);
         var now = DateTime.UtcNow;
 
@@ -67,15 +73,18 @@ public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientF
         logger.LogInformation("Bill created: {BillId}, Amount={Amount}, DueDate={DueDate}", bill.Id, bill.Amount, bill.DueDateUtc);
 
         var (userOk, user, _) = await GetUserAsync(request.UserId, request.AuthorizationHeader, ct);
-        if (userOk && user != null && !string.IsNullOrWhiteSpace(user.Email))
+        var userEmail = userOk && user != null ? user.Email : null;
+        var userName = userOk && user != null ? user.FullName : null;
+
+        if (string.IsNullOrWhiteSpace(userEmail))
         {
-            await publisher.Publish(new { BillId = bill.Id, bill.UserId, user.Email, user.FullName, bill.CardId, bill.Amount, DueDate = bill.DueDateUtc, GeneratedAt = bill.CreatedAtUtc }, ct);
-            logger.LogInformation("Published IBillGenerated for {BillId}", bill.Id);
+            logger.LogWarning("Could not fetch user email for {UserId}. Publishing event with fallback.", request.UserId);
+            userEmail = $"user-{request.UserId}@credvault.local";
+            userName = "User";
         }
-        else
-        {
-            logger.LogWarning("Could not fetch user details for {UserId}: {Error}", request.UserId, userOk ? "null user" : "fetch failed");
-        }
+
+        await publisher.Publish<IBillGenerated>(new { BillId = bill.Id, UserId = bill.UserId, Email = userEmail, FullName = userName, CardId = bill.CardId, Amount = bill.Amount, DueDate = bill.DueDateUtc, GeneratedAt = bill.CreatedAtUtc }, ct);
+        logger.LogInformation("Published IBillGenerated for {BillId}", bill.Id);
 
         return new() { Success = true, Message = "Bill generated", Data = bill };
     }

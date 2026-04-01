@@ -99,6 +99,27 @@ public class UsersController : BaseApiController
         return FromOperationResult(result);
     }
 
+    [HttpPut("{userId:guid}/role")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> UpdateUserRole(Guid userId, [FromBody] UpdateUserRoleRequest request, CancellationToken cancellationToken)
+    {
+        var roleStr = request.Role?.Trim().ToLowerInvariant() ?? "";
+        var role = roleStr switch
+        {
+            "admin" => IdentityService.Domain.Enums.UserRole.Admin,
+            "user" => IdentityService.Domain.Enums.UserRole.User,
+            _ => (IdentityService.Domain.Enums.UserRole?)null
+        };
+
+        if (role is null)
+        {
+            return BadRequest(BuildResponse(false, (object?)null, "Invalid role value. Use 'admin' or 'user'."));
+        }
+
+        var result = await _mediator.Send(new UpdateUserRoleCommand(userId, role.Value), cancellationToken);
+        return FromOperationResult(result);
+    }
+
     [HttpGet]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> ListAllUsers(

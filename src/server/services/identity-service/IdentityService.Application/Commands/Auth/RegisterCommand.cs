@@ -50,10 +50,10 @@ public sealed class RegisterCommandHandler(IUserRepository users, IPublishEndpoi
             await users.AddAsync(user, ct);
             logger.LogInformation("User created: {UserId}, {Email}", user.Id, email);
 
-            await publisher.Publish(new { user.Id, user.Email, user.FullName, OtpCode = otp, Purpose = "EmailVerification", ExpiresAtUtc = user.EmailVerificationOtpExpiresAtUtc }, ct);
+            await publisher.Publish<IUserOtpGenerated>(new { UserId = user.Id, user.Email, user.FullName, OtpCode = otp, Purpose = "EmailVerification", ExpiresAtUtc = user.EmailVerificationOtpExpiresAtUtc }, ct);
             logger.LogInformation("Published IUserOtpGenerated for {UserId}", user.Id);
 
-            await publisher.Publish(new { UserId = user.Id, Email = user.Email, FullName = user.FullName, CreatedAtUtc = user.CreatedAtUtc }, ct);
+            await publisher.Publish<IUserRegistered>(new { UserId = user.Id, Email = user.Email, FullName = user.FullName, CreatedAtUtc = user.CreatedAtUtc }, ct);
             logger.LogInformation("Published IUserRegistered for {UserId}", user.Id);
 
             return new()

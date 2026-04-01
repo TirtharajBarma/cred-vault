@@ -81,18 +81,22 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
 
     public Task<CardIssuer?> GetIssuerByNetworkAsync(CardNetwork network, CancellationToken cancellationToken = default)
     {
-        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.IsActive && x.Network == network, cancellationToken);
+        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.Network == network, cancellationToken);
     }
 
     public Task<CardIssuer?> GetIssuerByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.IsActive && x.Id == id, cancellationToken);
+        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    }
+
+    public Task<CardIssuer?> GetIssuerByIdRawAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
     public Task<List<CardIssuer>> ListIssuersAsync(CancellationToken cancellationToken = default)
     {
         return dbContext.CardIssuers
-            .Where(x => x.IsActive)
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
     }
@@ -109,11 +113,15 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default)
+    {
+        dbContext.CardIssuers.Update(issuer);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task DeleteIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default)
     {
-        issuer.IsActive = false;
-        issuer.UpdatedAtUtc = DateTime.UtcNow;
-        dbContext.CardIssuers.Update(issuer);
+        dbContext.CardIssuers.Remove(issuer);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

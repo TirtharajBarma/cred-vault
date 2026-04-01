@@ -25,6 +25,11 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<bool> HasPendingBillAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Bills.AnyAsync(x => x.UserId == userId && x.CardId == cardId && x.Status == BillStatus.Pending, cancellationToken);
+    }
+
     public async Task AddAsync(Bill bill, CancellationToken cancellationToken = default)
     {
         await dbContext.Bills.AddAsync(bill, cancellationToken);

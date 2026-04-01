@@ -41,24 +41,21 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
             return new() { Success = false, Message = "Invalid card number length" };
         }
 
-        var network = CardHelpers.DetectNetwork(digits);
-        if (network == CardNetwork.Unknown)
-        {
-            logger.LogWarning("CreateCard rejected: unsupported network for {Digits}", digits[..4] + "****");
-            return new() { Success = false, Message = "Unsupported network" };
-        }
-
         var issuer = await cards.GetIssuerByIdAsync(request.IssuerId, ct);
         if (issuer == null)
         {
             logger.LogWarning("CreateCard rejected: issuer {IssuerId} not found", request.IssuerId);
             return new() { Success = false, Message = "Issuer not found" };
         }
-        if (issuer.Network != network)
+
+        var detectedNetwork = CardHelpers.DetectNetwork(digits);
+        if (detectedNetwork != CardNetwork.Unknown && issuer.Network != detectedNetwork)
         {
             logger.LogWarning("CreateCard rejected: issuer/network mismatch");
             return new() { Success = false, Message = "Issuer doesn't support this card network" };
         }
+
+        var network = issuer.Network;
 
         var last4 = digits.Length >= 4 ? digits[^4..] : digits;
         if (await cards.HasDuplicateCardAsync(request.UserId, network, last4, ct))
@@ -78,18 +75,21 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
 
         if (card.IsDefault) await cards.UnsetDefaultForUserAsync(request.UserId, null, ct);
         await cards.AddAsync(card, ct);
-        logger.LogInformation("Card created: {CardId}, UserId={UserId}, Last4={Last4}", card.Id, card.UserId, last4);
+        logger.LogInformation("Card created: {CardId}, UserId={UserId}, Last4={Last4}", card.Id, request.UserId, last4);
 
         var (ok, user, error) = await GetUserAsync(request.UserId, request.AuthorizationHeader, ct);
-        if (ok && user != null && !string.IsNullOrWhiteSpace(user.Email))
+        var userEmail = ok && user != null ? user.Email : null;
+        var userName = ok && user != null ? user.FullName : null;
+
+        if (string.IsNullOrWhiteSpace(userEmail))
         {
-            await publisher.Publish(new { CardId = card.Id, card.UserId, user.Email, user.FullName, CardNumberLast4 = card.Last4, CardHolderName = card.CardholderName, AddedAt = card.CreatedAtUtc }, ct);
-            logger.LogInformation("Published ICardAdded for {CardId}", card.Id);
+            logger.LogWarning("Could not fetch user email for {UserId}: {Error}. Publishing event with fallback.", request.UserId, error);
+            userEmail = $"user-{request.UserId}@credvault.local";
+            userName = request.CardholderName.Trim();
         }
-        else
-        {
-            logger.LogWarning("Could not fetch user details for {UserId}: {Error}", request.UserId, error);
-        }
+
+        await publisher.Publish<ICardAdded>(new { CardId = card.Id, UserId = card.UserId, Email = userEmail, FullName = userName, CardNumberLast4 = card.Last4, CardHolderName = card.CardholderName, AddedAt = card.CreatedAtUtc }, ct);
+        logger.LogInformation("Published ICardAdded for {CardId}", card.Id);
 
         return new() { Success = true, Message = "Card created", Card = CardMapping.ToDto(card) };
     }

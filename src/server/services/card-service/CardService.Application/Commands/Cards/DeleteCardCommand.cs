@@ -1,5 +1,5 @@
 using CardService.Application.Abstractions.Persistence;
-using Shared.Contracts.DTOs.Card.Responses;
+using Shared.Contracts.DTOs;
 using MediatR;
 
 namespace CardService.Application.Commands.Cards;

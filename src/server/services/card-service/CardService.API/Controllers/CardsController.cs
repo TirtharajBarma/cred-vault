@@ -209,8 +209,15 @@ public class CardsController(IMediator mediator) : BaseApiController
         if (request.OutstandingBalance.HasValue)
             card.OutstandingBalance = request.OutstandingBalance.Value;
 
-        if (request.BillingCycleStartDay.HasValue && request.BillingCycleStartDay.Value >= 1 && request.BillingCycleStartDay.Value <= 28)
+        if (request.BillingCycleStartDay.HasValue)
+        {
+            if (!CardHelpers.IsValidBillingCycleStartDay(request.BillingCycleStartDay.Value))
+            {
+                return CreateResponse(false, (object?)null, "Billing cycle day must be between 1 and 31.", "ValidationError");
+            }
+
             card.BillingCycleStartDay = request.BillingCycleStartDay.Value;
+        }
 
         card.UpdatedAtUtc = DateTime.UtcNow;
         await cardRepository.UpdateAsync(card, cancellationToken);
@@ -230,4 +237,3 @@ public class CardsController(IMediator mediator) : BaseApiController
         return CreateResponse(true, dtos, "Cards fetched successfully.");
     }
 }
-

@@ -36,7 +36,7 @@ public sealed class DeleteAccountCommandHandler(
 
         try
         {
-            await publisher.Publish(new { UserId = user.Id, DeletedAtUtc = DateTime.UtcNow }, cancellationToken);
+            await publisher.Publish<IUserDeleted>(new { UserId = user.Id, DeletedAtUtc = DateTime.UtcNow }, cancellationToken);
             logger.LogInformation("Published IUserDeleted for {UserId}", user.Id);
         }
         catch (Exception ex)
