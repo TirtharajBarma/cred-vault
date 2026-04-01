@@ -2,7 +2,7 @@
   <!-- Header -->
   <div class="bg-white border-b border-slate-200 px-6 py-4">
     <h1 class="text-2xl font-bold text-slate-900">My Bills & Payments</h1>
-    <p class="text-sm text-slate-500 mt-1">View your bills and make payments easily</p>
+    <p class="text-sm text-slate-500 mt-1">View your bills and make payments</p>
   </div>
 
   <div class="p-6 max-w-5xl mx-auto">
@@ -53,7 +53,6 @@
             <div class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-amber-400 hover:shadow-lg transition-all">
               <div class="flex items-center justify-between">
                 <div class="flex-1">
-                  <!-- Card Info -->
                   <div class="flex items-center gap-2 mb-3">
                     <span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded">
                       {{ getCardName(bill) }}
@@ -64,29 +63,21 @@
                       <span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded">DUE {{ bill.dueDateUtc | date:'MMM d' }}</span>
                     }
                   </div>
-                  
-                  <!-- Amount -->
                   <div class="flex items-center gap-4">
                     <span class="text-2xl font-bold text-slate-900">${{ bill.amount | number:'1.2-2' }}</span>
                     <span class="text-sm text-slate-500">Min: ${{ bill.minDue | number:'1.2-2' }}</span>
                   </div>
-                  
-                  <p class="text-sm text-slate-500 mt-1">
-                    Billed {{ bill.billingDateUtc | date:'MMM d, y' }}
-                  </p>
+                  <p class="text-sm text-slate-500 mt-1">Billed {{ bill.billingDateUtc | date:'MMM d, y' }}</p>
                 </div>
-                <div class="flex items-center gap-3">
-                  <button (click)="viewBillDetail(bill); $event.stopPropagation()" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="View Details">
+                <div class="flex items-center gap-2">
+                  <button (click)="viewBillDetail(bill)" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="View Details">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                     </svg>
                   </button>
-                  <button (click)="openPayment(bill)" class="flex items-center gap-2 text-sm font-semibold text-amber-600 hover:text-amber-700">
+                  <button (click)="openPayment(bill)" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors">
                     Pay Now
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
                   </button>
                 </div>
               </div>
@@ -153,12 +144,11 @@
     }
   </div>
 
-  <!-- PAYMENT MODAL - Simple Direct Payment -->
+  <!-- PAYMENT MODAL -->
   @if (showPaymentModal()) {
     <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" (click)="closePayment()">
       <div class="bg-white rounded-3xl w-full max-w-md overflow-hidden" (click)="$event.stopPropagation()">
-        
-        <!-- Modal Header -->
+        <!-- Header -->
         <div class="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-5">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold text-white">Pay Bill</h2>
@@ -168,100 +158,62 @@
               </svg>
             </button>
           </div>
-          <p class="text-white/80 text-sm mt-1">
-            {{ getCardName(selectedBill()) }} • ${{ selectedBill()?.amount | number:'1.2-2' }}
-          </p>
+          <p class="text-white/80 text-sm mt-1">{{ getCardName(selectedBill()) }}</p>
         </div>
 
-        <!-- Modal Body -->
+        <!-- Body -->
         <div class="p-6">
-          
-          @if (paymentStep() === 1) {
-            <!-- Amount Selection -->
-            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">How much do you want to pay?</h3>
-            <div class="space-y-3">
-              <button (click)="selectAmount(selectedBill()!.amount, 'full')"
-                      [class]="selectedAmount() === selectedBill()!.amount ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-300'"
-                      class="w-full p-4 border-2 rounded-xl text-left transition-all flex justify-between items-center">
-                <div>
-                  <p class="font-semibold text-slate-900">Pay Full Amount</p>
-                  <p class="text-sm text-slate-500">${{ selectedBill()!.amount | number:'1.2-2' }}</p>
-                </div>
-                @if (selectedAmount() === selectedBill()!.amount) {
-                  <svg class="w-6 h-6 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                  </svg>
-                }
-              </button>
-              <button (click)="selectAmount(selectedBill()!.minDue, 'min')"
-                      [class]="selectedAmount() === selectedBill()!.minDue ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-300'"
-                      class="w-full p-4 border-2 rounded-xl text-left transition-all flex justify-between items-center">
-                <div>
-                  <p class="font-semibold text-slate-900">Pay Minimum Due</p>
-                  <p class="text-sm text-slate-500">${{ selectedBill()!.minDue | number:'1.2-2' }}</p>
-                </div>
-                @if (selectedAmount() === selectedBill()!.minDue) {
-                  <svg class="w-6 h-6 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                  </svg>
-                }
-              </button>
-            </div>
-            <button (click)="nextStep()" [disabled]="selectedAmount() === 0"
-                    class="w-full mt-6 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-colors">
-              Continue
-            </button>
-          }
-
-          @if (paymentStep() === 2) {
-            <!-- Confirm & Pay -->
-            <div class="flex items-center gap-2 mb-4">
-              <button (click)="paymentStep.set(1)" class="text-slate-500 hover:text-slate-700">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Choose payment type</h3>
+          <div class="space-y-3">
+            <button (click)="paymentType.set('full')"
+                    [class]="paymentType() === 'full' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-300'"
+                    class="w-full p-4 border-2 rounded-xl text-left transition-all flex justify-between items-center">
+              <div>
+                <p class="font-semibold text-slate-900">Pay Full Amount</p>
+                <p class="text-sm text-slate-500">${{ selectedBill()?.amount | number:'1.2-2' }}</p>
+              </div>
+              @if (paymentType() === 'full') {
+                <svg class="w-6 h-6 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                 </svg>
-              </button>
-              <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Confirm Payment</h3>
-            </div>
-
-            <!-- Summary -->
-            <div class="bg-slate-50 rounded-xl p-4 mb-6 space-y-3">
-              <div class="flex justify-between text-sm">
-                <span class="text-slate-500">Bill Amount</span>
-                <span class="font-semibold text-slate-900">${{ selectedBill()?.amount | number:'1.2-2' }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-slate-500">You're Paying</span>
-                <span class="font-bold text-lg text-amber-600">${{ selectedAmount() | number:'1.2-2' }}</span>
-              </div>
-              <div class="border-t border-slate-200 pt-3 flex justify-between text-sm">
-                <span class="text-slate-500">From Card</span>
-                <span class="font-medium text-slate-900">{{ getCardName(selectedBill()) }}</span>
-              </div>
-            </div>
-
-            @if (errorMessage()) {
-              <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <p class="text-red-600 text-sm">{{ errorMessage() }}</p>
-              </div>
-            }
-
-            <button (click)="initiatePayment()" [disabled]="isProcessing()"
-                    class="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-              @if (isProcessing()) {
-                <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-              } @else {
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                </svg>
-                Pay ${{ selectedAmount() | number:'1.2-2' }}
               }
             </button>
+            <button (click)="paymentType.set('min')"
+                    [class]="paymentType() === 'min' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-300'"
+                    class="w-full p-4 border-2 rounded-xl text-left transition-all flex justify-between items-center">
+              <div>
+                <p class="font-semibold text-slate-900">Pay Minimum Due</p>
+                <p class="text-sm text-slate-500">${{ selectedBill()?.minDue | number:'1.2-2' }}</p>
+              </div>
+              @if (paymentType() === 'min') {
+                <svg class="w-6 h-6 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+              }
+            </button>
+          </div>
+
+          @if (errorMessage()) {
+            <div class="bg-red-50 border border-red-200 rounded-lg p-3 mt-4">
+              <p class="text-red-600 text-sm">{{ errorMessage() }}</p>
+            </div>
           }
+
+          <button (click)="initiatePayment()" [disabled]="isProcessing()"
+                  class="w-full mt-6 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+            @if (isProcessing()) {
+              <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Processing...
+            } @else {
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+              </svg>
+              Pay ${{ paymentType() === 'full' ? (selectedBill()?.amount | number:'1.2-2') : (selectedBill()?.minDue | number:'1.2-2') }}
+            }
+          </button>
         </div>
       </div>
     </div>
@@ -280,21 +232,12 @@
           <h2 class="text-xl font-bold text-white">Verify Your Payment</h2>
           <p class="text-white/80 text-sm mt-1">Enter the 6-digit code sent to your email</p>
         </div>
-
         <div class="p-6">
-          @if (devOtp()) {
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-center">
-              <p class="text-blue-700 text-sm">Dev OTP: <span class="font-bold">{{ devOtp() }}</span></p>
-            </div>
-          }
-
           <input type="text" [(ngModel)]="otpCode" maxlength="6" placeholder="Enter 6-digit OTP"
                  class="w-full text-center text-2xl tracking-[0.5em] py-4 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none">
-
           @if (otpError()) {
             <p class="text-red-500 text-sm text-center mt-2">{{ otpError() }}</p>
           }
-
           <button (click)="verifyOtp()" [disabled]="otpCode.length !== 6 || isVerifying()"
                   class="w-full mt-4 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-colors">
             @if (isVerifying()) { Verifying... } @else { Verify & Pay }

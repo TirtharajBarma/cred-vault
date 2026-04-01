@@ -27,10 +27,7 @@ export class PaymentsComponent implements OnInit {
 
   showPaymentModal = signal(false);
   selectedBill = signal<Bill | null>(null);
-  paymentStep = signal(1);
-  selectedAmount = signal(0);
   paymentType = signal<'full' | 'min'>('full');
-  selectedCard = signal<CreditCard | null>(null);
   
   isProcessing = signal(false);
   errorMessage = signal<string | null>(null);
@@ -41,7 +38,6 @@ export class PaymentsComponent implements OnInit {
   showPaymentDetailModal = signal(false);
   selectedBillDetail = signal<Bill | null>(null);
   selectedPaymentDetail = signal<Payment | null>(null);
-  devOtp = signal<string | null>(null);
   paymentId = signal<string | null>(null);
   
   otpCode = '';
@@ -69,15 +65,7 @@ export class PaymentsComponent implements OnInit {
   }
 
   pendingBills(): Bill[] {
-    return this.bills().filter(b => b.status === 1);
-  }
-
-  availableCards(): CreditCard[] {
-    return this.cards().filter(c => c.creditLimit > c.outstandingBalance);
-  }
-
-  getAvailableCredit(card: CreditCard): number {
-    return card.creditLimit - card.outstandingBalance;
+    return this.bills().filter(b => b.status === 1 || b.status === 3);
   }
 
   getCardName(bill: Bill | null): string {
@@ -112,12 +100,25 @@ export class PaymentsComponent implements OnInit {
     }
   }
 
+  getBillStatusLabel(status: number): string {
+    const map: Record<number, string> = { 1: 'Pending', 2: 'Paid', 3: 'Overdue', 4: 'Partially Paid', 5: 'Cancelled' };
+    return map[status] || 'Unknown';
+  }
+
+  getBillStatusClass(status: number): string {
+    const map: Record<number, string> = {
+      1: 'bg-amber-100 text-amber-700',
+      2: 'bg-green-100 text-green-700',
+      3: 'bg-red-100 text-red-700',
+      4: 'bg-blue-100 text-blue-700',
+      5: 'bg-slate-100 text-slate-600'
+    };
+    return map[status] || 'bg-slate-100 text-slate-600';
+  }
+
   openPayment(bill: Bill): void {
     this.selectedBill.set(bill);
-    this.selectedAmount.set(bill.amount);
     this.paymentType.set('full');
-    this.selectedCard.set(null);
-    this.paymentStep.set(1);
     this.errorMessage.set(null);
     this.showPaymentModal.set(true);
   }
@@ -125,41 +126,34 @@ export class PaymentsComponent implements OnInit {
   closePayment(): void {
     this.showPaymentModal.set(false);
     this.selectedBill.set(null);
-    this.selectedAmount.set(0);
-    this.selectedCard.set(null);
-    this.paymentStep.set(1);
-  }
-
-  selectAmount(amount: number, type: 'full' | 'min'): void {
-    this.selectedAmount.set(amount);
-    this.paymentType.set(type);
-  }
-
-  selectCard(card: CreditCard): void {
-    this.selectedCard.set(card);
-  }
-
-  nextStep(): void {
-    this.paymentStep.update(s => s + 1);
   }
 
   initiatePayment(): void {
-    if (!this.selectedBill() || !this.selectedCard()) return;
+    if (!this.selectedBill()) return;
+    
+    const bill = this.selectedBill()!;
+    const card = this.cards().find(c => c.id === bill.cardId);
+    
+    if (!card) {
+      this.errorMessage.set('Card associated with this bill not found');
+      return;
+    }
+    
+    const amount = this.paymentType() === 'full' ? bill.amount : bill.minDue;
     
     this.isProcessing.set(true);
     this.errorMessage.set(null);
 
     this.paymentService.initiatePayment({
-      cardId: this.selectedCard()!.id,
-      billId: this.selectedBill()!.id,
-      amount: this.selectedAmount(),
-      paymentType: this.paymentType() === 'full' ? 'Full' : 'Minimum'
+      cardId: card.id,
+      billId: bill.id,
+      amount: amount,
+      paymentType: this.paymentType() === 'full' ? 'Full' : 'Partial'
     }).subscribe({
       next: (res) => {
         this.isProcessing.set(false);
         if (res.success && res.data) {
           this.paymentId.set(res.data.paymentId);
-          this.devOtp.set(res.data.devOtp || null);
           this.showPaymentModal.set(false);
           this.showOtpModal.set(true);
         } else {
@@ -185,7 +179,7 @@ export class PaymentsComponent implements OnInit {
         if (res.success) {
           this.showOtpModal.set(false);
           this.showSuccessModal.set(true);
-          this.paidAmount.set(this.selectedAmount());
+          this.paidAmount.set(this.paymentType() === 'full' ? this.selectedBill()!.amount : this.selectedBill()!.minDue);
           this.loadData();
         } else {
           this.otpError.set(res.message || 'Invalid OTP');
@@ -206,13 +200,10 @@ export class PaymentsComponent implements OnInit {
 
   resetState(): void {
     this.selectedBill.set(null);
-    this.selectedCard.set(null);
-    this.selectedAmount.set(0);
     this.paymentType.set('full');
     this.otpCode = '';
     this.paymentId.set(null);
-    this.devOtp.set(null);
-    this.paymentStep.set(1);
+    this.paymentType.set('full');
   }
 
   viewBillDetail(bill: Bill): void {
@@ -233,21 +224,5 @@ export class PaymentsComponent implements OnInit {
   closePaymentDetail(): void {
     this.showPaymentDetailModal.set(false);
     this.selectedPaymentDetail.set(null);
-  }
-
-  getBillStatusLabel(status: number): string {
-    const map: Record<number, string> = { 1: 'Pending', 2: 'Paid', 3: 'Overdue', 4: 'Partially Paid', 5: 'Cancelled' };
-    return map[status] || 'Unknown';
-  }
-
-  getBillStatusClass(status: number): string {
-    const map: Record<number, string> = {
-      1: 'bg-amber-100 text-amber-700',
-      2: 'bg-green-100 text-green-700',
-      3: 'bg-red-100 text-red-700',
-      4: 'bg-blue-100 text-blue-700',
-      5: 'bg-slate-100 text-slate-600'
-    };
-    return map[status] || 'bg-slate-100 text-slate-600';
   }
 }

@@ -4,7 +4,6 @@ using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Commands.Cards;
 using CardService.Application.Queries.Cards;
 using CardService.API.Messaging;
-using CardService.API.BackgroundServices;
 using CardService.Infrastructure.Persistence.Sql;
 using CardService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -45,8 +44,6 @@ try
     builder.Services.AddScoped<ICardRepository, SqlCardRepository>();
     builder.Services.AddScoped<IViolationRepository, SqlViolationRepository>();
     builder.Services.AddScoped<ICardDbContextAccessor, CardDbContextAccessor>();
-
-    builder.Services.AddHostedService<OverdueBillCheckService>();
 
     builder.Services.AddMassTransit(x =>
     {

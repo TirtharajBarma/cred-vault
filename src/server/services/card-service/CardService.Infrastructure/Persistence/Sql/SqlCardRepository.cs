@@ -200,4 +200,9 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .Where(x => !x.IsDeleted && !x.IsBlocked && x.OutstandingBalance > 0)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<bool> HasTransactionsAsync(Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.CardTransactions.AnyAsync(x => x.CardId == cardId, cancellationToken);
+    }
 }

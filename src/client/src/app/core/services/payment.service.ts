@@ -22,14 +22,13 @@ export interface PaymentInitiateRequest {
   cardId: string;
   billId: string;
   amount: number;
-  paymentType: 'Full' | 'Minimum';
+  paymentType: 'Full' | 'Partial';
 }
 
 export interface PaymentInitiateResponse {
   paymentId: string;
   otpRequired: boolean;
   status: string;
-  devOtp?: string;
 }
 
 @Injectable({

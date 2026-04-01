@@ -5,6 +5,7 @@ namespace BillingService.Application.Abstractions.Persistence;
 public interface IStatementRepository
 {
     Task<Statement?> GetByIdAsync(Guid statementId, CancellationToken ct = default);
+    Task<Statement?> GetByBillIdAsync(Guid billId, CancellationToken ct = default);
     Task<List<Statement>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
     Task<List<Statement>> GetByCardIdAsync(Guid cardId, CancellationToken ct = default);
     Task<List<Statement>> GetAllAsync(CancellationToken ct = default);

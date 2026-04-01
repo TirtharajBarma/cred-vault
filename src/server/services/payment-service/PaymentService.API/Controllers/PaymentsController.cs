@@ -43,8 +43,7 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
             {
                 PaymentId = result.PaymentId,
                 OtpRequired = result.OtpRequired,
-                Status = "Pending OTP Verification",
-                DevOtp = isDevelopment ? result.OtpCode : null
+                Status = "Pending OTP Verification"
             },
             TraceId = HttpContext.TraceIdentifier
         });

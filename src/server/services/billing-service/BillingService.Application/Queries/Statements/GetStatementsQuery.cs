@@ -13,6 +13,7 @@ public record StatementDetailResult(bool Success, StatementDetailDto? Statement,
 
 public record StatementDto(
     Guid Id,
+    Guid? BillId,
     Guid CardId,
     string StatementPeriod,
     string CardLast4,
@@ -69,7 +70,7 @@ public class GetMyStatementsQueryHandler(IStatementRepository statementRepositor
     {
         var statements = await statementRepository.GetByUserIdAsync(request.UserId, ct);
         var dtos = statements.Select(s => new StatementDto(
-            s.Id, s.CardId, s.StatementPeriod, s.CardLast4, s.CardNetwork, s.IssuerName,
+            s.Id, s.BillId, s.CardId, s.StatementPeriod, s.CardLast4, s.CardNetwork, s.IssuerName,
             s.ClosingBalance, s.MinimumDue, s.AmountPaid, s.Status, s.PeriodEndUtc, s.DueDateUtc
         )).ToList();
 
@@ -115,7 +116,7 @@ public class GetAllStatementsQueryHandler(IStatementRepository statementReposito
     {
         var statements = await statementRepository.GetAllAsync(ct);
         var dtos = statements.Select(s => new StatementDto(
-            s.Id, s.CardId, s.StatementPeriod, s.CardLast4, s.CardNetwork, s.IssuerName,
+            s.Id, s.BillId, s.CardId, s.StatementPeriod, s.CardLast4, s.CardNetwork, s.IssuerName,
             s.ClosingBalance, s.MinimumDue, s.AmountPaid, s.Status, s.PeriodEndUtc, s.DueDateUtc
         )).ToList();
 

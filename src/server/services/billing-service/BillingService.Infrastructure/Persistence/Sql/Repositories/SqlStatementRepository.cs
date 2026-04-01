@@ -11,6 +11,12 @@ public sealed class SqlStatementRepository(BillingDbContext dbContext) : IStatem
         return await dbContext.Statements.FirstOrDefaultAsync(x => x.Id == statementId, ct);
     }
 
+    public async Task<Statement?> GetByBillIdAsync(Guid billId, CancellationToken ct = default)
+    {
+        return await dbContext.Statements
+            .FirstOrDefaultAsync(x => x.BillId == billId, ct);
+    }
+
     public async Task<List<Statement>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
         return await dbContext.Statements

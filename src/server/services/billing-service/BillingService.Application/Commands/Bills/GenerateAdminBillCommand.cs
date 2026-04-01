@@ -13,7 +13,15 @@ namespace BillingService.Application.Commands.Bills;
 
 public record GenerateAdminBillCommand(Guid AdminUserId, Guid UserId, Guid CardId, string Currency, string AuthorizationHeader) : IRequest<ApiResponse<Bill>>;
 
-public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientFactory http, Microsoft.Extensions.Configuration.IConfiguration config, IUnitOfWork uow, IPublishEndpoint publisher, ILogger<GenerateAdminBillCommandHandler> logger) : IRequestHandler<GenerateAdminBillCommand, ApiResponse<Bill>>
+public class GenerateAdminBillCommandHandler(
+    IBillRepository bills,
+    IStatementRepository statements,
+    IHttpClientFactory http,
+    Microsoft.Extensions.Configuration.IConfiguration config,
+    IUnitOfWork uow,
+    IPublishEndpoint publisher,
+    ILogger<GenerateAdminBillCommandHandler> logger)
+    : IRequestHandler<GenerateAdminBillCommand, ApiResponse<Bill>>
 {
     public async Task<ApiResponse<Bill>> Handle(GenerateAdminBillCommand request, CancellationToken ct)
     {
@@ -71,6 +79,7 @@ public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientF
         };
 
         await bills.AddAsync(bill, ct);
+        await EnsureStatementForBillAsync(bill, card, now, ct);
         await uow.SaveChangesAsync(ct);
         logger.LogInformation("Bill created: {BillId}, Amount={Amount}, DueDate={DueDate}", bill.Id, bill.Amount, bill.DueDateUtc);
 
@@ -140,6 +149,49 @@ public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientF
             logger.LogError(ex, "Exception fetching user {UserId}", userId);
             return (false, null, "External service error");
         }
+    }
+
+    private async Task EnsureStatementForBillAsync(Bill bill, CardDto card, DateTime now, CancellationToken ct)
+    {
+        var existing = await statements.GetByBillIdAsync(bill.Id, ct);
+        if (existing is not null)
+        {
+            return;
+        }
+
+        var statement = new Statement
+        {
+            Id = Guid.NewGuid(),
+            UserId = bill.UserId,
+            CardId = bill.CardId,
+            BillId = bill.Id,
+            StatementPeriod = $"{bill.BillingDateUtc:MMM yyyy}",
+            PeriodStartUtc = bill.BillingDateUtc.Date,
+            PeriodEndUtc = bill.DueDateUtc.Date,
+            GeneratedAtUtc = now,
+            DueDateUtc = bill.DueDateUtc,
+            OpeningBalance = 0,
+            TotalPurchases = bill.Amount,
+            TotalPayments = 0,
+            TotalRefunds = 0,
+            PenaltyCharges = 0,
+            InterestCharges = 0,
+            ClosingBalance = bill.Amount,
+            MinimumDue = bill.MinDue,
+            AmountPaid = 0,
+            PaidAtUtc = null,
+            Status = StatementStatus.Generated,
+            CardLast4 = string.Empty,
+            CardNetwork = card.Network,
+            IssuerName = bill.IssuerId.ToString(),
+            CreditLimit = card.CreditLimit,
+            AvailableCredit = Math.Max(0, card.CreditLimit - card.OutstandingBalance),
+            Notes = "Auto-generated when bill is generated",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        await statements.AddAsync(statement, ct);
     }
 
     private record CardDto(Guid Id, Guid UserId, string Network, Guid IssuerId, decimal CreditLimit, decimal OutstandingBalance, int BillingCycleStartDay);

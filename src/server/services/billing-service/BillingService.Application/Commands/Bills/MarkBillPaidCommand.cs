@@ -12,6 +12,7 @@ public record MarkBillPaidCommand(Guid UserId, Guid BillId, decimal Amount) : IR
 public class MarkBillPaidCommandHandler(
     IBillRepository billRepository,
     IRewardRepository rewardRepository,
+    IStatementRepository statementRepository,
     IUnitOfWork unitOfWork,
     ILogger<MarkBillPaidCommandHandler> logger)
     : IRequestHandler<MarkBillPaidCommand, ApiResponse<Bill>>
@@ -32,10 +33,12 @@ public class MarkBillPaidCommandHandler(
         if (bill.Status == BillStatus.Paid)
         {
             var alreadyProcessed = await rewardRepository.HasTransactionForBillAsync(request.BillId, cancellationToken);
-            if (alreadyProcessed)
+            if (!alreadyProcessed)
             {
-                logger.LogInformation("Bill {BillId} already paid and rewards processed, skipping", request.BillId);
+                await EnsureRewardsRecordedAsync(bill, bill.AmountPaid ?? bill.Amount, now: DateTime.UtcNow, cancellationToken);
             }
+
+            await EnsureStatementRecordedAsync(bill, DateTime.UtcNow, cancellationToken);
             return new ApiResponse<Bill> { Success = true, Message = "Bill is already paid.", Data = bill };
         }
 
@@ -50,39 +53,119 @@ public class MarkBillPaidCommandHandler(
         bill.PaidAtUtc = now;
         bill.UpdatedAtUtc = now;
 
-        // Rewards logic - use actual payment amount, not bill total
-        var paymentAmount = request.Amount;
-        var tier = await rewardRepository.GetBestMatchingTierAsync(bill.CardNetwork, bill.IssuerId, paymentAmount, now, cancellationToken);
-        logger.LogInformation("Rewards: Bill={BillId} PaymentAmount={PaymentAmount} Network={Network} IssuerId={IssuerId} Tier={TierFound}", 
-            bill.Id, paymentAmount, bill.CardNetwork, bill.IssuerId, tier is not null);
-        if (tier is not null)
-        {
-            var account = await rewardRepository.GetAccountByUserIdAsync(request.UserId, cancellationToken);
-            if (account is null)
-            {
-                account = new RewardAccount { Id = Guid.NewGuid(), UserId = request.UserId, RewardTierId = tier.Id, PointsBalance = 0, CreatedAtUtc = now, UpdatedAtUtc = now };
-                await rewardRepository.AddAccountAsync(account, cancellationToken);
-            }
-            else
-            {
-                account.RewardTierId = tier.Id;
-                account.UpdatedAtUtc = now;
-                await rewardRepository.UpdateAccountAsync(account, cancellationToken);
-            }
-
-            var points = Math.Round(paymentAmount * tier.RewardRate, 2, MidpointRounding.AwayFromZero);
-            if (points > 0)
-            {
-                account.PointsBalance += points;
-                account.UpdatedAtUtc = now;
-
-                await rewardRepository.AddTransactionAsync(new RewardTransaction { Id = Guid.NewGuid(), RewardAccountId = account.Id, BillId = bill.Id, Points = points, Type = RewardTransactionType.Earned, CreatedAtUtc = now }, cancellationToken);
-            }
-        }
+        await EnsureRewardsRecordedAsync(bill, request.Amount, now, cancellationToken);
+        await EnsureStatementRecordedAsync(bill, now, cancellationToken);
 
         await billRepository.UpdateAsync(bill, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ApiResponse<Bill> { Success = true, Message = "Bill marked as paid.", Data = bill };
+    }
+
+    private async Task EnsureRewardsRecordedAsync(Bill bill, decimal paymentAmount, DateTime now, CancellationToken cancellationToken)
+    {
+        var alreadyProcessed = await rewardRepository.HasTransactionForBillAsync(bill.Id, cancellationToken);
+        if (alreadyProcessed)
+        {
+            logger.LogInformation("Rewards already recorded for Bill={BillId}", bill.Id);
+            return;
+        }
+
+        var tier = await rewardRepository.GetBestMatchingTierAsync(bill.CardNetwork, bill.IssuerId, paymentAmount, now, cancellationToken);
+        if (tier is null)
+        {
+            logger.LogInformation("No matching reward tier for Bill={BillId}, Network={Network}, Issuer={IssuerId}", bill.Id, bill.CardNetwork, bill.IssuerId);
+            return;
+        }
+
+        var account = await rewardRepository.GetAccountByUserIdAsync(bill.UserId, cancellationToken);
+        if (account is null)
+        {
+            account = new RewardAccount
+            {
+                Id = Guid.NewGuid(),
+                UserId = bill.UserId,
+                RewardTierId = tier.Id,
+                PointsBalance = 0,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            };
+            await rewardRepository.AddAccountAsync(account, cancellationToken);
+        }
+        else
+        {
+            account.RewardTierId = tier.Id;
+            account.UpdatedAtUtc = now;
+            await rewardRepository.UpdateAccountAsync(account, cancellationToken);
+        }
+
+        var points = Math.Round(paymentAmount * tier.RewardRate, 2, MidpointRounding.AwayFromZero);
+        if (points <= 0)
+        {
+            return;
+        }
+
+        account.PointsBalance += points;
+        account.UpdatedAtUtc = now;
+
+        await rewardRepository.AddTransactionAsync(new RewardTransaction
+        {
+            Id = Guid.NewGuid(),
+            RewardAccountId = account.Id,
+            BillId = bill.Id,
+            Points = points,
+            Type = RewardTransactionType.Earned,
+            CreatedAtUtc = now
+        }, cancellationToken);
+    }
+
+    private async Task EnsureStatementRecordedAsync(Bill bill, DateTime now, CancellationToken cancellationToken)
+    {
+        var existing = await statementRepository.GetByBillIdAsync(bill.Id, cancellationToken);
+        if (existing is not null)
+        {
+            existing.AmountPaid = bill.AmountPaid ?? 0;
+            existing.TotalPayments = bill.AmountPaid ?? 0;
+            existing.PaidAtUtc = bill.PaidAtUtc;
+            existing.ClosingBalance = Math.Max(0, bill.Amount - (bill.AmountPaid ?? 0));
+            existing.Status = bill.Status == BillStatus.Paid ? StatementStatus.Paid : existing.Status;
+            existing.UpdatedAtUtc = now;
+            await statementRepository.UpdateAsync(existing, cancellationToken);
+            return;
+        }
+
+        var statement = new Statement
+        {
+            Id = Guid.NewGuid(),
+            UserId = bill.UserId,
+            CardId = bill.CardId,
+            BillId = bill.Id,
+            StatementPeriod = $"{bill.BillingDateUtc:MMM yyyy}",
+            PeriodStartUtc = bill.BillingDateUtc.Date,
+            PeriodEndUtc = bill.DueDateUtc.Date,
+            GeneratedAtUtc = now,
+            DueDateUtc = bill.DueDateUtc,
+            OpeningBalance = 0,
+            TotalPurchases = bill.Amount,
+            TotalPayments = bill.AmountPaid ?? 0,
+            TotalRefunds = 0,
+            PenaltyCharges = 0,
+            InterestCharges = 0,
+            ClosingBalance = Math.Max(0, bill.Amount - (bill.AmountPaid ?? 0)),
+            MinimumDue = bill.MinDue,
+            AmountPaid = bill.AmountPaid ?? 0,
+            PaidAtUtc = bill.PaidAtUtc,
+            Status = bill.Status == BillStatus.Paid ? StatementStatus.Paid : StatementStatus.Generated,
+            CardLast4 = string.Empty,
+            CardNetwork = bill.CardNetwork.ToString(),
+            IssuerName = bill.IssuerId.ToString(),
+            CreditLimit = 0,
+            AvailableCredit = 0,
+            Notes = "Auto-generated for paid bill",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        await statementRepository.AddAsync(statement, cancellationToken);
     }
 }

@@ -31,7 +31,7 @@ public class InitiatePaymentCommandHandler(
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<InitiatePaymentCommandHandler> logger) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
 {
-    private record BillDto(Guid UserId, decimal MinDue);
+    private record BillDto(Guid UserId, Guid CardId, decimal MinDue);
 
     public async Task<InitiatePaymentResult> Handle(InitiatePaymentCommand request, CancellationToken cancellationToken)
     {
@@ -59,11 +59,11 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, "Bill does not belong to the user");
         }
 
-        if (request.Amount > bill.MinDue)
+        if (bill.CardId != request.CardId)
         {
-            logger.LogWarning("Payment rejected: Amount {Amount} exceeds bill minimum due {MinDue} for Bill {BillId}",
-                request.Amount, bill.MinDue, request.BillId);
-            return new InitiatePaymentResult(false, null, $"Payment amount exceeds bill minimum due of {bill.MinDue}");
+            logger.LogWarning("Payment rejected: Card mismatch - Bill {BillId} is for Card {BillCardId}, but payment uses Card {RequestCardId}",
+                request.BillId, bill.CardId, request.CardId);
+            return new InitiatePaymentResult(false, null, "Selected card does not match the bill's card");
         }
 
         var otpCode = GenerateOtp();
@@ -180,7 +180,8 @@ public class InitiatePaymentCommandHandler(
             var baseUrl = configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
             client.BaseAddress = new Uri(baseUrl);
 
-            var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/identity/users/{userId}");
+            // Use /me endpoint which works with any user token (no admin role required)
+            var request = new HttpRequestMessage(HttpMethod.Get, "api/v1/identity/users/me");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
@@ -188,24 +189,24 @@ public class InitiatePaymentCommandHandler(
             
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Identity service returned {Status} for User {UserId}", response.StatusCode, userId);
+                logger.LogWarning("Identity service returned {Status} for User /me", response.StatusCode);
                 return (false, null, $"Identity service error: {response.StatusCode}");
             }
 
             var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<UserResponseWrapper>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
-            if (result?.Data == null)
+            if (result?.Data?.User == null)
             {
-                logger.LogWarning("Identity service returned null user for {UserId}", userId);
+                logger.LogWarning("Identity service returned null user for /me endpoint");
                 return (false, null, "User not found");
             }
             
-            return (true, result.Data, null);
+            return (true, result.Data.User, null);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception fetching user {UserId}", userId);
+            logger.LogError(ex, "Exception fetching user /me");
             return (false, null, "External service error");
         }
     }
@@ -214,6 +215,11 @@ public class InitiatePaymentCommandHandler(
     {
         public bool Success { get; set; }
         public string? Message { get; set; }
-        public UserDto? Data { get; set; }
+        public UserData? Data { get; set; }
+    }
+
+    private class UserData
+    {
+        public UserDto? User { get; set; }
     }
 }
