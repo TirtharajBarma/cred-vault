@@ -7,17 +7,14 @@ public static class BillingCycleCalculator
 
     public static DateTime CalculateNextBillingDate(DateTime billingDate, DateTime referenceDate)
     {
-        var nextBilling = new DateTime(referenceDate.Year, referenceDate.Month, billingDate.Day, 0, 0, 0, DateTimeKind.Utc);
+        var safeDay = Math.Min(billingDate.Day, DateTime.DaysInMonth(referenceDate.Year, referenceDate.Month));
+        var nextBilling = new DateTime(referenceDate.Year, referenceDate.Month, safeDay, 0, 0, 0, DateTimeKind.Utc);
         
         if (nextBilling <= referenceDate)
         {
             nextBilling = nextBilling.AddMonths(1);
-        }
-        
-        if (nextBilling.Day != billingDate.Day)
-        {
-            nextBilling = new DateTime(nextBilling.Year, nextBilling.Month, 
-                DateTime.DaysInMonth(nextBilling.Year, nextBilling.Month), 0, 0, 0, DateTimeKind.Utc);
+            safeDay = Math.Min(billingDate.Day, DateTime.DaysInMonth(nextBilling.Year, nextBilling.Month));
+            nextBilling = new DateTime(nextBilling.Year, nextBilling.Month, safeDay, 0, 0, 0, DateTimeKind.Utc);
         }
         
         return nextBilling;
@@ -31,18 +28,14 @@ public static class BillingCycleCalculator
     public static DateTime GetCurrentBillingPeriodStart(int billingCycleStartDay)
     {
         var today = DateTime.UtcNow;
-        var currentPeriodStart = new DateTime(today.Year, today.Month, billingCycleStartDay, 0, 0, 0, DateTimeKind.Utc);
+        var safeDay = Math.Min(billingCycleStartDay, DateTime.DaysInMonth(today.Year, today.Month));
+        var currentPeriodStart = new DateTime(today.Year, today.Month, safeDay, 0, 0, 0, DateTimeKind.Utc);
         
         if (currentPeriodStart > today)
         {
             currentPeriodStart = currentPeriodStart.AddMonths(-1);
-        }
-        
-        if (currentPeriodStart.Day != billingCycleStartDay && currentPeriodStart.Day != DateTime.DaysInMonth(currentPeriodStart.Year, currentPeriodStart.Month))
-        {
-            currentPeriodStart = new DateTime(currentPeriodStart.Year, currentPeriodStart.Month, 
-                Math.Min(billingCycleStartDay, DateTime.DaysInMonth(currentPeriodStart.Year, currentPeriodStart.Month)), 
-                0, 0, 0, DateTimeKind.Utc);
+            safeDay = Math.Min(billingCycleStartDay, DateTime.DaysInMonth(currentPeriodStart.Year, currentPeriodStart.Month));
+            currentPeriodStart = new DateTime(currentPeriodStart.Year, currentPeriodStart.Month, safeDay, 0, 0, 0, DateTimeKind.Utc);
         }
         
         return currentPeriodStart;

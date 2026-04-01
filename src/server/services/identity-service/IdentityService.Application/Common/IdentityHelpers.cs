@@ -57,20 +57,4 @@ public static class IdentityHelpers
         UserStatus.Blocked => "blocked",
         _ => "pending-verification"
     };
-
-    public static bool TryParseStatus(string value, out UserStatus status)
-    {
-        var normalized = value.Trim().ToLowerInvariant();
-        status = normalized switch
-        {
-            "active" => UserStatus.Active,
-            "suspended" => UserStatus.Suspended,
-            "blocked" => UserStatus.Blocked,
-            "pending-verification" => UserStatus.PendingVerification,
-            "pendingverification" => UserStatus.PendingVerification,
-            _ => UserStatus.PendingVerification
-        };
-
-        return normalized is "active" or "suspended" or "blocked" or "pending-verification" or "pendingverification";
-    }
 }

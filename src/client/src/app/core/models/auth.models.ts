@@ -3,6 +3,9 @@ export interface User {
   email: string;
   fullName: string;
   role: string;
+  status?: string;
+  isEmailVerified?: boolean;
+  createdAtUtc?: string;
 }
 
 export interface AuthResult {

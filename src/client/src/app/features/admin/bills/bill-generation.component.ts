@@ -123,6 +123,24 @@ export class BillGenerationComponent implements OnInit {
     });
   }
 
+  isCheckingOverdue = signal(false);
+  overdueResult = signal<string | null>(null);
+
+  checkOverdue() {
+    this.isCheckingOverdue.set(true);
+    this.overdueResult.set(null);
+    this.adminService.checkOverdue().subscribe({
+      next: (res: any) => {
+        this.overdueResult.set(res.message || 'Overdue check completed');
+        this.isCheckingOverdue.set(false);
+      },
+      error: () => {
+        this.overdueResult.set('Overdue check failed');
+        this.isCheckingOverdue.set(false);
+      }
+    });
+  }
+
   clearMessages() {
     this.successMessage.set(null);
     this.errorMessage.set(null);

@@ -57,6 +57,18 @@ export class AuthService {
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/reset-password`, data);
   }
 
+  getProfile(): Observable<ApiResponse<User>> {
+    return this.http.get<ApiResponse<User>>(`${API_GATEWAY}/api/v1/identity/users/me`);
+  }
+
+  updateProfile(data: { fullName?: string }): Observable<ApiResponse<User>> {
+    return this.http.put<ApiResponse<User>>(`${API_GATEWAY}/api/v1/identity/users/me`, data);
+  }
+
+  changePassword(data: { currentPassword: string, newPassword: string }): Observable<ApiResponse<any>> {
+    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/identity/users/me/password`, data);
+  }
+
   login(credentials: { email: string, password: string }): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/login`, credentials).pipe(
       tap(response => {

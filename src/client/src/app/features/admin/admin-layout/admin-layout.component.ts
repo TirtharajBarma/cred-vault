@@ -51,6 +51,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     { path: '/admin/users', label: 'User Management', icon: 'group', description: 'Monitor and control access' },
     { path: '/admin/issuers', label: 'Card Issuers', icon: 'account_balance', description: 'Manage fintech partners' },
     { path: '/admin/bills', label: 'Bill Generation', icon: 'receipt_long', description: 'Manual ledger control' },
+    { path: '/admin/violations', label: 'Violations', icon: 'warning', description: 'Blocked cards & strikes' },
     { path: '/admin/rewards', label: 'Reward Tiers', icon: 'military_tech', description: 'Configure cashback rates' },
     { path: '/admin/logs', label: 'System Logs', icon: 'database', description: 'Audit trail & templates' }
   ];

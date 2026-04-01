@@ -34,6 +34,7 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         if (!result.Success)
             return BadRequest(Fail(result.Error ?? "Payment initiation failed."));
 
+        var isDevelopment = env.IsDevelopment();
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
         {
             Success = true,
@@ -43,7 +44,7 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
                 PaymentId = result.PaymentId,
                 OtpRequired = result.OtpRequired,
                 Status = "Pending OTP Verification",
-                DevOtp = result.OtpCode
+                DevOtp = isDevelopment ? result.OtpCode : null
             },
             TraceId = HttpContext.TraceIdentifier
         });

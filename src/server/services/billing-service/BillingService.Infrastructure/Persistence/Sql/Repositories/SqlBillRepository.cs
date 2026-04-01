@@ -33,7 +33,6 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
     public async Task<List<Bill>> GetAllPendingAsync(CancellationToken cancellationToken = default)
     {
         return await dbContext.Bills
-            .AsNoTracking()
             .Where(x => x.Status == BillStatus.Pending)
             .ToListAsync(cancellationToken);
     }
@@ -41,7 +40,6 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
     public async Task<List<Bill>> GetOverdueBillsAsync(CancellationToken cancellationToken = default)
     {
         return await dbContext.Bills
-            .AsNoTracking()
             .Where(x => x.Status == BillStatus.Pending && x.DueDateUtc < DateTime.UtcNow)
             .ToListAsync(cancellationToken);
     }

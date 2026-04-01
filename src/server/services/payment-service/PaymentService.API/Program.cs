@@ -92,6 +92,15 @@ try
                 e.ConfigureConsumer<PaymentProcessConsumer>(ctx);
                 e.ConfigureConsumer<RevertPaymentConsumer>(ctx);
             });
+
+            cfg.ReceiveEndpoint("payment-domain-event", e =>
+            {
+                e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
+                e.UseInMemoryOutbox();
+                e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
+                e.ConfigureConsumer<PaymentFailedConsumer>(ctx);
+                e.ConfigureConsumer<UserDeletedConsumer>(ctx);
+            });
         });
     });
 

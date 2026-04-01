@@ -35,9 +35,34 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
+    path: 'payments',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent)
+  },
+  {
     path: 'cards/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./features/cards/card-details/card-details.component').then(m => m.CardDetailsComponent)
+  },
+  {
+    path: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent)
+  },
+  {
+    path: 'statements',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/statements/statements.component').then(m => m.StatementsComponent)
+  },
+  {
+    path: 'rewards',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/rewards/rewards.component').then(m => m.RewardsComponent)
+  },
+  {
+    path: 'notifications',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/notifications/notifications.component').then(m => m.NotificationsComponent)
   },
   {
     path: 'admin',
@@ -67,6 +92,10 @@ export const routes: Routes = [
       {
         path: 'logs',
         loadComponent: () => import('./features/admin/logs/system-logs.component').then(m => m.SystemLogsComponent)
+      },
+      {
+        path: 'violations',
+        loadComponent: () => import('./features/admin/violations/violations.component').then(m => m.ViolationsComponent)
       },
       {
         path: '',

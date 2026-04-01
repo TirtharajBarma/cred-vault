@@ -150,4 +150,25 @@ export class AdminService {
       BillingCycleStartDay: cardData.billingCycleStartDay ?? null
     });
   }
+
+  // Violations Admin
+  getBlockedCards(): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/admin/blocked`);
+  }
+
+  unblockCard(cardId: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/admin/${cardId}/unblock`, {});
+  }
+
+  getCardViolations(cardId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/admin/${cardId}/violations`);
+  }
+
+  clearCardViolations(cardId: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/admin/${cardId}/violations/clear`, {});
+  }
+
+  checkOverdue(): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/bills/admin/check-overdue`, {});
+  }
 }

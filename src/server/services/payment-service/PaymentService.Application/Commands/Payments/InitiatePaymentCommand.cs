@@ -59,6 +59,13 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, "Bill does not belong to the user");
         }
 
+        if (request.Amount > bill.MinDue)
+        {
+            logger.LogWarning("Payment rejected: Amount {Amount} exceeds bill minimum due {MinDue} for Bill {BillId}",
+                request.Amount, bill.MinDue, request.BillId);
+            return new InitiatePaymentResult(false, null, $"Payment amount exceeds bill minimum due of {bill.MinDue}");
+        }
+
         var otpCode = GenerateOtp();
         var otpExpires = DateTime.UtcNow.AddMinutes(10);
 
@@ -125,8 +132,14 @@ public class InitiatePaymentCommandHandler(
         return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: true, OtpCode: otpCode);
     }
 
-    private static string GenerateOtp() =>
-        Random.Shared.Next(100000, 999999).ToString();
+    private static string GenerateOtp()
+    {
+        var bytes = new byte[4];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(bytes);
+        var number = Math.Abs(BitConverter.ToInt32(bytes, 0)) % 900000;
+        return (100000 + number).ToString();
+    }
 
     private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
     {
@@ -182,13 +195,13 @@ public class InitiatePaymentCommandHandler(
             var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<UserResponseWrapper>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
-            if (result?.Data?.User == null)
+            if (result?.Data == null)
             {
                 logger.LogWarning("Identity service returned null user for {UserId}", userId);
                 return (false, null, "User not found");
             }
             
-            return (true, result.Data.User, null);
+            return (true, result.Data, null);
         }
         catch (Exception ex)
         {
@@ -201,11 +214,6 @@ public class InitiatePaymentCommandHandler(
     {
         public bool Success { get; set; }
         public string? Message { get; set; }
-        public UserDataWrapper? Data { get; set; }
-    }
-
-    private class UserDataWrapper
-    {
-        public UserDto? User { get; set; }
+        public UserDto? Data { get; set; }
     }
 }

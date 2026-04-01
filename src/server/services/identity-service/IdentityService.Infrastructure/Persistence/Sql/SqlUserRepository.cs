@@ -56,10 +56,10 @@ public sealed class SqlUserRepository(IdentityDbContext dbContext) : IUserReposi
 
     public async Task<Dictionary<UserStatus, int>> GetCountByStatusAsync(CancellationToken ct = default)
     {
-        var users = await dbContext.Users.ToListAsync(ct);
-        return users
+        return await dbContext.Users
             .GroupBy(x => x.Status)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Status, x => x.Count, ct);
     }
 
     public async Task SoftDeleteAsync(Guid userId, CancellationToken cancellationToken = default)

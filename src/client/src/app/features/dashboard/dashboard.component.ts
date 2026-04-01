@@ -154,4 +154,38 @@ export class DashboardComponent implements OnInit {
   getTotalAssets(): number {
     return this.cards().reduce((acc, card) => acc + card.creditLimit, 0);
   }
+
+  showDeleteConfirm = signal(false);
+  deleteCardId = signal<string | null>(null);
+  deleteCardName = signal<string | null>(null);
+
+  confirmDeleteCard(cardId: string, cardName: string, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.deleteCardId.set(cardId);
+    this.deleteCardName.set(cardName);
+    this.showDeleteConfirm.set(true);
+  }
+
+  cancelDelete(): void {
+    this.showDeleteConfirm.set(false);
+    this.deleteCardId.set(null);
+    this.deleteCardName.set(null);
+  }
+
+  executeDeleteCard(): void {
+    const cardId = this.deleteCardId();
+    if (!cardId) return;
+
+    this.dashboardService.deleteCard(cardId).subscribe({
+      next: () => {
+        this.loadDashboardData();
+        this.cancelDelete();
+      },
+      error: (err) => {
+        console.error('[Dashboard] Delete card failed:', err);
+        this.cancelDelete();
+      }
+    });
+  }
 }

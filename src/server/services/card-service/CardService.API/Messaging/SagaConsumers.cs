@@ -51,22 +51,22 @@ public class CardDeductionSagaConsumer(
                 return;
             }
 
-            if (card.OutstandingBalance + message.Amount > card.CreditLimit)
+            if (card.OutstandingBalance < message.Amount)
             {
-                logger.LogWarning("Exceeds credit limit: CardId={CardId}, Balance={Balance}, CreditLimit={Limit}, Required={Amount}",
-                    message.CardId, card.OutstandingBalance, card.CreditLimit, message.Amount);
+                logger.LogWarning("Insufficient balance: CardId={CardId}, Balance={Balance}, PaymentAmount={Amount}",
+                    message.CardId, card.OutstandingBalance, message.Amount);
                 await context.Publish<ICardDeductionFailed>(new
                 {
                     CorrelationId = message.CorrelationId,
                     CardId = message.CardId,
-                    Reason = "Exceeds credit limit",
+                    Reason = "Insufficient bill balance to pay",
                     FailedAt = DateTime.UtcNow
                 });
                 return;
             }
 
             var oldBalance = card.OutstandingBalance;
-            card.OutstandingBalance = card.OutstandingBalance + message.Amount;
+            card.OutstandingBalance = card.OutstandingBalance - message.Amount;
             card.UpdatedAtUtc = DateTime.UtcNow;
 
             dbContext.CardTransactions.Add(new CardTransaction
@@ -76,7 +76,7 @@ public class CardDeductionSagaConsumer(
                 UserId = card.UserId,
                 Type = TransactionType.Payment,
                 Amount = message.Amount,
-                Description = $"Saga:{message.CorrelationId}",
+                Description = $"Bill Payment:{message.CorrelationId}",
                 DateUtc = DateTime.UtcNow
             });
 

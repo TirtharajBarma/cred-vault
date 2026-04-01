@@ -23,10 +23,12 @@
     @if (user()?.role !== 'admin') {
       <a routerLink="/dashboard" routerLinkActive="nav-pill-active" [routerLinkActiveOptions]="{exact: true}" 
          class="nav-pill nav-pill-hover text-charcoal/60">Dashboard</a>
-      <a routerLink="/bills" routerLinkActive="nav-pill-active" 
-         class="nav-pill nav-pill-hover text-charcoal/60">Bills</a>
-      <a routerLink="/analytics" routerLinkActive="nav-pill-active" 
-         class="nav-pill nav-pill-hover text-charcoal/60">Analytics</a>
+      <a routerLink="/payments" routerLinkActive="nav-pill-active" 
+         class="nav-pill nav-pill-hover text-charcoal/60">Payments</a>
+      <a routerLink="/statements" routerLinkActive="nav-pill-active" 
+         class="nav-pill nav-pill-hover text-charcoal/60">Statements</a>
+      <a routerLink="/rewards" routerLinkActive="nav-pill-active" 
+         class="nav-pill nav-pill-hover text-charcoal/60">Rewards</a>
     } @else {
       <a routerLink="/admin/dashboard" routerLinkActive="nav-pill-active" 
          class="nav-pill nav-pill-hover !text-primary !bg-primary/5 font-black flex items-center gap-2">
@@ -48,7 +50,7 @@
 
     <!-- Quick Actions -->
     <div class="flex items-center gap-1 md:gap-2">
-      <button class="w-10 h-10 flex items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all relative">
+      <button routerLink="/notifications" class="w-10 h-10 flex items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all relative">
         <span class="material-symbols-outlined">notifications</span>
         <span class="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
       </button>
@@ -96,9 +98,21 @@
                   Admin Control Center
                 </button>
               }
-              <button class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
+              <button routerLink="/profile" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
                 <span class="material-symbols-outlined text-lg">person_outline</span>
                 Account Settings
+              </button>
+              <button routerLink="/notifications" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
+                <span class="material-symbols-outlined text-lg">notifications</span>
+                Notifications
+              </button>
+              <button routerLink="/statements" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
+                <span class="material-symbols-outlined text-lg">receipt_long</span>
+                Statements
+              </button>
+              <button routerLink="/rewards" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
+                <span class="material-symbols-outlined text-lg">stars</span>
+                Rewards
               </button>
               <div class="h-px bg-charcoal/5 my-2 mx-4"></div>
               <button (click)="logout()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-red-500 hover:bg-red-50 rounded-xl transition-all group">
@@ -140,15 +154,25 @@
             <span class="material-symbols-outlined">dashboard</span>
             Dashboard
           </a>
-          <a routerLink="/bills" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+          <a routerLink="/payments" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
+            <span class="material-symbols-outlined">payments</span>
+            Payments
+          </a>
+          <a routerLink="/statements" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
              class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
             <span class="material-symbols-outlined">receipt_long</span>
-            Bills
+            Statements
           </a>
-          <a routerLink="/analytics" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+          <a routerLink="/rewards" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
              class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">analytics</span>
-            Analytics
+            <span class="material-symbols-outlined">stars</span>
+            Rewards
+          </a>
+          <a routerLink="/notifications" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
+            <span class="material-symbols-outlined">notifications</span>
+            Notifications
           </a>
         } @else {
           <a routerLink="/admin/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"

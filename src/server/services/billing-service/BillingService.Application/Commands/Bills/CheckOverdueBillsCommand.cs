@@ -14,6 +14,7 @@ public record OverdueCheckResult(int BillsChecked, int OverdueCount);
 
 public class CheckOverdueBillsCommandHandler(
     IBillRepository bills,
+    IUnitOfWork unitOfWork,
     IPublishEndpoint publisher,
     ILogger<CheckOverdueBillsCommandHandler> logger
 ) : IRequestHandler<CheckOverdueBillsCommand, ApiResponse<OverdueCheckResult>>
@@ -48,6 +49,11 @@ public class CheckOverdueBillsCommandHandler(
                 logger.LogInformation("Bill marked overdue: BillId={BillId}, DaysOverdue={Days}", 
                     bill.Id, (DateTime.UtcNow - bill.DueDateUtc).TotalDays);
             }
+        }
+
+        if (overdueCount > 0)
+        {
+            await unitOfWork.SaveChangesAsync(ct);
         }
 
         logger.LogInformation("Overdue check completed: Checked={Checked}, Overdue={Overdue}", pendingBills.Count, overdueCount);

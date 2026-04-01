@@ -1,0 +1,208 @@
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+  <!-- Header -->
+  <div class="bg-white border-b border-slate-200 px-6 py-5">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">My Statements</h1>
+        <p class="text-sm text-slate-500 mt-1">View your billing statements with full transaction details</p>
+      </div>
+      <button (click)="loadData()" class="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="p-6 max-w-6xl mx-auto">
+    @if (isLoading()) {
+      <div class="grid gap-4 md:grid-cols-2">
+        @for (i of [1,2,3,4]; track i) {
+          <div class="bg-white rounded-2xl p-6 animate-pulse">
+            <div class="h-4 w-32 bg-slate-200 rounded mb-3"></div>
+            <div class="h-3 w-48 bg-slate-100 rounded"></div>
+          </div>
+        }
+      </div>
+    } @else if (statements().length === 0) {
+      <div class="bg-white rounded-2xl p-12 text-center">
+        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-2">No Statements Yet</h3>
+        <p class="text-slate-500 mb-6">Generate statements for your cards to see detailed billing summaries.</p>
+        <div class="flex flex-wrap gap-3 justify-center">
+          @for (card of cards(); track card.id) {
+            <button (click)="generateStatement(card.id)" [disabled]="isGenerating()"
+                    class="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">
+              @if (isGenerating() && generateCardId() === card.id) {
+                <span class="flex items-center gap-2">
+                  <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                  Generating...
+                </span>
+              } @else {
+                Generate: {{ card.issuerName }} *{{ card.last4 }}
+              }
+            </button>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="space-y-4">
+        @for (stmt of statements(); track stmt.id) {
+          <div class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-indigo-300 hover:shadow-lg transition-all cursor-pointer"
+               (click)="viewStatement(stmt.id)">
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+                    {{ stmt.statementPeriod }}
+                  </span>
+                  <span [class]="getStatusClass(stmt.status) + ' px-2.5 py-0.5 text-xs font-semibold rounded-full'">
+                    {{ getStatusLabel(stmt.status) }}
+                  </span>
+                </div>
+                <p class="text-sm font-medium text-slate-700">{{ getCardName(stmt.cardId) }}</p>
+                <div class="flex items-center gap-6 mt-3">
+                  <div>
+                    <p class="text-xs text-slate-500">Closing Balance</p>
+                    <p class="text-lg font-bold text-slate-900">${{ stmt.closingBalance | number:'1.2-2' }}</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-slate-500">Minimum Due</p>
+                    <p class="text-lg font-semibold text-amber-600">${{ stmt.minimumDue | number:'1.2-2' }}</p>
+                  </div>
+                  @if (stmt.amountPaid > 0) {
+                    <div>
+                      <p class="text-xs text-slate-500">Amount Paid</p>
+                      <p class="text-lg font-semibold text-green-600">${{ stmt.amountPaid | number:'1.2-2' }}</p>
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="flex items-center gap-2 text-indigo-500">
+                <span class="text-sm font-medium">View Details</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- STATEMENT DETAIL MODAL -->
+  @if (showDetailModal() && selectedStatement()) {
+    <div class="fixed inset-0 bg-black/60 flex items-start justify-center p-4 z-50 overflow-y-auto" (click)="closeDetail()">
+      <div class="bg-white rounded-2xl w-full max-w-3xl my-8 overflow-hidden shadow-2xl" (click)="$event.stopPropagation()">
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-bold text-white">Statement Details</h2>
+              <p class="text-white/80 text-sm mt-1">{{ selectedStatement()?.statementPeriod }}</p>
+            </div>
+            <button (click)="closeDetail()" class="text-white/80 hover:text-white">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 max-h-[70vh] overflow-y-auto">
+          <!-- Card & Summary -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-slate-50 rounded-xl p-4">
+              <p class="text-xs text-slate-500 mb-1">Card</p>
+              <p class="font-semibold text-slate-900">{{ selectedStatement()?.cardNetwork }} *{{ selectedStatement()?.cardLast4 }}</p>
+              <p class="text-sm text-slate-600">{{ selectedStatement()?.issuerName }}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-4">
+              <p class="text-xs text-slate-500 mb-1">Credit Limit</p>
+              <p class="font-semibold text-slate-900">${{ selectedStatement()?.creditLimit | number:'1.2-2' }}</p>
+              <p class="text-sm text-slate-600">Available: ${{ selectedStatement()?.availableCredit | number:'1.2-2' }}</p>
+            </div>
+          </div>
+
+          <!-- Financial Summary -->
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-5 mb-6">
+            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Financial Summary</h3>
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <span class="text-slate-600">Opening Balance</span>
+                <span class="font-medium">${{ selectedStatement()?.openingBalance | number:'1.2-2' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-red-600">Purchases</span>
+                <span class="font-medium text-red-600">+${{ selectedStatement()?.totalPurchases | number:'1.2-2' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-green-600">Payments</span>
+                <span class="font-medium text-green-600">-${{ selectedStatement()?.totalPayments | number:'1.2-2' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-blue-600">Refunds</span>
+                <span class="font-medium text-blue-600">-${{ selectedStatement()?.totalRefunds | number:'1.2-2' }}</span>
+              </div>
+              @if ((selectedStatement()?.penaltyCharges || 0) > 0) {
+                <div class="flex justify-between">
+                  <span class="text-orange-600">Penalty Charges</span>
+                  <span class="font-medium text-orange-600">+${{ selectedStatement()?.penaltyCharges | number:'1.2-2' }}</span>
+                </div>
+              }
+              @if ((selectedStatement()?.interestCharges || 0) > 0) {
+                <div class="flex justify-between">
+                  <span class="text-orange-600">Interest Charges</span>
+                  <span class="font-medium text-orange-600">+${{ selectedStatement()?.interestCharges | number:'1.2-2' }}</span>
+                </div>
+              }
+              <div class="border-t border-slate-300 pt-3 flex justify-between">
+                <span class="font-bold text-slate-900">Closing Balance</span>
+                <span class="font-bold text-lg text-slate-900">${{ selectedStatement()?.closingBalance | number:'1.2-2' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-amber-600 font-medium">Minimum Due</span>
+                <span class="font-bold text-amber-600">${{ selectedStatement()?.minimumDue | number:'1.2-2' }}</span>
+              </div>
+              @if ((selectedStatement()?.amountPaid || 0) > 0) {
+                <div class="flex justify-between">
+                  <span class="text-green-600 font-medium">Amount Paid</span>
+                  <span class="font-bold text-green-600">${{ selectedStatement()?.amountPaid | number:'1.2-2' }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Transactions -->
+          @if (selectedStatement()?.transactions && selectedStatement()!.transactions.length > 0) {
+            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Transaction History</h3>
+            <div class="space-y-2">
+              @for (txn of selectedStatement()?.transactions; track txn.id) {
+                <div class="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+                  <div class="flex-1">
+                    <p class="font-medium text-slate-900 text-sm">{{ txn.description }}</p>
+                    <p class="text-xs text-slate-500">{{ txn.dateUtc | date:'MMM d, y' }}</p>
+                  </div>
+                  <div class="text-right">
+                    <span [class]="getTxnTypeClass(txn.type) + ' font-semibold text-sm'">
+                      {{ getTxnSign(txn.type) }}${{ txn.amount | number:'1.2-2' }}
+                    </span>
+                    <p class="text-xs text-slate-500">{{ txn.type }}</p>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

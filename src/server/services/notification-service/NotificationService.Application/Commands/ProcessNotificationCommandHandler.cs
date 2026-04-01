@@ -101,7 +101,10 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             if (userIdToken != null && Guid.TryParse(userIdToken.ToString(), out var userId))
                 return userId;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to extract UserId from payload: {ex.Message}");
+        }
         return null;
     }
 

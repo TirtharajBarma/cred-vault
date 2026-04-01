@@ -4,6 +4,7 @@ using BillingService.Infrastructure.Persistence.Sql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BillingService.Infrastructure.Persistence.Sql.Migrations
 {
     [DbContext(typeof(BillingDbContext))]
-    partial class BillingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260401145349_AddStatementsTables")]
+    partial class AddStatementsTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -320,6 +323,9 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.Property<Guid>("StatementId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("StatementId1")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -330,6 +336,8 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.HasIndex("DateUtc");
 
                     b.HasIndex("StatementId");
+
+                    b.HasIndex("StatementId1");
 
                     b.ToTable("StatementTransactions", (string)null);
                 });
@@ -360,19 +368,17 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
 
             modelBuilder.Entity("BillingService.Domain.Entities.StatementTransaction", b =>
                 {
-                    b.HasOne("BillingService.Domain.Entities.Statement", "Statement")
-                        .WithMany("Transactions")
+                    b.HasOne("BillingService.Domain.Entities.Statement", null)
+                        .WithMany()
                         .HasForeignKey("StatementId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_StatementTransactions_Statements_StatementId");
+                        .IsRequired();
+
+                    b.HasOne("BillingService.Domain.Entities.Statement", "Statement")
+                        .WithMany()
+                        .HasForeignKey("StatementId1");
 
                     b.Navigation("Statement");
-                });
-
-            modelBuilder.Entity("BillingService.Domain.Entities.Statement", b =>
-                {
-                    b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
         }

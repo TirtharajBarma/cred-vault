@@ -2,7 +2,9 @@ using BillingService.Infrastructure.Persistence.Sql;
 using BillingService.API.Messaging;
 using BillingService.Application.Abstractions.Persistence;
 using BillingService.Application.Commands.Bills;
+using BillingService.Application.Commands.Statements;
 using BillingService.Application.Queries.Bills;
+using BillingService.Application.Queries.Statements;
 using BillingService.Infrastructure.Persistence.Sql.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Shared.Contracts.Extensions;
@@ -38,10 +40,13 @@ try
     {
         cfg.RegisterServicesFromAssemblyContaining<MarkBillPaidCommandHandler>();
         cfg.RegisterServicesFromAssemblyContaining<GetMyBillsQueryHandler>();
+        cfg.RegisterServicesFromAssemblyContaining<GenerateStatementCommandHandler>();
+        cfg.RegisterServicesFromAssemblyContaining<GetMyStatementsQueryHandler>();
     });
     builder.Services.AddDbContext<BillingDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("BillingDb")));
     builder.Services.AddScoped<IBillRepository, SqlBillRepository>();
     builder.Services.AddScoped<IRewardRepository, SqlRewardRepository>();
+    builder.Services.AddScoped<IStatementRepository, SqlStatementRepository>();
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddHttpClient();
 

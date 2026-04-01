@@ -1,0 +1,57 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { ApiResponse } from '../models/auth.models';
+
+const API_GATEWAY = 'http://localhost:5006';
+
+export interface Payment {
+  id: string;
+  userId: string;
+  cardId: string;
+  billId: string;
+  amount: number;
+  paymentType: string;
+  status: string;
+  failureReason?: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+}
+
+export interface PaymentInitiateRequest {
+  cardId: string;
+  billId: string;
+  amount: number;
+  paymentType: 'Full' | 'Minimum';
+}
+
+export interface PaymentInitiateResponse {
+  paymentId: string;
+  otpRequired: boolean;
+  status: string;
+  devOtp?: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class PaymentService {
+  private http = inject(HttpClient);
+  private readonly baseUrl = `${API_GATEWAY}/api/v1/payments`;
+
+  initiatePayment(request: PaymentInitiateRequest): Observable<ApiResponse<PaymentInitiateResponse>> {
+    return this.http.post<ApiResponse<PaymentInitiateResponse>>(`${this.baseUrl}/initiate`, request);
+  }
+
+  verifyOtp(paymentId: string, otpCode: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${this.baseUrl}/${paymentId}/verify-otp`, { otpCode });
+  }
+
+  getMyPayments(): Observable<ApiResponse<Payment[]>> {
+    return this.http.get<ApiResponse<Payment[]>>(this.baseUrl);
+  }
+
+  getPaymentById(paymentId: string): Observable<ApiResponse<Payment>> {
+    return this.http.get<ApiResponse<Payment>>(`${this.baseUrl}/${paymentId}`);
+  }
+}
