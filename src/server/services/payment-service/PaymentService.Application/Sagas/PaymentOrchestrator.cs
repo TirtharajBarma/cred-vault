@@ -56,6 +56,7 @@ public class PaymentOrchestrator(
             PaymentId = payment.Id,
             UserId = payment.UserId,
             BillId = payment.BillId,
+            CardId = payment.CardId,
             Amount = payment.Amount,
             RequestedAt = DateTime.UtcNow
         }, cancellationToken);

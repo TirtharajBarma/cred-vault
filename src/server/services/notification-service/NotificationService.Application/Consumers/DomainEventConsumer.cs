@@ -5,6 +5,7 @@ using Shared.Contracts.Events.Identity;
 using Shared.Contracts.Events.Card;
 using Shared.Contracts.Events.Billing;
 using Shared.Contracts.Events.Payment;
+using Shared.Contracts.Events.Saga;
 using NotificationService.Application.Commands;
 
 namespace NotificationService.Application.Consumers;
@@ -12,7 +13,7 @@ namespace NotificationService.Application.Consumers;
 public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer> logger) 
     : IConsumer<IUserRegistered>, IConsumer<IUserOtpGenerated>, IConsumer<ICardAdded>, IConsumer<IBillGenerated>, 
       IConsumer<IPaymentOtpGenerated>, IConsumer<IPaymentCompleted>, IConsumer<IPaymentFailed>,
-      IConsumer<IUserDeleted>
+      IConsumer<IUserDeleted>, IConsumer<IOtpFailed>
 {
     public async Task Consume(ConsumeContext<IUserRegistered> context)
     {
@@ -61,6 +62,13 @@ public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer
         logger.LogWarning("PaymentFailed: {PaymentId}, Reason={Reason}", context.Message.PaymentId, context.Message.Reason);
         await mediator.Send(new ProcessNotificationCommand("PaymentFailed", context.Message.Email, context.Message.FullName,
             new { context.Message.PaymentId, context.Message.UserId, context.Message.Amount, context.Message.Reason }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
+    }
+
+    public async Task Consume(ConsumeContext<IOtpFailed> context)
+    {
+        logger.LogWarning("OtpFailed: CorrelationId={CorrelationId}, Reason={Reason}", context.Message.CorrelationId, context.Message.Reason);
+        await mediator.Send(new ProcessNotificationCommand("OtpFailed", "user@example.com", "User",
+            new { context.Message.CorrelationId, context.Message.Reason }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 
     public async Task Consume(ConsumeContext<IUserDeleted> context)

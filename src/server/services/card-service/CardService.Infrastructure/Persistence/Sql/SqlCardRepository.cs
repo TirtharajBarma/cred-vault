@@ -183,4 +183,21 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
         return dbContext.CreditCards
             .AnyAsync(x => x.IssuerId == issuerId && !x.IsDeleted, cancellationToken);
     }
+
+    public async Task<List<CreditCard>> GetBlockedCardsAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.CreditCards
+            .AsNoTracking()
+            .Where(x => x.IsBlocked && !x.IsDeleted)
+            .OrderByDescending(x => x.BlockedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<CreditCard>> GetAllActiveCardsWithBalanceAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.CreditCards
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted && !x.IsBlocked && x.OutstandingBalance > 0)
+            .ToListAsync(cancellationToken);
+    }
 }

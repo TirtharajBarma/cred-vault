@@ -70,27 +70,6 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         });
     }
 
-    [HttpPost("{paymentId:guid}/reverse")]
-    public async Task<IActionResult> Reverse(Guid paymentId, CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
-
-        var command = new ReversePaymentCommand(paymentId, userId.Value);
-        var result = await mediator.Send(command, cancellationToken);
-
-        if (!result)
-            return NotFound(Fail("Payment not found or not authorized."));
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Message = "Payment reversed.",
-            TraceId = HttpContext.TraceIdentifier
-        });
-    }
-
     [HttpGet]
     public async Task<IActionResult> GetMyPayments(CancellationToken cancellationToken)
     {

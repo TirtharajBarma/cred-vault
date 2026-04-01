@@ -15,12 +15,24 @@ public interface IStartPaymentOrchestration
     DateTime StartedAt { get; }
 }
 
-public interface IOtpVerificationRequested
+public interface IBillOverdueDetected
 {
-    Guid CorrelationId { get; }
-    Guid PaymentId { get; }
-    string OtpCode { get; }
-    DateTime RequestedAt { get; }
+    Guid BillId { get; }
+    Guid CardId { get; }
+    Guid UserId { get; }
+    decimal OverdueAmount { get; }
+    DateTime DueDate { get; }
+    int DaysOverdue { get; }
+    DateTime DetectedAt { get; }
+}
+
+public interface ICardBlocked
+{
+    Guid CardId { get; }
+    Guid UserId { get; }
+    int StrikeCount { get; }
+    string Reason { get; }
+    DateTime BlockedAt { get; }
 }
 
 public interface IOtpVerified
@@ -69,6 +81,7 @@ public interface IBillUpdateRequested
     Guid PaymentId { get; }
     Guid UserId { get; }
     Guid BillId { get; }
+    Guid CardId { get; }
     decimal Amount { get; }
     DateTime RequestedAt { get; }
 }
@@ -77,6 +90,7 @@ public interface IBillUpdateSucceeded
 {
     Guid CorrelationId { get; }
     Guid BillId { get; }
+    Guid CardId { get; }
     DateTime SucceededAt { get; }
 }
 

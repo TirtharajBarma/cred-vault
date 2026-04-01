@@ -99,4 +99,12 @@ public class BillsController(IMediator mediator) : BaseApiController
 
         return Ok(result);
     }
+
+    [HttpPost("admin/check-overdue")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> CheckOverdueBills(CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new CheckOverdueBillsCommand(), cancellationToken);
+        return Ok(result);
+    }
 }

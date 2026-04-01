@@ -9,6 +9,7 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
     public DbSet<CardIssuer> CardIssuers => Set<CardIssuer>();
     public DbSet<CardTransaction> CardTransactions => Set<CardTransaction>();
+    public DbSet<CardViolation> CardViolations => Set<CardViolation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,6 +40,10 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.Property(x => x.CreditLimit).IsRequired().HasColumnType("decimal(18,2)");
             entity.Property(x => x.OutstandingBalance).IsRequired().HasColumnType("decimal(18,2)");
             entity.Property(x => x.BillingCycleStartDay).IsRequired();
+            entity.Property(x => x.StrikeCount).IsRequired().HasDefaultValue(0);
+            entity.Property(x => x.IsBlocked).IsRequired().HasDefaultValue(false);
+            entity.Property(x => x.BlockedAtUtc);
+            entity.Property(x => x.UnblockedAtUtc);
             entity.Property(x => x.IsDefault).IsRequired();
             entity.Property(x => x.IsVerified).IsRequired();
             entity.Property(x => x.VerifiedAtUtc);
@@ -70,6 +75,29 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.HasIndex(x => x.UserId);
             entity.HasIndex(x => x.DateUtc);
             entity.HasQueryFilter(x => !x.Card!.IsDeleted);
+        });
+
+        modelBuilder.Entity<CardViolation>(entity =>
+        {
+            entity.ToTable("CardViolations");
+            entity.HasKey(x => x.Id);
+            entity.HasOne(x => x.Card)
+                .WithMany()
+                .HasForeignKey(x => x.CardId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.CardId).IsRequired();
+            entity.Property(x => x.UserId).IsRequired();
+            entity.Property(x => x.BillId);
+            entity.Property(x => x.Type).IsRequired().HasConversion<int>();
+            entity.Property(x => x.StrikeCount).IsRequired();
+            entity.Property(x => x.Reason).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.PenaltyAmount).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.IsActive).IsRequired();
+            entity.Property(x => x.AppliedAtUtc).IsRequired();
+            entity.Property(x => x.ClearedAtUtc);
+            entity.HasIndex(x => x.CardId);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => new { x.CardId, x.IsActive });
         });
     }
 }

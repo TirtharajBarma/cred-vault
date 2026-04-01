@@ -60,12 +60,14 @@ public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientF
         var minDue = Math.Max(Math.Round(card.OutstandingBalance * 0.10m, 2, MidpointRounding.AwayFromZero), 10.00m);
         var now = DateTime.UtcNow;
 
+        var (billingDate, dueDate) = BillingCycleCalculator.CalculateBillingAndDueDate(card.BillingCycleStartDay);
+
         var bill = new Bill
         {
             Id = Guid.NewGuid(), UserId = request.UserId, CardId = request.CardId,
             CardNetwork = network, IssuerId = card.IssuerId, Amount = card.OutstandingBalance,
-            MinDue = minDue, Currency = request.Currency, BillingDateUtc = now,
-            DueDateUtc = now.AddDays(20), Status = BillStatus.Pending, CreatedAtUtc = now, UpdatedAtUtc = now
+            MinDue = minDue, Currency = request.Currency, BillingDateUtc = billingDate,
+            DueDateUtc = dueDate, Status = BillStatus.Pending, CreatedAtUtc = now, UpdatedAtUtc = now
         };
 
         await bills.AddAsync(bill, ct);
@@ -140,6 +142,6 @@ public class GenerateAdminBillCommandHandler(IBillRepository bills, IHttpClientF
         }
     }
 
-    private record CardDto(Guid Id, Guid UserId, string Network, Guid IssuerId, decimal CreditLimit, decimal OutstandingBalance);
+    private record CardDto(Guid Id, Guid UserId, string Network, Guid IssuerId, decimal CreditLimit, decimal OutstandingBalance, int BillingCycleStartDay);
     private record UserDto(Guid Id, string Email, string FullName);
 }
