@@ -16,18 +16,6 @@ public interface ITransactionRepository
     Task AddAsync(Transaction transaction);
 }
 
-public interface IRiskRepository
-{
-    Task<RiskScore?> GetByPaymentIdAsync(Guid paymentId);
-    Task AddAsync(RiskScore riskScore);
-}
-
-public interface IFraudRepository
-{
-    Task<FraudAlert?> GetByPaymentIdAsync(Guid paymentId);
-    Task AddAsync(FraudAlert fraudAlert);
-}
-
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

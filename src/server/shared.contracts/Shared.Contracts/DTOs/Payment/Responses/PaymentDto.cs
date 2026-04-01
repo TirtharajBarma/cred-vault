@@ -24,25 +24,3 @@ public sealed class TransactionDto
     public string Description { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; }
 }
-
-public sealed class RiskScoreDto
-{
-    public Guid Id { get; set; }
-    public Guid PaymentId { get; set; }
-    public Guid UserId { get; set; }
-    public decimal Score { get; set; }
-    public string Decision { get; set; } = string.Empty;
-    public DateTime CreatedAtUtc { get; set; }
-}
-
-public sealed class FraudAlertDto
-{
-    public Guid Id { get; set; }
-    public Guid PaymentId { get; set; }
-    public Guid UserId { get; set; }
-    public string AlertType { get; set; } = string.Empty;
-    public decimal RiskScore { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public DateTime CreatedAtUtc { get; set; }
-    public DateTime UpdatedAtUtc { get; set; }
-}

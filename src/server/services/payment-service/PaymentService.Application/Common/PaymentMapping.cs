@@ -29,14 +29,4 @@ public static class PaymentMapping
         Description  = t.Description,
         CreatedAtUtc = t.CreatedAtUtc
     };
-
-    public static RiskScoreDto ToDto(RiskScore r) => new()
-    {
-        Id           = r.Id,
-        PaymentId    = r.PaymentId,
-        UserId       = r.UserId,
-        Score        = r.Score,
-        Decision     = r.Decision.ToString(),
-        CreatedAtUtc = r.CreatedAtUtc
-    };
 }

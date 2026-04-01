@@ -63,7 +63,6 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.BillId = ctx.Message.BillId;
                     ctx.Saga.Amount = ctx.Message.Amount;
                     ctx.Saga.PaymentType = ctx.Message.PaymentType;
-                    ctx.Saga.RiskScore = ctx.Message.RiskScore;
                     ctx.Saga.OtpCode = ctx.Message.OtpCode;
                     ctx.Saga.OtpExpiresAtUtc = DateTime.UtcNow.AddMinutes(10);
                     ctx.Saga.CreatedAtUtc = DateTime.UtcNow;
@@ -168,7 +167,16 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.CardDeducted = true;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
-                .TransitionTo(Completed),
+                .TransitionTo(Completed)
+                .PublishAsync(ctx => ctx.Init<IPaymentCompleted>(new
+                {
+                    PaymentId = ctx.Saga.PaymentId,
+                    ctx.Saga.UserId,
+                    Email = ctx.Saga.Email ?? string.Empty,
+                    FullName = ctx.Saga.FullName ?? "User",
+                    ctx.Saga.Amount,
+                    CompletedAt = DateTime.UtcNow
+                })),
             When(CardDeductionFailed)
                 .Then(ctx =>
                 {

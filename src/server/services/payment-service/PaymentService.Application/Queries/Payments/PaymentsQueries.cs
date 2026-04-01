@@ -7,7 +7,6 @@ namespace PaymentService.Application.Queries.Payments;
 
 public record GetAllPaymentsQuery(Guid UserId) : IRequest<List<PaymentDto>>;
 public record GetPaymentTransactionsQuery(Guid PaymentId, Guid RequestingUserId) : IRequest<List<TransactionDto>>;
-public record GetRiskScoreQuery(Guid PaymentId, Guid RequestingUserId) : IRequest<RiskScoreDto?>;
 
 public class GetAllPaymentsQueryHandler(IPaymentRepository paymentRepository)
     : IRequestHandler<GetAllPaymentsQuery, List<PaymentDto>>
@@ -33,22 +32,5 @@ public class GetPaymentTransactionsQueryHandler(
 
         var txns = await transactionRepository.GetByPaymentIdAsync(request.PaymentId);
         return txns.Select(PaymentMapping.ToDto).ToList();
-    }
-}
-
-public class GetRiskScoreQueryHandler(
-    IPaymentRepository paymentRepository,
-    IRiskRepository riskRepository)
-    : IRequestHandler<GetRiskScoreQuery, RiskScoreDto?>
-{
-    public async Task<RiskScoreDto?> Handle(GetRiskScoreQuery request, CancellationToken cancellationToken)
-    {
-        // Ownership check
-        var payment = await paymentRepository.GetByIdAsync(request.PaymentId);
-        if (payment is null || payment.UserId != request.RequestingUserId)
-            return null;
-
-        var risk = await riskRepository.GetByPaymentIdAsync(request.PaymentId);
-        return risk is null ? null : PaymentMapping.ToDto(risk);
     }
 }

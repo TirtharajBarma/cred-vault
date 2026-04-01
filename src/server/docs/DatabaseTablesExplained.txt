@@ -1,0 +1,201 @@
+# Payment Database Tables Explained
+
+## 1. PaymentOrchestrationSagas Table (Saga State Machine)
+
+This is OUR saga - tracks the entire payment orchestration process across all 3 services.
+
+### Columns Explained:
+
+| Column | Purpose | Example |
+|---------|---------|---------|
+| CorrelationId | Unique ID linking all saga events | `6FD5C9DA-A578-4CB0-AAFA-4112AD431787` |
+| CurrentState | Where saga is in the flow | `Completed`, `Compensated`, `AwaitingOtpVerification` |
+| PaymentId | Same as CorrelationId - the payment being orchestrated | `6FD5C9DA-A578-4CB0-AAFA-4112AD431787` |
+| UserId | Who initiated the payment | `03DA1D1E-7228-457B-B67B-432CA3785E5F` |
+| Email | User's email for notifications | `tirtharajbarma3@gmail.com` |
+| FullName | User's name | `Tirtharaj Barma` |
+| CardId | Which card is being charged | `15E05B2B-3E9B-4BC7-B43F-B37D285FCFAE` |
+| BillId | Which bill is being paid | `8E00EFC1-A8CB-4991-811B-B26F0BC4FF94` |
+| Amount | Payment amount | `100.00`, `4445.00` |
+| PaymentType | Type of payment | `Full`, `Partial`, `Scheduled` |
+| RiskScore | Risk assessment score (lower = safer) | `20.00` |
+| RiskDecision | Risk engine decision | NULL (skipping real risk check) |
+| OtpVerified | Has user verified OTP? | `0` (no), `1` (yes) |
+| OtpCode | The 6-digit OTP code | `268587` |
+| OtpExpiresAtUtc | When OTP expires | `2026-04-01 06:06:04` |
+| PaymentProcessed | Did payment processing succeed? | `0` or `1` |
+| BillUpdated | Did bill get marked as paid? | `0` or `1` |
+| CardDeducted | Did card balance get deducted? | `0` or `1` |
+| PaymentError | Error if payment processing failed | NULL (success) |
+| BillUpdateError | Error if bill update failed | NULL (success) |
+| CardDeductionError | Error if card deduction failed | `Exceeds credit limit` |
+| CompensationReason | Why compensation was triggered | `Card deduction failed: Exceeds credit limit` |
+| CompensationAttempts | How many times we tried to compensate | `0`, `1`, `2`, `3` |
+| CreatedAtUtc | When saga started | `2026-04-01 05:56:04` |
+| UpdatedAtUtc | Last time saga state changed | `2026-04-01 05:56:05` |
+
+### Why Some Columns Are NULL/Empty:
+
+| Column | When NULL | Reason |
+|--------|-----------|--------|
+| RiskDecision | Always NULL | We skip real risk scoring - hardcoded to pass |
+| PaymentError | When successful | No error occurred |
+| BillUpdateError | When successful | No error occurred |
+| CompensationReason | When successful | No compensation needed |
+
+### Saga States Explained:
+
+| State | Meaning |
+|-------|---------|
+| Initial | Saga just created |
+| AwaitingOtpVerification | Waiting for user to verify OTP |
+| AwaitingPaymentConfirmation | OTP verified, processing payment |
+| AwaitingBillUpdate | Payment processed, updating bill |
+| AwaitingCardDeduction | Bill updated, deducting from card |
+| Completed | All steps successful! |
+| Compensating | Something failed, rolling back |
+| Compensated | Rollback complete |
+| Failed | Failed after max compensation attempts |
+
+---
+
+## 2. Payments Table (Source of Truth)
+
+The CORE payment record - single source of truth for each payment.
+
+| Column | Purpose | Example |
+|--------|---------|---------|
+| Id | Unique payment ID | `D8DD8EF7-7423-42C1-ADD7-C39345CE195F` |
+| UserId | Who made the payment | `03DA1D1E-7228-457B-B67B-432CA3785E5F` |
+| CardId | Card used | `15E05B2B-3E9B-4BC7-B43F-B37D285FCFAE` |
+| BillId | Bill being paid | `8E00EFC1-A8CB-4991-811B-B26F0BC4FF94` |
+| Amount | Payment amount | `4445.00` |
+| PaymentType | Full/Partial/Scheduled | `Full` (as int: 0) |
+| Status | Current payment status | `0`=Initiated, `2`=Completed, `5`=Reversed |
+| FailureReason | Why payment failed (if failed) | NULL (unless failed) |
+| IsDeleted | Soft delete flag | `0` (not deleted) |
+| DeletedAtUtc | When deleted | NULL |
+| CreatedAtUtc | When payment was created | `2026-04-01 05:45:20` |
+| UpdatedAtUtc | Last update time | `2026-04-01 05:45:30` |
+
+### Payment Status Codes:
+
+| Status | Value | Meaning |
+|--------|-------|---------|
+| Initiated | 0 | Payment created, waiting for OTP |
+| RiskCheckPassed | 1 | (unused now - was for old flow) |
+| Processing | 2 | OTP verified, saga running |
+| Completed | 3 | Payment successful |
+| Failed | 4 | Payment failed |
+| Reversed | 5 | Payment rolled back (compensation) |
+| Cancelled | 6 | User cancelled |
+
+---
+
+## 3. RiskScores Table (Audit/Compliance)
+
+Stores risk assessment results for each payment.
+
+| Column | Purpose | Example |
+|--------|---------|---------|
+| Id | Unique ID | `2D309EC1-5062-474E-A489-25F712647EEA` |
+| PaymentId | Which payment this belongs to | `90A23EAC-F69B-4B91-89AF-980629EE953C` |
+| UserId | User who made payment | `019E1D84-20C7-4C01-99AB-1C53CFA39CE3` |
+| Score | Risk score (0-100, lower = safer) | `20.00` |
+| Decision | AutoApproved=0, OTPRequired=1, Blocked=2 | `0` (AutoApproved) |
+| CreatedAtUtc | When score was created | `2026-03-29 09:00:10` |
+
+### Why This Table Exists:
+- **Future-proofing**: When you implement real fraud detection, this stores actual risk scores
+- **Audit trail**: Shows risk decisions made for each payment
+- **Compliance**: Required for some payment regulations
+
+---
+
+## 4. Transactions Table (Financial Ledger)
+
+Records EVERY financial movement related to payments.
+
+| Column | Purpose | Example |
+|--------|---------|---------|
+| Id | Unique transaction ID | `D04F52A8-A8F0-4F1C-A0E6-8CBF981094B7` |
+| PaymentId | Which payment this belongs to | `6FD5C9DA-A578-4CB0-AAFA-4112AD431787` |
+| UserId | User who initiated | `03DA1D1E-7228-457B-B67B-432CA3785E5F` |
+| Amount | Transaction amount | `100.00` |
+| Type | `0`=Payment, `1`=Reversal | `1` (Reversal) |
+| Description | Human-readable description | `Saga compensation: 6fd5c9da...` |
+| CreatedAtUtc | When transaction occurred | `2026-04-01 05:56:05` |
+
+### Transaction Types:
+
+| Type | Value | When Created |
+|------|-------|--------------|
+| Payment | 0 | When payment completes successfully |
+| Reversal | 1 | When payment is rolled back (compensation) |
+
+---
+
+## Summary: How These Tables Work Together
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PaymentOrchestrationSagas                      │
+│                    (Saga State Machine)                           │
+│  - Tracks MULTI-SERVICE orchestration                          │
+│  - Contains data needed by all 3 services                       │
+│  - Is the "brain" - knows what step we're on                   │
+│  - Contains progress flags (OtpVerified, PaymentProcessed, etc.) │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ Links via PaymentId
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        Payments Table                             │
+│                    (Source of Truth)                             │
+│  - The CORE payment record                                       │
+│  - Single source of truth for THIS service                       │
+│  - Only PaymentService reads/writes this                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────────┐
+│      RiskScores          │     │      Transactions            │
+│   (Audit/Compliance)    │     │    (Financial Ledger)       │
+│ - Stores risk decisions │     │ - Every money movement       │
+│ - Future fraud detection│     │ - Immutable audit trail      │
+│ - May be empty now      │     │ - Used for refunds/reversals │
+└─────────────────────────┘     └─────────────────────────────┘
+```
+
+---
+
+## Example Flow:
+
+### Successful Payment:
+```
+1. Payment created → Payments (Status=Initiated)
+2. Saga starts → PaymentOrchestrationSagas (OtpVerified=0)
+3. User enters OTP → Saga updates (OtpVerified=1)
+4. Payment processed → Payments (Status=Processing)
+5. Bill updated → PaymentOrchestrationSagas (BillUpdated=1)
+6. Card deducted → PaymentOrchestrationSagas (CardDeducted=1)
+7. Saga completes → PaymentOrchestrationSagas (CurrentState=Completed)
+8. Transaction created → Transactions (Type=Payment)
+```
+
+### Failed Payment (Compensation):
+```
+1. Payment created → Payments (Status=Initiated)
+2. Saga starts → PaymentOrchestrationSagas
+3. OTP verified → OtpVerified=1
+4. Payment processed → PaymentProcessed=1
+5. Bill updated → BillUpdated=1
+6. Card deduction FAILS → CardDeductionError="Exceeds credit limit"
+7. Compensation starts → CurrentState=Compensating
+8. Bill reverted → BillUpdated=0
+9. Payment reverted → PaymentProcessed=0, Payments (Status=Reversed)
+10. Saga completes → CurrentState=Compensated
+11. Transaction created → Transactions (Type=Reversal)
+```

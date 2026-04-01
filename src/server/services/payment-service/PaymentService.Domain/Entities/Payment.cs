@@ -20,6 +20,4 @@ public sealed class Payment
 
     // Navigation
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
-    public RiskScore? RiskScore { get; set; }
-    public FraudAlert? FraudAlert { get; set; }
 }

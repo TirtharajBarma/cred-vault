@@ -48,8 +48,6 @@ try
     builder.Services.AddHttpClient();
     builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
-    builder.Services.AddScoped<IRiskRepository, RiskRepository>();
-    builder.Services.AddScoped<IFraudRepository, FraudRepository>();
     builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PaymentDbContext>());
 
     builder.Services.AddMediatR(cfg =>
@@ -66,7 +64,6 @@ try
         x.SetKebabCaseEndpointNameFormatter();
         x.AddConsumer<PaymentCompletedConsumer>();
         x.AddConsumer<PaymentFailedConsumer>();
-        x.AddConsumer<FraudDetectedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<PaymentProcessConsumer>();
         x.AddConsumer<RevertPaymentConsumer>();

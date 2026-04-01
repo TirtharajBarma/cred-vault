@@ -16,9 +16,6 @@ public sealed class PaymentOrchestrationSagaState : SagaStateMachineInstance
     public decimal Amount { get; set; }
     public string? PaymentType { get; set; }
 
-    public decimal RiskScore { get; set; }
-    public string? RiskDecision { get; set; }
-
     public string? OtpCode { get; set; }
     public DateTime? OtpExpiresAtUtc { get; set; }
     public bool OtpVerified { get; set; }

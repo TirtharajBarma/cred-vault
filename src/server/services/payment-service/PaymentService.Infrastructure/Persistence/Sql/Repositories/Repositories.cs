@@ -10,8 +10,6 @@ public sealed class PaymentRepository(PaymentDbContext dbContext) : IPaymentRepo
     {
         return await dbContext.Payments
             .Include(x => x.Transactions)
-            .Include(x => x.RiskScore)
-            .Include(x => x.FraudAlert)
             .FirstOrDefaultAsync(x => x.Id == id);
     }
 
@@ -48,31 +46,5 @@ public sealed class TransactionRepository(PaymentDbContext dbContext) : ITransac
     public async Task AddAsync(Transaction transaction)
     {
         await dbContext.Transactions.AddAsync(transaction);
-    }
-}
-
-public sealed class RiskRepository(PaymentDbContext dbContext) : IRiskRepository
-{
-    public async Task<RiskScore?> GetByPaymentIdAsync(Guid paymentId)
-    {
-        return await dbContext.RiskScores.FirstOrDefaultAsync(x => x.PaymentId == paymentId);
-    }
-
-    public async Task AddAsync(RiskScore riskScore)
-    {
-        await dbContext.RiskScores.AddAsync(riskScore);
-    }
-}
-
-public sealed class FraudRepository(PaymentDbContext dbContext) : IFraudRepository
-{
-    public async Task<FraudAlert?> GetByPaymentIdAsync(Guid paymentId)
-    {
-        return await dbContext.FraudAlerts.FirstOrDefaultAsync(x => x.PaymentId == paymentId);
-    }
-
-    public async Task AddAsync(FraudAlert fraudAlert)
-    {
-        await dbContext.FraudAlerts.AddAsync(fraudAlert);
     }
 }

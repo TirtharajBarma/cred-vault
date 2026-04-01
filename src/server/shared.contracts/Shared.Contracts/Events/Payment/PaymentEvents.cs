@@ -23,8 +23,6 @@ public interface IPaymentCompleted
     Guid CardId { get; }
     Guid BillId { get; }
     decimal Amount { get; }
-    decimal RiskScore { get; }
-    string RiskDecision { get; }
     DateTime CompletedAt { get; }
 }
 
@@ -48,15 +46,6 @@ public interface IPaymentReversed
     decimal Amount { get; }
     decimal PointsDeducted { get; }
     DateTime ReversedAt { get; }
-}
-
-public interface IFraudDetected
-{
-    Guid PaymentId { get; }
-    Guid UserId { get; }
-    decimal RiskScore { get; }
-    string AlertType { get; }
-    DateTime DetectedAt { get; }
 }
 
 public interface IOTPVerified

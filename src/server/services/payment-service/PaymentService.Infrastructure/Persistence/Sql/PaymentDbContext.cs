@@ -9,8 +9,6 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
 {
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
-    public DbSet<RiskScore> RiskScores => Set<RiskScore>();
-    public DbSet<FraudAlert> FraudAlerts => Set<FraudAlert>();
     public DbSet<PaymentOrchestrationSagaState> PaymentOrchestrationSagas => Set<PaymentOrchestrationSagaState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -54,44 +52,6 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
             entity.HasIndex(x => x.PaymentId);
         });
 
-        modelBuilder.Entity<RiskScore>(entity =>
-        {
-            entity.ToTable("RiskScores");
-            entity.HasKey(x => x.Id);
-
-            entity.Property(x => x.Score).IsRequired().HasColumnType("decimal(5,2)");
-            entity.Property(x => x.Decision).IsRequired().HasConversion<int>();
-            entity.Property(x => x.CreatedAtUtc).IsRequired();
-
-            entity.HasOne(x => x.Payment)
-                .WithOne(x => x.RiskScore)
-                .HasForeignKey<RiskScore>(x => x.PaymentId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasIndex(x => x.UserId);
-            entity.HasIndex(x => x.PaymentId);
-        });
-
-        modelBuilder.Entity<FraudAlert>(entity =>
-        {
-            entity.ToTable("FraudAlerts");
-            entity.HasKey(x => x.Id);
-
-            entity.Property(x => x.AlertType).IsRequired().HasMaxLength(100);
-            entity.Property(x => x.RiskScore).IsRequired().HasColumnType("decimal(5,2)");
-            entity.Property(x => x.Status).IsRequired().HasConversion<int>();
-            entity.Property(x => x.CreatedAtUtc).IsRequired();
-            entity.Property(x => x.UpdatedAtUtc).IsRequired();
-
-            entity.HasOne(x => x.Payment)
-                .WithOne(x => x.FraudAlert)
-                .HasForeignKey<FraudAlert>(x => x.PaymentId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasIndex(x => x.UserId);
-            entity.HasIndex(x => x.PaymentId);
-        });
-
         // Orchestration Saga Configuration
         modelBuilder.Entity<PaymentOrchestrationSagaState>(entity =>
         {
@@ -102,13 +62,11 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
             entity.Property(x => x.Email).HasMaxLength(256);
             entity.Property(x => x.FullName).HasMaxLength(256);
             entity.Property(x => x.PaymentType).HasMaxLength(32);
-            entity.Property(x => x.RiskDecision).HasMaxLength(32);
             entity.Property(x => x.CompensationReason).HasMaxLength(500);
             entity.Property(x => x.PaymentError).HasMaxLength(500);
             entity.Property(x => x.BillUpdateError).HasMaxLength(500);
             entity.Property(x => x.CardDeductionError).HasMaxLength(500);
             entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
-            entity.Property(x => x.RiskScore).HasColumnType("decimal(5,2)");
         });
     }
 }

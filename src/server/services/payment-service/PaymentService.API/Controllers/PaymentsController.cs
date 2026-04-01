@@ -147,27 +147,6 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
             TraceId = HttpContext.TraceIdentifier
         });
     }
-
-    [HttpGet("{paymentId:guid}/risk")]
-    public async Task<IActionResult> GetRiskScore(Guid paymentId, CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
-
-        var risk = await mediator.Send(new GetRiskScoreQuery(paymentId, userId.Value), cancellationToken);
-
-        if (risk is null)
-            return NotFound(Fail("Risk score not found."));
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Message = "Risk score fetched.",
-            Data = risk,
-            TraceId = HttpContext.TraceIdentifier
-        });
-    }
 }
 
 public record InitiatePaymentRequest(Guid CardId, Guid BillId, decimal Amount, string PaymentType);

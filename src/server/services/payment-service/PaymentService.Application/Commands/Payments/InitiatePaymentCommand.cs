@@ -85,6 +85,7 @@ public class InitiatePaymentCommandHandler(
 
         var riskScore = payment.Amount > 10000 ? 85m : payment.Amount > 5000 ? 60m : 20m;
         var otpCode = GenerateOtp();
+        var otpExpires = DateTime.UtcNow.AddMinutes(10);
 
         logger.LogInformation("Starting SAGA orchestration for PaymentId={PaymentId}, Amount={Amount}, RiskScore={RiskScore}, OTP={OtpCode}",
             payment.Id, payment.Amount, riskScore, otpCode);
@@ -103,6 +104,17 @@ public class InitiatePaymentCommandHandler(
             RiskScore = riskScore,
             OtpCode = otpCode,
             StartedAt = DateTime.UtcNow
+        }, cancellationToken);
+
+        await publishEndpoint.Publish<IPaymentOtpGenerated>(new
+        {
+            PaymentId = payment.Id,
+            UserId = payment.UserId,
+            Email = user?.Email ?? string.Empty,
+            FullName = user?.FullName ?? "Unknown",
+            Amount = payment.Amount,
+            OtpCode = otpCode,
+            ExpiresAtUtc = otpExpires
         }, cancellationToken);
 
         logger.LogInformation("SAGA orchestration started: PaymentId={PaymentId}, OTP={OtpCode}", payment.Id, otpCode);

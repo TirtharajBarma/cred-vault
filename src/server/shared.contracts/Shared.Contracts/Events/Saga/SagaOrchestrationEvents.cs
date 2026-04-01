@@ -11,7 +11,6 @@ public interface IStartPaymentOrchestration
     Guid BillId { get; }
     decimal Amount { get; }
     string PaymentType { get; }
-    decimal RiskScore { get; }
     string OtpCode { get; }
     DateTime StartedAt { get; }
 }

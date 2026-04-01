@@ -7,7 +7,7 @@ using Shared.Contracts.Events.Payment;
 
 namespace PaymentService.Infrastructure.Messaging.Consumers;
 
-public class PaymentCompletedConsumer(IPaymentRepository payments, ITransactionRepository transactions, IRiskRepository risk, IUnitOfWork uow, ILogger<PaymentCompletedConsumer> logger) : IConsumer<IPaymentCompleted>
+public class PaymentCompletedConsumer(IPaymentRepository payments, ITransactionRepository transactions, IUnitOfWork uow, ILogger<PaymentCompletedConsumer> logger) : IConsumer<IPaymentCompleted>
 {
     public async Task Consume(ConsumeContext<IPaymentCompleted> context)
     {
@@ -39,17 +39,6 @@ public class PaymentCompletedConsumer(IPaymentRepository payments, ITransactionR
                 Amount = payment.Amount, Type = TransactionType.Payment,
                 Description = "Payment completed", CreatedAtUtc = DateTime.UtcNow
             });
-
-            if (await risk.GetByPaymentIdAsync(payment.Id) == null)
-            {
-                var decision = Enum.TryParse<RiskDecision>(context.Message.RiskDecision, out var d) ? d : RiskDecision.AutoApproved;
-                await risk.AddAsync(new RiskScore
-                {
-                    Id = Guid.NewGuid(), PaymentId = payment.Id, UserId = payment.UserId,
-                    Score = context.Message.RiskScore, Decision = decision, CreatedAtUtc = DateTime.UtcNow
-                });
-                logger.LogInformation("RiskScore created for {PaymentId}: Decision={Decision}", payment.Id, decision);
-            }
 
             await uow.SaveChangesAsync();
             logger.LogInformation("Payment {PaymentId} marked as completed", payment.Id);
@@ -95,51 +84,6 @@ public class PaymentFailedConsumer(IPaymentRepository payments, IUnitOfWork uow,
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to process IPaymentFailed: PaymentId={PaymentId}", paymentId);
-            throw;
-        }
-    }
-}
-
-public class FraudDetectedConsumer(IFraudRepository fraud, IRiskRepository risk, IUnitOfWork uow, ILogger<FraudDetectedConsumer> logger) : IConsumer<IFraudDetected>
-{
-    public async Task Consume(ConsumeContext<IFraudDetected> context)
-    {
-        var paymentId = context.Message.PaymentId;
-        var userId = context.Message.UserId;
-        var riskScore = context.Message.RiskScore;
-        var alertType = context.Message.AlertType;
-
-        logger.LogError("FRAUD DETECTED: PaymentId={PaymentId}, UserId={UserId}, Score={Score}, Type={Type}",
-            paymentId, userId, riskScore, alertType);
-
-        try
-        {
-            if (await risk.GetByPaymentIdAsync(paymentId) == null)
-            {
-                await risk.AddAsync(new RiskScore
-                {
-                    Id = Guid.NewGuid(), PaymentId = paymentId, UserId = userId,
-                    Score = riskScore, Decision = RiskDecision.Blocked, CreatedAtUtc = DateTime.UtcNow
-                });
-                logger.LogWarning("Fraud risk score recorded: PaymentId={PaymentId}, Decision=Blocked", paymentId);
-            }
-
-            if (await fraud.GetByPaymentIdAsync(paymentId) == null)
-            {
-                await fraud.AddAsync(new FraudAlert
-                {
-                    Id = Guid.NewGuid(), PaymentId = paymentId, UserId = userId,
-                    RiskScore = riskScore, AlertType = alertType,
-                    Status = FraudAlertStatus.Open, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-                });
-                logger.LogWarning("Fraud alert created: PaymentId={PaymentId}, Type={Type}", paymentId, alertType);
-            }
-
-            await uow.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to process fraud alert: PaymentId={PaymentId}", paymentId);
             throw;
         }
     }

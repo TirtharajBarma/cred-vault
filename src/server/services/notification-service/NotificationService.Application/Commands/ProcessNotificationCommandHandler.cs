@@ -23,7 +23,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             EntityName = request.EventType,
             EntityId = request.MessageId ?? "Event",
             Action = "Received",
-            UserId = request.Email ?? $"unknown-{request.EventType}",
+            UserId = userId?.ToString() ?? request.Email ?? $"unknown-{request.EventType}",
             Changes = JsonConvert.SerializeObject(new { request.Payload, MessageId = request.MessageId, ReceivedAt = DateTime.UtcNow }),
             TraceId = traceId,
             CreatedAtUtc = DateTime.UtcNow
@@ -59,7 +59,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
                 EntityName = request.EventType,
                 EntityId = request.MessageId ?? "Event",
                 Action = success ? "EmailSent" : "EmailFailed",
-                UserId = request.Email,
+                UserId = userId?.ToString() ?? request.Email ?? "unknown",
                 Changes = JsonConvert.SerializeObject(new { Subject = subject, Success = success, Error = error }),
                 TraceId = traceId,
                 CreatedAtUtc = DateTime.UtcNow
@@ -78,7 +78,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
                 EntityName = request.EventType,
                 EntityId = request.MessageId ?? "Event",
                 Action = "NoEmail",
-                UserId = $"unknown-{request.EventType}",
+                UserId = userId?.ToString() ?? $"unknown-{request.EventType}",
                 Changes = JsonConvert.SerializeObject(new { Reason = "No email in event payload" }),
                 TraceId = traceId,
                 CreatedAtUtc = DateTime.UtcNow
@@ -119,7 +119,6 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             "PaymentOtpGenerated" => ("Payment Verification", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Amount: ${data.GetValueOrDefault("Amount", "0")}</p>"),
             "PaymentCompleted" => ("Payment Successful", $"<h2>Payment of ${data.GetValueOrDefault("Amount", "0")} completed!</h2>"),
             "PaymentFailed" => ("Payment Failed", $"<h2>Payment failed: {data.GetValueOrDefault("Reason", "Unknown")}</h2>"),
-            "FraudDetected" => ("SECURITY ALERT", $"<h2 style='color:red'>Fraud detected! Payment: {data.GetValueOrDefault("PaymentId", "N/A")}</h2>"),
             _ => (eventType, $"<h2>{eventType}</h2><p>Details: {json}</p>")
         };
     }

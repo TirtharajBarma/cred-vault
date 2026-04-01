@@ -11,7 +11,7 @@ namespace NotificationService.Application.Consumers;
 
 public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer> logger) 
     : IConsumer<IUserRegistered>, IConsumer<IUserOtpGenerated>, IConsumer<ICardAdded>, IConsumer<IBillGenerated>, 
-      IConsumer<IPaymentOtpGenerated>, IConsumer<IPaymentCompleted>, IConsumer<IPaymentFailed>, IConsumer<IFraudDetected>,
+      IConsumer<IPaymentOtpGenerated>, IConsumer<IPaymentCompleted>, IConsumer<IPaymentFailed>,
       IConsumer<IUserDeleted>
 {
     public async Task Consume(ConsumeContext<IUserRegistered> context)
@@ -51,9 +51,9 @@ public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer
 
     public async Task Consume(ConsumeContext<IPaymentCompleted> context)
     {
-        logger.LogDebug("PaymentCompleted: {PaymentId}, Amount={Amount}, Risk={Risk}", context.Message.PaymentId, context.Message.Amount, context.Message.RiskScore);
+        logger.LogDebug("PaymentCompleted: {PaymentId}, Amount={Amount}", context.Message.PaymentId, context.Message.Amount);
         await mediator.Send(new ProcessNotificationCommand("PaymentCompleted", context.Message.Email, context.Message.FullName,
-            new { context.Message.PaymentId, context.Message.UserId, context.Message.Amount, context.Message.RiskScore, context.Message.RiskDecision }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
+            new { context.Message.PaymentId, context.Message.UserId, context.Message.Amount }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 
     public async Task Consume(ConsumeContext<IPaymentFailed> context)
@@ -63,17 +63,10 @@ public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer
             new { context.Message.PaymentId, context.Message.UserId, context.Message.Amount, context.Message.Reason }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 
-    public async Task Consume(ConsumeContext<IFraudDetected> context)
-    {
-        logger.LogError("FraudDetected: {PaymentId}, Score={Score}, Type={Type}", context.Message.PaymentId, context.Message.RiskScore, context.Message.AlertType);
-        await mediator.Send(new ProcessNotificationCommand("FraudDetected", "security@credvault.com", "Security Team",
-            new { context.Message.PaymentId, context.Message.UserId, context.Message.RiskScore, context.Message.AlertType }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
-    }
-
     public async Task Consume(ConsumeContext<IUserDeleted> context)
     {
         logger.LogInformation("UserDeleted: {UserId}", context.Message.UserId);
-        await mediator.Send(new ProcessNotificationCommand("UserDeleted", "admin@credvault.com", "Admin",
+        await mediator.Send(new ProcessNotificationCommand("UserDeleted", "tirtharajbarma3@gmail.com", "Admin",
             new { context.Message.UserId, context.Message.DeletedAtUtc }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 }
