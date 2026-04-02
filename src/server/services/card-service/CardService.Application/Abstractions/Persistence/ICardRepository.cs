@@ -13,9 +13,7 @@ public interface ICardRepository
     Task DeleteAsync(CreditCard card, CancellationToken cancellationToken = default);
     Task UnsetDefaultForUserAsync(Guid userId, Guid? exceptCardId, CancellationToken cancellationToken = default);
 
-    Task<CardIssuer?> GetIssuerByNetworkAsync(CardNetwork network, CancellationToken cancellationToken = default);
     Task<CardIssuer?> GetIssuerByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<CardIssuer?> GetIssuerByIdRawAsync(Guid id, CancellationToken cancellationToken = default);
     Task<List<CardIssuer>> ListIssuersAsync(CancellationToken cancellationToken = default);
     Task<bool> HasDuplicateCardAsync(Guid userId, CardNetwork network, string last4, CancellationToken cancellationToken = default);
     Task<bool> HasDuplicateIssuerAsync(string normalizedName, CancellationToken cancellationToken = default);
@@ -31,6 +29,5 @@ public interface ICardRepository
     Task<bool> HasCardsByIssuerAsync(Guid issuerId, CancellationToken cancellationToken = default);
 
     Task<List<CreditCard>> GetBlockedCardsAsync(CancellationToken cancellationToken = default);
-    Task<List<CreditCard>> GetAllActiveCardsWithBalanceAsync(CancellationToken cancellationToken = default);
     Task<bool> HasTransactionsAsync(Guid cardId, CancellationToken cancellationToken = default);
 }

@@ -57,8 +57,6 @@ try
     });
     builder.Services.AddValidatorsFromAssemblyContaining<InitiatePaymentCommand>();
 
-    builder.Services.AddRabbitMqBindings();
-
     builder.Services.AddMassTransit(x =>
     {
         x.SetKebabCaseEndpointNameFormatter();

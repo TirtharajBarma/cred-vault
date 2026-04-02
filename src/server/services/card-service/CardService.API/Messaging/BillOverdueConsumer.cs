@@ -31,17 +31,6 @@ public class BillOverdueConsumer(
                     "Strike applied: CardId={CardId}, Strikes={Strikes}, Blocked={Blocked}",
                     message.CardId, result.Data.NewStrikeCount, result.Data.IsCardBlocked);
 
-                if (result.Data.IsCardBlocked)
-                {
-                    await context.Publish<ICardBlocked>(new
-                    {
-                        CardId = message.CardId,
-                        UserId = message.UserId,
-                        StrikeCount = result.Data.NewStrikeCount,
-                        Reason = $"Card blocked after {result.Data.NewStrikeCount} strikes due to overdue bills",
-                        BlockedAt = DateTime.UtcNow
-                    });
-                }
             }
             else
             {

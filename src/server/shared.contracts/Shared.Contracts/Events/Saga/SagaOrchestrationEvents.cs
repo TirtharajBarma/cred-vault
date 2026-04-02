@@ -26,15 +26,6 @@ public interface IBillOverdueDetected
     DateTime DetectedAt { get; }
 }
 
-public interface ICardBlocked
-{
-    Guid CardId { get; }
-    Guid UserId { get; }
-    int StrikeCount { get; }
-    string Reason { get; }
-    DateTime BlockedAt { get; }
-}
-
 public interface IOtpVerified
 {
     Guid CorrelationId { get; }

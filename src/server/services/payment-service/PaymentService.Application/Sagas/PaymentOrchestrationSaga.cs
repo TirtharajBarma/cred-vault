@@ -264,16 +264,17 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                 .If(ctx => ctx.Saga.CompensationAttempts >= 5,
                     x => x.TransitionTo(Failed))
                 .If(ctx => ctx.Saga.CompensationAttempts < 5,
-                    x => x.PublishAsync(ctx => ctx.Init<IRevertPaymentRequested>(new
-                    {
-                        CorrelationId = ctx.Saga.CorrelationId,
-                        PaymentId = ctx.Saga.PaymentId,
-                        ctx.Saga.UserId,
-                        ctx.Saga.BillId,
-                        ctx.Saga.CardId,
-                        ctx.Saga.Amount,
-                        RequestedAt = DateTime.UtcNow
-                    }))
+                    x => x.TransitionTo(Compensating)
+                        .PublishAsync(ctx => ctx.Init<IRevertPaymentRequested>(new
+                        {
+                            CorrelationId = ctx.Saga.CorrelationId,
+                            PaymentId = ctx.Saga.PaymentId,
+                            ctx.Saga.UserId,
+                            ctx.Saga.BillId,
+                            ctx.Saga.CardId,
+                            ctx.Saga.Amount,
+                            RequestedAt = DateTime.UtcNow
+                        }))
                 )
         );
 

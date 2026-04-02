@@ -7,16 +7,13 @@ using Shared.Contracts.Events.Card;
 using Shared.Contracts.Models;
 using MediatR;
 using MassTransit;
-using System.Net.Http.Headers;
-using System.Text.Json;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace CardService.Application.Commands.Cards;
 
-public sealed record CreateCardCommand(Guid UserId, string CardholderName, int ExpMonth, int ExpYear, string CardNumber, Guid IssuerId, bool IsDefault, string AuthorizationHeader) : IRequest<CardResult>;
+public sealed record CreateCardCommand(Guid UserId, string CardholderName, int ExpMonth, int ExpYear, string CardNumber, Guid IssuerId, bool IsDefault) : IRequest<CardResult>;
 
-public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndpoint publisher, IHttpClientFactory http, IConfiguration config, ILogger<CreateCardCommandHandler> logger) : IRequestHandler<CreateCardCommand, CardResult>
+public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndpoint publisher, ILogger<CreateCardCommandHandler> logger) : IRequestHandler<CreateCardCommand, CardResult>
 {
     public async Task<CardResult> Handle(CreateCardCommand request, CancellationToken ct)
     {
@@ -90,65 +87,12 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
         await cards.AddAsync(card, ct);
         logger.LogInformation("Card created: {CardId}, UserId={UserId}, Last4={Last4}", card.Id, request.UserId, last4);
 
-        var (ok, user, error) = await GetUserAsync(request.AuthorizationHeader, ct);
-        var userEmail = ok && user != null ? user.Email : null;
-        var userName = ok && user != null ? user.FullName : null;
-
-        if (string.IsNullOrWhiteSpace(userEmail))
-        {
-            logger.LogWarning("Could not fetch user email for {UserId}: {Error}. Publishing event with fallback.", request.UserId, error);
-            userEmail = $"user-{request.UserId}@credvault.local";
-            userName = request.CardholderName.Trim();
-        }
+        var userEmail = $"user-{request.UserId}@credvault.local";
+        var userName = request.CardholderName.Trim();
 
         await publisher.Publish<ICardAdded>(new { CardId = card.Id, UserId = card.UserId, Email = userEmail, FullName = userName, CardNumberLast4 = card.Last4, CardHolderName = card.CardholderName, AddedAt = card.CreatedAtUtc }, ct);
         logger.LogInformation("Published ICardAdded for {CardId}", card.Id);
 
         return new() { Success = true, Message = "Card created", Card = CardMapping.ToDto(card) };
     }
-
-    private async Task<(bool, UserDto?, string?)> GetUserAsync(string authHeader, CancellationToken ct)
-    {
-        try
-        {
-            var client = http.CreateClient();
-            client.BaseAddress = new Uri(config["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/");
-            var req = new HttpRequestMessage(HttpMethod.Get, "api/v1/identity/users/me");
-            if (!string.IsNullOrEmpty(authHeader)) req.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
-            var resp = await client.SendAsync(req, ct);
-
-            if (!resp.IsSuccessStatusCode)
-            {
-                logger.LogWarning("Failed to fetch /users/me: {Status}", resp.StatusCode);
-                return (false, null, resp.ReasonPhrase);
-            }
-
-            var content = await resp.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<UserResponseWrapper>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (result?.Data?.User is null)
-            {
-                return (false, null, "User not found");
-            }
-            return (result.Success, result.Data.User, result.Message);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Exception fetching /users/me");
-            return (false, null, ex.Message);
-        }
-    }
-
-    private class UserResponseWrapper
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public UserData? Data { get; set; }
-    }
-
-    private class UserData
-    {
-        public UserDto? User { get; set; }
-    }
-
-    private record UserDto(Guid Id, string Email, string FullName);
 }

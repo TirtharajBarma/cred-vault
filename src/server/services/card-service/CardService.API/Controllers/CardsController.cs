@@ -32,8 +32,7 @@ public class CardsController(IMediator mediator) : BaseApiController
                 request.ExpYear,
                 request.CardNumber,
                 request.IssuerId,
-                request.IsDefault,
-                Request.Headers.Authorization.ToString() ?? string.Empty),
+                request.IsDefault),
             cancellationToken);
 
         return CreateResponse(result.Success, result.Card, result.Message, result.ErrorCode, StatusCodes.Status201Created);
@@ -117,30 +116,6 @@ public class CardsController(IMediator mediator) : BaseApiController
 
         var result = await mediator.Send(new GetMyCardByIdQuery(userId.Value, cardId), cancellationToken);
         return CreateResponse(result.Success, result.Card, result.Message, result.ErrorCode);
-    }
-
-    [HttpGet("{cardId:guid}/health")]
-    public async Task<IActionResult> GetCardHealthScore(Guid cardId, CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null) return UnauthorizedResponse();
-
-        var cardResult = await mediator.Send(new GetMyCardByIdQuery(userId.Value, cardId), cancellationToken);
-        if (!cardResult.Success || cardResult.Card == null)
-            return NotFoundResponse("Card not found.");
-
-        var card = cardResult.Card;
-        var utilization = card.CreditLimit > 0 ? (decimal)card.OutstandingBalance / card.CreditLimit : 0;
-        
-        var healthScore = Math.Max(300, Math.Min(1000, 700 + (int)((1 - utilization) * 200) - (utilization > 0.8m ? 100 : 0)));
-        
-        string grade;
-        if (healthScore >= 800) grade = "Excellent";
-        else if (healthScore >= 700) grade = "Good";
-        else if (healthScore >= 500) grade = "Fair";
-        else grade = "Poor";
-
-        return Ok(new { healthScore, grade, utilization = Math.Round(utilization * 100, 1) });
     }
 
     [HttpPut("{cardId:guid}")]

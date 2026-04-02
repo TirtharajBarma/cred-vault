@@ -27,8 +27,8 @@ export enum BillStatus {
   Pending = 1,
   Paid = 2,
   Overdue = 3,
-  PartiallyPaid = 4,
-  Cancelled = 5
+  Cancelled = 4,
+  PartiallyPaid = 5
 }
 
 @Injectable({

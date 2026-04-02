@@ -9,7 +9,7 @@ public sealed class DeleteIssuerCommandHandler(ICardRepository cardRepository) :
 {
     public async Task<DeleteIssuerResult> Handle(DeleteIssuerCommand request, CancellationToken cancellationToken)
     {
-        var issuer = await cardRepository.GetIssuerByIdRawAsync(request.Id, cancellationToken);
+        var issuer = await cardRepository.GetIssuerByIdAsync(request.Id, cancellationToken);
         
         if (issuer == null)
         {

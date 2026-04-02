@@ -43,14 +43,22 @@ public class RevertBillPaidCommandHandler(
 
         await billRepository.UpdateAsync(bill, cancellationToken);
 
-        // Deduct rewards - find the reward transaction for this bill and reverse it
+        // Revert rewards - find the reward transaction for this bill and reverse it
         var rewardTx = await rewardRepository.GetTransactionByBillIdAsync(request.BillId, cancellationToken);
         if (rewardTx != null)
         {
             var account = await rewardRepository.GetAccountByUserIdAsync(request.UserId, cancellationToken);
-            if (account != null && account.PointsBalance >= rewardTx.Points)
+            if (account != null)
             {
-                account.PointsBalance -= rewardTx.Points;
+                // Prevent balance from going negative
+                if (account.PointsBalance >= rewardTx.Points)
+                {
+                    account.PointsBalance -= rewardTx.Points;
+                }
+                else
+                {
+                    account.PointsBalance = 0;
+                }
                 account.UpdatedAtUtc = DateTime.UtcNow;
                 await rewardRepository.UpdateAccountAsync(account, cancellationToken);
 
@@ -59,7 +67,7 @@ public class RevertBillPaidCommandHandler(
                 rewardTx.ReversedAtUtc = DateTime.UtcNow;
                 await rewardRepository.UpdateTransactionAsync(rewardTx, cancellationToken);
 
-                logger.LogInformation("Deducted {Points} points from user {UserId} account", rewardTx.Points, request.UserId);
+                logger.LogInformation("Reversed {Points} points from user {UserId} account", rewardTx.Points, request.UserId);
             }
         }
 

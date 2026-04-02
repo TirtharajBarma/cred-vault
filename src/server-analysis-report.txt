@@ -1,0 +1,1071 @@
+# CREDVAULT SERVER-SIDE APPLICATION - COMPREHENSIVE ANALYSIS REPORT
+Generated: 2026-04-02
+================================================================================
+
+## EXECUTIVE SUMMARY
+
+The CredVault server is a microservices-based backend application built with .NET 10,
+designed to manage credit card services, billing, payments, and notifications.
+The system follows a microservices architecture with 5 distinct services communicating
+via RabbitMQ message broker and an API Gateway using Ocelot.
+
+### Architecture Overview
+- API Gateway: Ocelot-based reverse proxy (Port 5006)
+- Card Service: Credit card management (Port 5002)
+- Payment Service: Payment orchestration with SAGA pattern (Port 5004)
+- Billing Service: Bills, statements, rewards management (Port 5003)
+- Notification Service: Email notifications (Port 5005)
+- Shared Contracts: Common DTOs, events, and base classes
+
+================================================================================
+
+## 1. API GATEWAY SERVICE (Port 5006)
+
+### File: services/gateway/Gateway.API/Program.cs
+- Standard Ocelot setup with CORS, OpenAPI
+- Configuration loaded from ocelot.json with environment variable overrides
+- Health endpoint: GET /health returns { status: "ok", service: "gateway" }
+
+### Routing Configuration (ocelot.json & ocelot.localhost.json)
+
+IDENTITY SERVICE (Port 5001):
+- /api/v1/identity → /api/v1/identity (base)
+- /api/v1/identity/{everything} → /api/v1/identity/{everything}
+
+CARDS SERVICE (Port 5002):
+- /api/v1/cards → /api/v1/cards
+- /api/v1/cards/transactions → /api/v1/cards/transactions
+- /api/v1/cards/{everything} → /api/v1/cards/{everything}
+- /api/v1/cards/{cardId}/transactions → /api/v1/cards/{cardId}/transactions
+- /api/v1/issuers → /api/v1/issuers
+- /api/v1/issuers/{everything} → /api/v1/issuers/{everything}
+
+BILLING SERVICE (Port 5003):
+- /api/v1/billing/bills → /api/v1/billing/bills
+- /api/v1/billing/bills/{everything} → /api/v1/billing/bills/{everything}
+- /api/v1/billing/rewards → /api/v1/billing/rewards
+- /api/v1/billing/rewards/{everything} → /api/v1/billing/rewards/{everything}
+- /api/v1/billing/statements → /api/v1/billing/statements
+- /api/v1/billing/statements/{everything} → /api/v1/billing/statements/{everything}
+
+PAYMENT SERVICE (Port 5004):
+- /api/v1/payments → /api/v1/payments
+- /api/v1/payments/{everything} → /api/v1/payments/{everything}
+
+NOTIFICATION SERVICE (Port 5005):
+- /api/v1/notifications → /api/v1/notifications
+- /api/v1/notifications/{everything} → /api/v1/notifications/{everything}
+
+### Observations:
+- Gateway BaseUrl: http://localhost:5006
+- Both ocelot.json and ocelot.localhost.json are nearly identical (DUPLICATION)
+- All routes allow GET, POST, PUT, PATCH, DELETE, OPTIONS methods
+- Missing authentication/authorization at gateway level (delegates to downstream services)
+
+================================================================================
+
+## 2. CARD SERVICE (Port 5002)
+
+### Database: SQL Server (credvault_cards)
+
+### Entities:
+
+CREDIT CARD (Table: CreditCards)
+- Id (PK), UserId, IssuerId (FK)
+- CardholderName, ExpMonth, ExpYear
+- Last4, MaskedNumber (card number storage - SECURITY CONCERN)
+- CreditLimit, OutstandingBalance, BillingCycleStartDay
+- StrikeCount (int, default 0)
+- IsBlocked (bool), BlockedAtUtc, UnblockedAtUtc
+- IsDefault, IsVerified, VerifiedAtUtc
+- IsDeleted (soft delete), DeletedAtUtc
+- CreatedAtUtc, UpdatedAtUtc
+- Query Filter: Excludes IsDeleted records
+- Indexes: UserId, (UserId, IsDefault), IssuerId
+
+CARD ISSUER (Table: CardIssuers)
+- Id (PK), Name, Network (CardNetwork enum)
+- CreatedAtUtc, UpdatedAtUtc
+- Index: Network
+
+CARD TRANSACTION (Table: CardTransactions)
+- Id (PK), CardId (FK), UserId
+- Type (TransactionType enum: Purchase=1, Payment=2, Refund=3)
+- Amount (decimal), Description, DateUtc
+- Indexes: CardId, UserId, DateUtc
+- Query Filter: Excludes transactions where Card is deleted
+
+CARD VIOLATION (Table: CardViolations)
+- Id (PK), CardId (FK), UserId, BillId (nullable)
+- Type (ViolationType enum: LatePayment=1, OverdueBill=2, MissedPayment=3)
+- StrikeCount, Reason, PenaltyAmount
+- IsActive (bool), AppliedAtUtc, ClearedAtUtc
+- Indexes: CardId, UserId, (CardId, IsActive)
+
+### Controllers:
+
+#### CardsController (Route: /api/v1/cards)
+
+1. POST / (CreateCard)
+   - Request: CreateCardRequest { CardholderName, ExpMonth, ExpYear, CardNumber, IssuerId, IsDefault }
+   - Auth: Required
+   - Business Logic:
+     * Validates card number format (13-19 digits)
+     * Validates expiration month (1-12) and year
+     * Detects card network and validates against issuer
+     * Checks for duplicate cards (same user, network, last4)
+     * Creates card with masked number
+     * Publishes ICardAdded event
+   - Response: CardResult { Success, Card, Message, ErrorCode }
+   - Status: 201 Created
+
+2. GET / (ListMyCards)
+   - Auth: Required
+   - Returns: CardsResult { Success, Cards[], Message }
+   - Orders: By IsDefault DESC, UpdatedAtUtc DESC
+
+3. GET /transactions
+   - Auth: Required
+   - Returns: ListUserTransactionsQuery result
+   - Route: /api/v1/cards/transactions (separate from card-specific transactions)
+
+4. GET /{cardId:guid}/transactions
+   - Auth: Required
+   - Returns: ListCardTransactionsQuery result (full OK response)
+
+5. POST /{cardId:guid}/transactions
+   - Request: AddTransactionRequest { Type, Amount, Description, DateUtc }
+   - Auth: Required
+   - Admin Check: User.IsInRole("admin") for override capability
+   - Returns: 201 Created with result
+
+6. GET /{cardId:guid}
+   - Auth: Required
+   - Returns: Single card by ID
+
+7. GET /{cardId:guid}/health
+   - Auth: Required
+   - Health Score Calculation:
+     * Base: 700
+     * Utilization bonus: (1-utilization) * 200 (max 900)
+     * High utilization penalty: -100 if utilization > 80%
+     * Range: 300-1000
+   - Grades: Excellent (>=800), Good (>=700), Fair (>=500), Poor (<500)
+   - Response: { healthScore, grade, utilization }
+
+8. PUT /{cardId:guid}
+   - Request: UpdateCardRequest { CardholderName, ExpMonth, ExpYear, IsDefault }
+   - Auth: Required
+   - Only allows non-admin fields
+
+9. DELETE /{cardId:guid}
+   - Auth: Required
+   - Soft delete (IsDeleted=true)
+
+10. GET /admin/{cardId:guid}
+    - Auth: Required + Role("admin")
+    - Returns full card data without user restriction
+
+11. GET /admin/{cardId:guid}/transactions
+    - Auth: Required + Role("admin")
+    - Returns all transactions for card
+
+12. PUT /{cardId:guid}/admin
+    - Auth: Required + Role("admin")
+    - Request: UpdateCardByAdminRequest { CreditLimit, OutstandingBalance, BillingCycleStartDay }
+    - Validation: BillingCycleStartDay must be 1-31
+
+13. GET /user/{userId:guid}
+    - Auth: Required + Role("admin")
+    - Returns all cards for specified user
+
+#### IssuersController (Route: /api/v1/issuers)
+
+1. GET /{id:guid}
+   - Auth: Required
+   - Returns: ApiResponse<CardIssuerDto>
+
+2. GET /
+   - Auth: Required
+   - Returns: List of all issuers
+
+3. POST /
+   - Auth: Required + Role("admin")
+   - Request: CreateIssuerRequest { Name, Network }
+   - Returns: 201 Created
+
+4. PUT /{id:guid}
+   - Auth: Required + Role("admin")
+   - Request: CreateIssuerRequest { Name, Network }
+
+5. DELETE /{id:guid}
+   - Auth: Required + Role("admin")
+
+#### ViolationsController (Route: /api/v1/cards/admin)
+
+1. GET /blocked
+   - Auth: Required
+   - Returns: List of blocked cards
+
+2. POST /{cardId}/unblock
+   - Auth: Required
+   - Unblocks specified card
+
+3. GET /{cardId}/violations
+   - Auth: Required
+   - Returns: Card violations
+
+4. POST /{cardId}/violations/clear
+   - Auth: Required
+   - Clears strikes for card
+
+#### HealthController (Route: /api/v1/cards/health)
+
+1. GET /
+   - No Auth
+   - Returns: { Success: true, Message: "Card service is healthy.", Data: "Card Service Healthy" }
+
+### Messaging (RabbitMQ - Endpoint: card-domain-event)
+
+Consumers:
+
+1. CardDeductionSagaConsumer (ICardDeductionRequested)
+   - Validates idempotency by checking for existing transaction with description "Saga:{CorrelationId}"
+   - Retrieves card, validates balance
+   - Deducts amount from OutstandingBalance
+   - Creates CardTransaction of type Payment
+   - Publishes ICardDeductionSucceeded or ICardDeductionFailed
+
+2. BillOverdueConsumer (IBillOverdueDetected)
+   - Applies strike to card via ApplyStrikeCommand
+   - If card blocked, publishes ICardBlocked
+
+3. BillPaidConsumer (IBillUpdateSucceeded)
+   - Clears strikes when bill is paid via ClearStrikesCommand
+   - Guards against empty CardId
+
+4. PaymentReversedConsumer (IPaymentReversed)
+   - Calls RefundCardBalanceCommand
+   - Throws if refund fails
+
+5. UserDeletedConsumer (IUserDeleted)
+   - Soft-deletes all cards for deleted user
+   - Sets IsDeleted=true, DeletedAtUtc, IsDefault=false
+
+### Application Layer Commands/Queries:
+
+CreateCardCommand:
+- Full validation of card data
+- Network detection from card number
+- Duplicate card detection
+- Publishes ICardAdded event
+- Calls IdentityService for user email/name
+
+### Security Observations:
+1. Card numbers are stored (masked) - potential PCI compliance concern
+2. No encryption at rest mentioned
+3. JWT-based authentication (config in appsettings.json)
+4. Role-based authorization on admin endpoints
+
+### Bugs/Issues Identified:
+1. Health endpoint route overlaps with ViolationsController path pattern
+2. Duplicate routes in Ocelot config (cards with and without trailing slash)
+3. No input sanitization on cardholderName
+4. CreditLimit defaults to 0 - cards created with no credit limit
+
+================================================================================
+
+## 3. PAYMENT SERVICE (Port 5004)
+
+### Database: SQL Server (credvault_payments)
+
+### Entities:
+
+PAYMENT (Table: Payments)
+- Id (PK), UserId, CardId, BillId
+- Amount (decimal), PaymentType (enum), Status (enum)
+- FailureReason (nullable, max 500)
+- OtpCode (nullable), OtpExpiresAtUtc (nullable)
+- IsDeleted, DeletedAtUtc
+- CreatedAtUtc, UpdatedAtUtc
+- Indexes: UserId, BillId
+
+TRANSACTION (Table: Transactions)
+- Id (PK), PaymentId (FK), UserId
+- Amount (decimal), Type (enum: Payment, Reversal)
+- Description (max 250), CreatedAtUtc
+- Indexes: UserId, PaymentId
+
+PAYMENT ORCHESTRATION SAGA STATE (Table: PaymentOrchestrationSagas)
+- CorrelationId (PK, = PaymentId)
+- CurrentState (max 64)
+- PaymentId, UserId, Email, FullName
+- CardId, BillId, Amount, PaymentType
+- OtpCode, OtpExpiresAtUtc, OtpVerified
+- PaymentProcessed, BillUpdated, CardDeducted
+- PaymentError, BillUpdateError, CardDeductionError
+- CompensationReason, CompensationAttempts
+- CreatedAtUtc, UpdatedAtUtc
+
+### PaymentStatus Enum:
+- Initiated
+- Processing
+- Completed
+- Failed
+- Cancelled
+- Reversed
+
+### PaymentType Enum:
+- FullPayment
+- PartialPayment
+
+### Controllers:
+
+#### PaymentsController (Route: /api/v1/payments)
+
+1. POST /initiate
+   - Request: { CardId, BillId, Amount, PaymentType }
+   - Validates PaymentType enum
+   - Fetches bill from BillingService for validation (IDOR check)
+   - Generates 6-digit OTP
+   - Creates Payment record
+   - Starts SAGA orchestration
+   - Publishes IPaymentOtpGenerated
+   - Response: { PaymentId, OtpRequired, Status: "Pending OTP Verification" }
+   - Status: 201 Created
+
+2. POST /{paymentId}/verify-otp
+   - Request: { OtpCode }
+   - Validates:
+     * Payment exists
+     * User owns payment (authorization check)
+     * Status is Initiated
+     * OTP code matches
+     * OTP not expired
+   - Publishes IOtpVerified
+
+3. GET /
+   - Returns all payments for authenticated user
+
+4. GET /{paymentId}
+   - Returns single payment (ownership validated)
+
+5. GET /{paymentId}/transactions
+   - Returns transactions for payment
+
+### SAGA Orchestration State Machine:
+
+States:
+- Initial
+- AwaitingOtpVerification
+- AwaitingPaymentConfirmation
+- AwaitingBillUpdate
+- AwaitingCardDeduction
+- Completed (Final)
+- Compensating
+- Compensated (Final)
+- Failed (Final)
+
+Events:
+- StartOrchestration
+- OtpVerified / OtpFailed
+- PaymentSucceeded / PaymentFailed
+- BillUpdateSucceeded / BillUpdateFailed
+- CardDeductionSucceeded / CardDeductionFailed
+- RevertBillSucceeded / RevertBillFailed
+- RevertPaymentSucceeded / RevertPaymentFailed
+
+Flow:
+1. StartOrchestration → AwaitingOtpVerification
+2. OtpVerified → AwaitingPaymentConfirmation (publishes IPaymentProcessRequested)
+3. PaymentSucceeded → AwaitingBillUpdate (publishes IBillUpdateRequested)
+4. BillUpdateSucceeded → AwaitingCardDeduction (publishes ICardDeductionRequested)
+5. CardDeductionSucceeded → Completed (publishes IPaymentCompleted)
+
+Compensation Flow:
+- If BillUpdateFailed → Compensating → RevertPayment
+- If CardDeductionFailed → Compensating → RevertBillUpdate → RevertPayment
+- Max 3 compensation attempts for bill revert
+- Max 5 compensation attempts for payment revert
+
+### Messaging Consumers:
+
+1. PaymentCompletedConsumer (IPaymentCompleted)
+   - Updates Payment status to Completed
+   - Adds Transaction record
+   - Idempotent (checks if already Completed)
+
+2. PaymentFailedConsumer (IPaymentFailed)
+   - Updates Payment status to Failed
+   - Sets FailureReason
+   - Idempotent (checks terminal state)
+
+3. UserDeletedConsumer (IUserDeleted)
+   - Cancels all Initiated payments for deleted user
+
+4. PaymentProcessConsumer (IPaymentProcessRequested)
+   - Updates payment status to Processing
+   - Publishes IPaymentProcessSucceeded
+   - Idempotent check for Completed status
+
+5. RevertPaymentConsumer (IRevertPaymentRequested)
+   - Sets payment status to Reversed
+   - Creates reversal transaction
+   - Publishes IPaymentReversed
+   - Idempotent check for already reversed
+
+### RabbitMQ Bindings (via RabbitMqBindingInitializer):
+
+Exchanges bound to payment-orchestration:
+- IStartPaymentOrchestration
+- IOtpVerified
+- IOtpFailed
+- IPaymentProcessSucceeded
+- IPaymentProcessFailed
+- IBillUpdateSucceeded
+- IBillUpdateFailed
+- ICardDeductionSucceeded
+- ICardDeductionFailed
+- IRevertBillUpdateSucceeded
+- IRevertBillUpdateFailed
+- IRevertPaymentSucceeded
+- IRevertPaymentFailed
+
+### Observations:
+1. SAGA pattern properly implemented with compensation logic
+2. OTP-based verification adds security layer
+3. Risk score calculation (Amount > 10000: 85, > 5000: 60, else: 20) - never used
+4. Idempotency handled in most places
+5. Hard-coded credential detection: RabbitMQ binding uses "localhost", "guest"/"guest"
+
+### Bugs/Issues:
+1. RiskScore calculated but never utilized in SAGA
+2. RabbitMqBindingInitializer hard-codes credentials
+3. No actual payment gateway integration (marks as processed without real payment)
+4. UserId/BillId/CardId validation exists but no external service verification
+5. No rate limiting on OTP attempts
+
+================================================================================
+
+## 4. BILLING SERVICE (Port 5003)
+
+### Database: SQL Server (credvault_billing)
+
+### Entities:
+
+BILL (Table: Bills)
+- Id (PK), UserId, CardId
+- CardNetwork (enum), IssuerId
+- Amount, MinDue, Currency (default "USD")
+- BillingDateUtc, DueDateUtc
+- AmountPaid (nullable), PaidAtUtc (nullable)
+- Status (enum: Pending=1, Paid=2, Overdue=3, Cancelled=4)
+- CreatedAtUtc, UpdatedAtUtc
+- NOTE: Cross-service reference to CardService (no FK constraint)
+
+REWARD ACCOUNT (Table: RewardAccounts)
+- Id (PK), UserId, RewardTierId
+- PointsBalance (decimal)
+- CreatedAtUtc, UpdatedAtUtc
+
+REWARD TIER (Table: RewardTiers)
+- Id (PK), CardNetwork (enum), IssuerId (nullable)
+- MinSpend (decimal), RewardRate (decimal, e.g., 0.015 = 1.5%)
+- EffectiveFromUtc, EffectiveToUtc (nullable)
+- CreatedAtUtc, UpdatedAtUtc
+
+REWARD TRANSACTION (Table: RewardTransactions)
+- Id (PK), RewardAccountId (FK), BillId (FK)
+- Points (decimal), Type (enum: Earned=1, Adjusted=2, Redeemed=3, Reversed=4)
+- CreatedAtUtc, ReversedAtUtc (nullable)
+
+STATEMENT (Table: Statements)
+- Id (PK), UserId, CardId
+- BillId (nullable)
+- StatementPeriod (e.g., "Mar 2026")
+- PeriodStartUtc, PeriodEndUtc, GeneratedAtUtc, DueDateUtc
+- OpeningBalance, TotalPurchases, TotalPayments, TotalRefunds
+- PenaltyCharges, InterestCharges, ClosingBalance, MinimumDue
+- AmountPaid, PaidAtUtc (nullable)
+- Status (enum: Generated=1, Paid=2, Overdue=3, PartiallyPaid=4)
+- CardLast4, CardNetwork, IssuerName, CreditLimit, AvailableCredit
+- Notes (nullable)
+- CreatedAtUtc, UpdatedAtUtc
+
+STATEMENT TRANSACTION (Table: StatementTransactions)
+- Id (PK), StatementId (FK)
+- SourceTransactionId (nullable)
+- Type (max 50), Amount, Description (max 256), DateUtc
+- CreatedAtUtc
+
+### BillingCycleCalculator (Utility Class):
+
+Constants:
+- GracePeriodDays = 12
+- MonthlyInterestRate = 0.035 (3.5%)
+
+Methods:
+- CalculateNextBillingDate: Determines next billing date
+- CalculateDueDate: Adds grace period to billing date
+- GetCurrentBillingPeriodStart: Calculates period start based on billingCycleStartDay
+- CalculateBillingAndDueDate: Returns tuple of both dates
+- CalculateMonthlyInterest: Compound interest for overdue amounts
+
+### Controllers:
+
+#### BillsController (Route: /api/v1/billing/bills)
+
+1. GET /
+   - Returns all bills for authenticated user
+
+2. GET /{billId:guid}
+   - Returns single bill by ID
+
+3. POST /admin/generate-bill
+   - Auth: Role("admin")
+   - Request: { UserId, CardId, Currency }
+   - Generates bill based on card's outstanding balance
+   - Creates Bill record
+   - Publishes IBillGenerated event
+
+4. POST /admin/check-overdue
+   - Auth: Role("admin")
+   - Triggers overdue bill detection
+   - Publishes IBillOverdueDetected for overdue bills
+
+#### RewardsController (Route: /api/v1/billing/rewards)
+
+1. GET /tiers
+   - Returns all reward tiers
+
+2. POST /tiers
+   - Auth: Role("admin")
+   - Request: { CardNetwork, IssuerId, MinSpend, RewardRate, EffectiveFromUtc, EffectiveToUtc }
+
+3. DELETE /tiers/{id:guid}
+   - Auth: Role("admin")
+
+4. GET /account
+   - Returns user's reward account
+
+5. GET /transactions
+   - Returns user's reward transactions
+
+#### StatementsController (Route: /api/v1/billing/statements)
+
+1. GET /
+   - Returns user's statements
+
+2. GET /{statementId:guid}
+   - Returns single statement
+
+3. POST /generate
+   - Request: { CardId }
+   - Generates statement for card
+
+4. POST /admin/generate
+   - Auth: Role("admin")
+   - Request: { CardId, UserId }
+
+5. GET /admin/all
+   - Auth: Role("admin")
+   - Returns all statements
+
+6. GET /bill/{billId:guid}
+   - Returns statement for specific bill
+
+### Messaging Consumers:
+
+1. BillUpdateSagaConsumer (IBillUpdateRequested)
+   - Calls MarkBillPaidCommand
+   - Publishes IBillUpdateSucceeded or IBillUpdateFailed
+
+2. RevertBillSagaConsumer (IRevertBillUpdateRequested)
+   - Calls RevertBillPaidCommand
+   - Publishes IRevertBillUpdateSucceeded or IRevertBillUpdateFailed
+
+3. UserDeletedConsumer (IUserDeleted)
+   - Cancels all bills for deleted user
+   - Removes reward account
+
+### Business Logic:
+
+MarkBillPaidCommand:
+- Validates bill exists and belongs to user
+- If already paid: still records rewards and statements (idempotency)
+- Validates amount >= MinDue
+- Updates bill status to Paid
+- Records reward points based on tier
+- Auto-creates statement
+- Handles reward tier assignment
+
+### Observations:
+1. Cross-service references (CardId) without FK constraints
+2. Statement auto-generation on payment
+3. Reward system with tiered rates
+4. Overdue detection with strike system integration
+
+### Bugs/Issues:
+1. BillingService fetches card data from CardService - no validation if card exists
+2. Statement.CardLast4, Statement.IssuerName stored as empty strings
+3. No cascading deletes between related entities
+4. CheckOverdueBillsCommand implementation missing (mentioned but not shown)
+
+================================================================================
+
+## 5. NOTIFICATION SERVICE (Port 5005)
+
+### Database: SQL Server (credvault_notifications)
+
+### Entities:
+
+AUDIT LOG (Table: AuditLogs)
+- Id (PK), EntityName, EntityId, Action, UserId
+- Changes (nullable), TraceId (nullable)
+- CreatedAtUtc
+
+NOTIFICATION LOG (Table: NotificationLogs)
+- Id (PK), UserId (nullable), Recipient
+- Subject, Body, Type
+- IsSuccess (bool), ErrorMessage (nullable)
+- TraceId (nullable), CreatedAtUtc
+
+### Controllers:
+
+#### NotificationsController (Route: /api/v1/notifications)
+
+1. GET /logs
+   - Query params: email (optional), page (default 1), pageSize (default 10)
+   - Returns: Paginated notification logs
+   - Response: { total, page, pageSize, logs }
+
+2. GET /audit
+   - Query params: traceId (optional), page (default 1), pageSize (default 10)
+   - Returns: Paginated audit logs
+
+### Messaging Consumer (DomainEventConsumer):
+
+Handles events:
+- IUserRegistered → UserRegistered notification
+- IUserOtpGenerated → UserOtpGenerated notification
+- ICardAdded → CardAdded notification
+- IBillGenerated → BillGenerated notification
+- IPaymentOtpGenerated → PaymentOtpGenerated notification
+- IPaymentCompleted → PaymentCompleted notification
+- IPaymentFailed → PaymentFailed notification
+- IUserDeleted → Logged (no notification sent)
+- IOtpFailed → Logged (no notification sent)
+
+### Email Service (GmailSmtpEmailSender):
+
+Configuration (appsettings.json):
+- Gmail:Host: smtp.gmail.com
+- Gmail:Port: 587
+- Gmail:Username: tirtharajbarma3@gmail.com (SENSITIVE DATA IN SOURCE)
+- Gmail:AppPassword: nstu hben lchq hmxz (SENSITIVE DATA IN SOURCE)
+- Gmail:FromEmail: tirtharajbarma3@gmail.com
+- Gmail:FromName: CredVault
+
+Features:
+- Connects to Gmail SMTP on initialization
+- Graceful fallback if not configured (logs only)
+- Sends HTML emails
+- Returns (Success, Error) tuple
+
+### Observations:
+1. Gmail credentials hardcoded in config file - SECURITY CONCERN
+2. Email templates not implemented (removed in migration)
+3. Notifications are fire-and-forget via MediatR
+4. No retry mechanism for failed emails
+
+### Bugs/Issues:
+1. App password exposed in source code
+2. No email template system - raw payloads sent
+3. DomainEventConsumer consumes but ProcessNotificationCommandHandler not shown
+4. IOtpFailed and IUserDeleted just logged, not processed
+
+================================================================================
+
+## 6. SHARED CONTRACTS
+
+### BaseApiController:
+
+Methods:
+- BuildResponse<T>: Creates ApiResponse<T>
+- CreateResponse<T>: Maps success/failure to appropriate HTTP status
+  * ValidationError → 400 BadRequest
+  * UserNotFound/NotFound/CardNotFound → 404 NotFound
+  * DuplicateEmail/Conflict → 409 Conflict
+  * InvalidCredentials/Unauthorized → 401 Unauthorized
+  * Forbidden/AccountLocked → 403 Forbidden
+  * ServiceUnavailable → 503 ServiceUnavailable
+  * Default → 400 BadRequest
+- GetUserIdFromToken: Extracts user ID from JWT claims
+- UnauthorizedResponse: Creates 401 response
+- Fail: Creates 400 response
+- NotFoundResponse: Creates 404 response
+- BadRequestResponse: Creates 400 response
+
+### OperationResult:
+
+Properties:
+- Success (bool)
+- Message (string)
+- ErrorCode (string?, nullable)
+- Data (object?, nullable)
+
+### Event Interfaces:
+
+Card Events:
+- ICardAdded: CardId, UserId, Email, FullName, CardNumberLast4, CardHolderName, AddedAt
+
+Billing Events:
+- IBillGenerated: BillId, UserId, Email, FullName, CardId, Amount, DueDate, GeneratedAt
+
+Identity Events:
+- IUserRegistered: UserId, Email, FullName, CreatedAtUtc
+- IUserOtpGenerated: UserId, Email, FullName, OtpCode, Purpose, ExpiresAtUtc
+- IUserDeleted: UserId, DeletedAtUtc
+
+Payment Events:
+- IPaymentCompleted: PaymentId, UserId, Email, FullName, CardId, BillId, Amount, CompletedAt
+- IPaymentFailed: PaymentId, UserId, Email, FullName, Amount, Reason, FailedAt
+- IPaymentReversed: PaymentId, UserId, BillId, CardId, Amount, PointsDeducted, ReversedAt
+- IPaymentOtpGenerated: PaymentId, UserId, Email, FullName, Amount, OtpCode, ExpiresAtUtc
+
+SAGA Events (18 total):
+- Orchestration: IStartPaymentOrchestration
+- OTP: IOtpVerified, IOtpFailed
+- Payment Process: IPaymentProcessRequested, IPaymentProcessSucceeded, IPaymentProcessFailed
+- Bill Update: IBillUpdateRequested, IBillUpdateSucceeded, IBillUpdateFailed
+- Card Deduction: ICardDeductionRequested, ICardDeductionSucceeded, ICardDeductionFailed
+- Compensation: IRevertBillUpdateRequested, IRevertBillUpdateSucceeded, IRevertBillUpdateFailed
+- Revert Payment: IRevertPaymentRequested, IRevertPaymentSucceeded, IRevertPaymentFailed
+
+================================================================================
+
+## 7. CROSS-CUTTING CONCERNS
+
+### Authentication:
+- JWT Bearer tokens
+- Issuer: "IdentityService"
+- Audience: "CredVaultClients"
+- SecretKey: "PleaseChangeThisToASecretKeyWithAtLeast32Chars" (WEAK KEY)
+- AccessTokenMinutes: 30
+- Configured via AddStandardAuth in Program.cs
+
+### Logging:
+- Serilog with console and file sinks
+- Rolling daily logs
+- Retention: 7 days
+- Custom property: Application name
+- Override rules for Microsoft/MassTransit
+
+### Database:
+- SQL Server with EF Core
+- Connection string pattern: Server=localhost,1434
+- Credentials: sa/Sql@Password!123
+- Encrypt=False, TrustServerCertificate=True (DEV SETTINGS)
+
+### RabbitMQ:
+- Host: localhost
+- Port: 5672 (default)
+- Credentials: guest/guest
+- MT_LICENSE environment variable set to "free"
+
+### CORS:
+- Policy: "AllowWebClients"
+- Configured via AddStandardCors
+
+### Exception Handling:
+- ExceptionHandlingMiddleware (Shared.Contracts.Middleware)
+- Custom middleware registered in all services
+
+### HTTP Clients:
+- IHttpClientFactory used for external service calls
+- CardService → IdentityService (fetching user info)
+- PaymentService → BillingService (fetching bill details)
+- PaymentService → IdentityService (fetching user info)
+
+================================================================================
+
+## 8. DATA FLOW ANALYSIS
+
+### Card Creation Flow:
+1. POST /api/v1/cards with card details
+2. Validates issuer, detects network, checks duplicates
+3. Creates CreditCard in CardService DB
+4. Publishes ICardAdded event
+5. NotificationService consumes and sends email
+6. Returns created card
+
+### Payment Flow (Full SAGA):
+1. POST /api/v1/payments/initiate
+2. PaymentService validates bill with BillingService
+3. Generates OTP, stores in Payment record
+4. Publishes IStartPaymentOrchestration, IPaymentOtpGenerated
+5. SAGA enters AwaitingOtpVerification state
+6. User submits OTP via POST /verify-otp
+7. PaymentService publishes IOtpVerified
+8. SAGA transitions to AwaitingPaymentConfirmation
+9. PaymentProcessConsumer receives IPaymentProcessRequested
+10. Updates payment status, publishes IPaymentProcessSucceeded
+11. SAGA transitions to AwaitingBillUpdate
+12. BillUpdateSagaConsumer receives IBillUpdateRequested
+13. BillingService marks bill paid, publishes IBillUpdateSucceeded
+14. SAGA transitions to AwaitingCardDeduction
+15. CardDeductionSagaConsumer receives ICardDeductionRequested
+16. CardService deducts from outstanding balance, publishes ICardDeductionSucceeded
+17. SAGA transitions to Completed
+18. Publishes IPaymentCompleted
+19. NotificationService sends payment confirmation
+
+### Overdue Bill Flow:
+1. Admin calls POST /api/v1/billing/bills/admin/check-overdue
+2. BillingService identifies overdue bills
+3. Publishes IBillOverdueDetected for each
+4. CardService BillOverdueConsumer receives event
+5. Applies strike to card via ApplyStrikeCommand
+6. If 3 strikes reached, card blocked
+7. Publishes ICardBlocked event
+8. NotificationService sends warning
+
+### Refund/Reversal Flow:
+1. Payment fails at any SAGA step
+2. SAGA enters Compensating state
+3. Reverts in reverse order:
+   - RevertBillUpdateRequested → IRevertBillUpdateSucceeded/Failed
+   - RevertPaymentRequested → IPaymentReversed + IRevertPaymentSucceeded/Failed
+4. NotificationService notified of failure
+
+================================================================================
+
+## 9. IDENTIFIED ISSUES AND CONCERNS
+
+### CRITICAL SECURITY ISSUES:
+
+1. **Hardcoded Credentials in Source Code**
+   - Gmail username and AppPassword in NotificationService/appsettings.json
+   - Database credentials in all appsettings.json files
+   - RabbitMQ guest credentials
+   - JWT secret key "PleaseChangeThisToASecretKeyWithAtLeast32Chars"
+
+2. **Card Number Storage**
+   - Full card numbers processed and stored (masked only)
+   - PCI compliance concerns
+
+3. **No Encryption**
+   - Sensitive data not encrypted at rest
+   - No field-level encryption mentioned
+
+### HIGH PRIORITY ISSUES:
+
+4. **Weak JWT Secret**
+   - Default key in configuration
+   - Should be minimum 256 bits
+
+5. **Insecure Database Connection**
+   - Encrypt=False in connection strings
+   - TrustServerCertificate=True
+
+6. **Missing Input Validation**
+   - CardholderName not sanitized
+   - No length limits enforced at API level
+
+7. **OTP Security**
+   - 6-digit OTP generated client-side (predictable RNG)
+   - No rate limiting on OTP verification
+   - No lockout after failed attempts
+
+### MEDIUM PRIORITY ISSUES:
+
+8. **Code Duplication**
+   - ocelot.json and ocelot.localhost.json identical
+   - Multiple user fetching implementations
+
+9. **Incomplete Features**
+   - Risk score calculated but never used
+   - CheckOverdueBillsCommand implementation missing
+   - Email templates removed but referenced
+
+10. **Cross-Service Dependencies**
+    - No circuit breakers for service-to-service calls
+    - No fallback mechanisms
+    - BillingService calls CardService without validation
+
+### LOW PRIORITY ISSUES:
+
+11. **Dead Code**
+    - Unused imports in various files
+    - Unused RiskScore variable
+
+12. **Logging Gaps**
+    - Some operations not fully logged
+    - No structured logging for business events
+
+13. **Missing Unit Tests**
+    - No test projects visible in structure
+
+================================================================================
+
+## 10. ENDPOINT SUMMARY
+
+### Card Service (5002):
+| Method | Endpoint | Auth | Role | Description |
+|--------|----------|------|------|-------------|
+| POST | /api/v1/cards | Yes | - | Create card |
+| GET | /api/v1/cards | Yes | - | List user cards |
+| GET | /api/v1/cards/{id} | Yes | - | Get card by ID |
+| PUT | /api/v1/cards/{id} | Yes | - | Update card |
+| DELETE | /api/v1/cards/{id} | Yes | - | Delete card |
+| GET | /api/v1/cards/{id}/health | Yes | - | Card health score |
+| POST | /api/v1/cards/{id}/transactions | Yes | - | Add transaction |
+| GET | /api/v1/cards/{id}/transactions | Yes | - | List card transactions |
+| GET | /api/v1/cards/transactions | Yes | - | List all user transactions |
+| GET | /api/v1/cards/admin/blocked | Yes | - | List blocked cards |
+| POST | /api/v1/cards/admin/{id}/unblock | Yes | - | Unblock card |
+| GET | /api/v1/cards/admin/{id}/violations | Yes | - | Get violations |
+| POST | /api/v1/cards/admin/{id}/violations/clear | Yes | - | Clear violations |
+| GET | /api/v1/cards/admin/{id} | Yes | admin | Admin get card |
+| GET | /api/v1/cards/admin/{id}/transactions | Yes | admin | Admin get transactions |
+| PUT | /api/v1/cards/{id}/admin | Yes | admin | Admin update card |
+| GET | /api/v1/cards/user/{userId} | Yes | admin | Get user cards |
+| GET | /api/v1/issuers | Yes | - | List issuers |
+| GET | /api/v1/issuers/{id} | Yes | - | Get issuer |
+| POST | /api/v1/issuers | Yes | admin | Create issuer |
+| PUT | /api/v1/issuers/{id} | Yes | admin | Update issuer |
+| DELETE | /api/v1/issuers/{id} | Yes | admin | Delete issuer |
+| GET | /api/v1/cards/health | No | - | Service health |
+
+### Payment Service (5004):
+| Method | Endpoint | Auth | Role | Description |
+|--------|----------|------|------|-------------|
+| POST | /api/v1/payments/initiate | Yes | - | Initiate payment |
+| POST | /api/v1/payments/{id}/verify-otp | Yes | - | Verify OTP |
+| GET | /api/v1/payments | Yes | - | List payments |
+| GET | /api/v1/payments/{id} | Yes | - | Get payment |
+| GET | /api/v1/payments/{id}/transactions | Yes | - | Get transactions |
+
+### Billing Service (5003):
+| Method | Endpoint | Auth | Role | Description |
+|--------|----------|------|------|-------------|
+| GET | /api/v1/billing/bills | Yes | - | List bills |
+| GET | /api/v1/billing/bills/{id} | Yes | - | Get bill |
+| POST | /api/v1/billing/bills/admin/generate-bill | Yes | admin | Generate bill |
+| POST | /api/v1/billing/bills/admin/check-overdue | Yes | admin | Check overdue |
+| GET | /api/v1/billing/rewards/tiers | Yes | - | List reward tiers |
+| POST | /api/v1/billing/rewards/tiers | Yes | admin | Create tier |
+| DELETE | /api/v1/billing/rewards/tiers/{id} | Yes | admin | Delete tier |
+| GET | /api/v1/billing/rewards/account | Yes | - | Get reward account |
+| GET | /api/v1/billing/rewards/transactions | Yes | - | Get reward transactions |
+| GET | /api/v1/billing/statements | Yes | - | List statements |
+| GET | /api/v1/billing/statements/{id} | Yes | - | Get statement |
+| POST | /api/v1/billing/statements/generate | Yes | - | Generate statement |
+| POST | /api/v1/billing/statements/admin/generate | Yes | admin | Admin generate |
+| GET | /api/v1/billing/statements/admin/all | Yes | admin | List all |
+| GET | /api/v1/billing/statements/bill/{billId} | Yes | - | Get by bill |
+
+### Notification Service (5005):
+| Method | Endpoint | Auth | Role | Description |
+|--------|----------|------|------|-------------|
+| GET | /api/v1/notifications/logs | Yes | - | Notification logs |
+| GET | /api/v1/notifications/audit | Yes | - | Audit logs |
+
+### Gateway (5006):
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | /health | No | Gateway health |
+
+================================================================================
+
+## 11. MESSAGING TOPOLOGY
+
+### Exchanges and Queues:
+
+CARD-DOMAIN-EVENT (card-service):
+- Bound: IUserDeleted, ICardDeductionRequested, IBillUpdateSucceeded, IBillOverdueDetected, IPaymentReversed
+- Consumers: PaymentReversedConsumer, UserDeletedConsumer, CardDeductionSagaConsumer, BillPaidConsumer, BillOverdueConsumer
+
+BILLING-DOMAIN-EVENT (billing-service):
+- Bound: IUserDeleted, IBillUpdateRequested, IRevertBillUpdateRequested
+- Consumers: UserDeletedConsumer, BillUpdateSagaConsumer, RevertBillSagaConsumer
+
+PAYMENT-ORCHESTRATION (payment-service):
+- Bound: All SAGA events
+- SAGA: PaymentOrchestrationSaga
+
+PAYMENT-PROCESS (payment-service):
+- Consumers: PaymentProcessConsumer, RevertPaymentConsumer
+
+PAYMENT-DOMAIN-EVENT (payment-service):
+- Consumers: PaymentCompletedConsumer, PaymentFailedConsumer, UserDeletedConsumer
+
+NOTIFICATION-DOMAIN-EVENT (notification-service):
+- Consumer: DomainEventConsumer
+- Handles: All domain events
+
+================================================================================
+
+## 12. TESTING OBSERVATIONS
+
+### Log Files Found:
+- card-service-20260402.log
+- card-service-20260401.log
+- card-service-20260331.log
+- notification-service-20260402.log
+- notification-service-20260401.log
+- notification-service-20260331.log
+- payment-service logs (directory structure exists)
+- billing-service logs (directory structure exists)
+
+Services appear to be running and generating logs.
+
+### SQL Script:
+- payment-correlation-audit.sql: Useful for debugging payment sagas
+- Cross-database queries for payment tracking
+
+================================================================================
+
+## 13. SUMMARY OF FINDINGS
+
+### Fully Implemented Features:
+1. Card CRUD operations with validation
+2. Payment initiation with OTP verification
+3. SAGA-based payment orchestration with compensation
+4. Bill generation and payment tracking
+5. Statement generation
+6. Reward points system with tiers
+7. Card blocking with strike system
+8. Email notifications via Gmail SMTP
+9. Soft delete for cards, payments, bills
+10. Health check endpoints
+11. Admin operations for all services
+12. RabbitMQ message-based communication
+13. EF Core with SQL Server
+
+### Partially Implemented Features:
+1. Risk scoring (calculated but unused)
+2. CheckOverdueBillsCommand (endpoint exists, logic not shown)
+3. Email templates (removed from codebase)
+4. Statement transactions (table exists, usage unclear)
+
+### Not Consumed by Frontend (likely):
+1. Card health score endpoint
+2. Violations endpoints
+3. Reward tier management
+4. Admin endpoints (by design)
+5. Audit logs endpoint
+
+### Recommendations:
+1. Move all secrets to environment variables or secure vault
+2. Implement proper card number tokenization
+3. Add rate limiting especially for OTP
+4. Implement circuit breakers for service calls
+5. Add integration tests for SAGA flows
+6. Review and implement missing features
+7. Add comprehensive logging for audit trail
+8. Consider implementing idempotency keys at API level
+
+================================================================================
+
+END OF REPORT

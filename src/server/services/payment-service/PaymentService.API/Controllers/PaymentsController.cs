@@ -22,17 +22,17 @@ public class PaymentsController(IMediator mediator) : BaseApiController
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         if (!Enum.TryParse<PaymentType>(request.PaymentType, ignoreCase: true, out var paymentType))
-            return BadRequest(Fail($"Invalid PaymentType. Valid values: {string.Join(", ", Enum.GetNames<PaymentType>())}"));
+            return BadRequest(BadRequestResponse($"Invalid PaymentType. Valid values: {string.Join(", ", Enum.GetNames<PaymentType>())}"));
 
         var authHeader = HttpContext.Request.Headers.Authorization.ToString();
         var command = new InitiatePaymentCommand(userId.Value, request.CardId, request.BillId, request.Amount, paymentType, authHeader);
         var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)
-            return Fail(result.Error ?? "Payment initiation failed.");
+            return BadRequestResponse(result.Error ?? "Payment initiation failed.");
 
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
         {
@@ -56,13 +56,13 @@ public class PaymentsController(IMediator mediator) : BaseApiController
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         var command = new VerifyOtpCommand(paymentId, userId.Value, request.OtpCode);
         var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)
-            return Fail(result.Error ?? "OTP verification failed.");
+            return BadRequestResponse(result.Error ?? "OTP verification failed.");
 
         return Ok(new ApiResponse<object>
         {
@@ -78,7 +78,7 @@ public class PaymentsController(IMediator mediator) : BaseApiController
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         var payments = await mediator.Send(new GetAllPaymentsQuery(userId.Value), cancellationToken);
 
@@ -96,12 +96,12 @@ public class PaymentsController(IMediator mediator) : BaseApiController
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         var payment = await mediator.Send(new GetPaymentByIdQuery(paymentId, userId.Value), cancellationToken);
 
         if (payment is null)
-            return NotFound(Fail("Payment not found."));
+            return NotFound(BadRequestResponse("Payment not found."));
 
         return Ok(new ApiResponse<object>
         {
@@ -117,7 +117,7 @@ public class PaymentsController(IMediator mediator) : BaseApiController
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         var transactions = await mediator.Send(new GetPaymentTransactionsQuery(paymentId, userId.Value), cancellationToken);
 

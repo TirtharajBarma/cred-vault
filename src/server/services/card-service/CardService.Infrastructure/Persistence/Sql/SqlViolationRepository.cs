@@ -30,22 +30,6 @@ public sealed class SqlViolationRepository(CardDbContext dbContext) : IViolation
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<CardViolation>> GetViolationsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        return await dbContext.CardViolations
-            .AsNoTracking()
-            .Where(x => x.UserId == userId)
-            .OrderByDescending(x => x.AppliedAtUtc)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<int> GetActiveStrikeCountAsync(Guid cardId, CancellationToken cancellationToken = default)
-    {
-        return await dbContext.CardViolations
-            .Where(x => x.CardId == cardId && x.IsActive)
-            .SumAsync(x => x.StrikeCount, cancellationToken);
-    }
-
     public async Task AddAsync(CardViolation violation, CancellationToken cancellationToken = default)
     {
         await dbContext.CardViolations.AddAsync(violation, cancellationToken);

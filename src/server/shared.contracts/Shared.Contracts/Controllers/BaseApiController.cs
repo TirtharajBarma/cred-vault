@@ -31,13 +31,9 @@ public abstract class BaseApiController : ControllerBase
         return errorCode switch
         {
             "ValidationError" => BadRequest(response),
-            "UserNotFound" => NotFound(response),
-            "NotFound" => NotFound(response),
-            "CardNotFound" => NotFound(response),
-            "DuplicateEmail" => Conflict(response),
-            "Conflict" => Conflict(response),
-            "InvalidCredentials" => Unauthorized(response),
-            "Unauthorized" => Unauthorized(response),
+            "NotFound" or "UserNotFound" or "CardNotFound" => NotFound(response),
+            "Conflict" or "DuplicateEmail" => Conflict(response),
+            "Unauthorized" or "InvalidCredentials" => Unauthorized(response),
             "Forbidden" => StatusCode(StatusCodes.Status403Forbidden, response),
             "AccountLocked" => StatusCode(StatusCodes.Status403Forbidden, response),
             "ServiceUnavailable" => StatusCode(StatusCodes.Status503ServiceUnavailable, response),
@@ -65,13 +61,6 @@ public abstract class BaseApiController : ControllerBase
             TraceId = HttpContext.TraceIdentifier
         });
     }
-
-    protected IActionResult Fail(string message) => BadRequest(new ApiResponse<object>
-    {
-        Success = false,
-        Message = message,
-        TraceId = HttpContext.TraceIdentifier
-    });
 
     protected IActionResult NotFoundResponse(string message)
     {

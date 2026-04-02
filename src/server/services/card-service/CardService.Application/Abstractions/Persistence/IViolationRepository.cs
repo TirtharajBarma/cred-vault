@@ -7,8 +7,6 @@ public interface IViolationRepository
     Task<CardViolation?> GetByIdAsync(Guid violationId, CancellationToken cancellationToken = default);
     Task<CardViolation?> GetActiveViolationByCardIdAsync(Guid cardId, CancellationToken cancellationToken = default);
     Task<List<CardViolation>> GetViolationsByCardIdAsync(Guid cardId, CancellationToken cancellationToken = default);
-    Task<List<CardViolation>> GetViolationsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-    Task<int> GetActiveStrikeCountAsync(Guid cardId, CancellationToken cancellationToken = default);
     Task AddAsync(CardViolation violation, CancellationToken cancellationToken = default);
     Task UpdateAsync(CardViolation violation, CancellationToken cancellationToken = default);
 }

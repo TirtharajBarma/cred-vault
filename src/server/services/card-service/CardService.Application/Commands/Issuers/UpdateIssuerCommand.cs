@@ -17,7 +17,7 @@ public sealed class UpdateIssuerCommandHandler(
 {
     public async Task<IssuersResult> Handle(UpdateIssuerCommand request, CancellationToken cancellationToken)
     {
-        var issuer = await cardRepository.GetIssuerByIdRawAsync(request.Id, cancellationToken);
+        var issuer = await cardRepository.GetIssuerByIdAsync(request.Id, cancellationToken);
         
         if (issuer == null)
         {

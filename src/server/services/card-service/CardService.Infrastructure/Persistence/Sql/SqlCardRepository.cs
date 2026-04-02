@@ -79,17 +79,7 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<CardIssuer?> GetIssuerByNetworkAsync(CardNetwork network, CancellationToken cancellationToken = default)
-    {
-        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.Network == network, cancellationToken);
-    }
-
     public Task<CardIssuer?> GetIssuerByIdAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-    }
-
-    public Task<CardIssuer?> GetIssuerByIdRawAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
@@ -199,14 +189,6 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .AsNoTracking()
             .Where(x => x.IsBlocked && !x.IsDeleted)
             .OrderByDescending(x => x.BlockedAtUtc)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<List<CreditCard>> GetAllActiveCardsWithBalanceAsync(CancellationToken cancellationToken = default)
-    {
-        return await dbContext.CreditCards
-            .AsNoTracking()
-            .Where(x => !x.IsDeleted && !x.IsBlocked && x.OutstandingBalance > 0)
             .ToListAsync(cancellationToken);
     }
 

@@ -95,10 +95,8 @@ public class InitiatePaymentCommandHandler(
             logger.LogWarning("Payment {PaymentId}: User verification failed - proceeding but flagging", payment.Id);
         }
 
-        var riskScore = payment.Amount > 10000 ? 85m : payment.Amount > 5000 ? 60m : 20m;
-
-        logger.LogInformation("Starting SAGA orchestration for PaymentId={PaymentId}, Amount={Amount}, RiskScore={RiskScore}, OTP={OtpCode}",
-            payment.Id, payment.Amount, riskScore, otpCode);
+        logger.LogInformation("Starting SAGA orchestration for PaymentId={PaymentId}, Amount={Amount}, OTP={OtpCode}",
+            payment.Id, payment.Amount, otpCode);
 
         await publishEndpoint.Publish<IStartPaymentOrchestration>(new
         {
@@ -111,7 +109,6 @@ public class InitiatePaymentCommandHandler(
             BillId = payment.BillId,
             Amount = payment.Amount,
             PaymentType = payment.PaymentType.ToString(),
-            RiskScore = riskScore,
             OtpCode = otpCode,
             StartedAt = DateTime.UtcNow
         }, cancellationToken);
@@ -134,11 +131,7 @@ public class InitiatePaymentCommandHandler(
 
     private static string GenerateOtp()
     {
-        var bytes = new byte[4];
-        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-        rng.GetBytes(bytes);
-        var number = Math.Abs(BitConverter.ToInt32(bytes, 0)) % 900000;
-        return (100000 + number).ToString();
+        return Random.Shared.Next(100000, 999999).ToString();
     }
 
     private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)

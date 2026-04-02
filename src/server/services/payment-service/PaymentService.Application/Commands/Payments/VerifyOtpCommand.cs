@@ -13,7 +13,7 @@ public record VerifyOtpResult(bool Success, string? Error);
 
 public class VerifyOtpCommandHandler(
     IPaymentRepository paymentRepository,
-    IPublishEndpoint publishEndpoint,
+    ISendEndpointProvider sendEndpointProvider,
     ILogger<VerifyOtpCommandHandler> logger
 ) : IRequestHandler<VerifyOtpCommand, VerifyOtpResult>
 {
@@ -51,18 +51,35 @@ public class VerifyOtpCommandHandler(
         if (payment.OtpCode != request.OtpCode)
         {
             logger.LogWarning("Invalid OTP for Payment {PaymentId}", request.PaymentId);
+            var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
+            await endpoint.Send<IOtpFailed>(new
+            {
+                CorrelationId = request.PaymentId,
+                PaymentId = request.PaymentId,
+                Reason = "Invalid OTP code",
+                FailedAt = DateTime.UtcNow
+            }, cancellationToken);
             return new VerifyOtpResult(false, "Invalid OTP code");
         }
 
         if (payment.OtpExpiresAtUtc < DateTime.UtcNow)
         {
             logger.LogWarning("Expired OTP for Payment {PaymentId}", request.PaymentId);
+            var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
+            await endpoint.Send<IOtpFailed>(new
+            {
+                CorrelationId = request.PaymentId,
+                PaymentId = request.PaymentId,
+                Reason = "OTP has expired",
+                FailedAt = DateTime.UtcNow
+            }, cancellationToken);
             return new VerifyOtpResult(false, "OTP has expired");
         }
 
         logger.LogInformation("Publishing IOtpVerified for PaymentId={PaymentId}", request.PaymentId);
 
-        await publishEndpoint.Publish<IOtpVerified>(new
+        var successEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
+        await successEndpoint.Send<IOtpVerified>(new
         {
             CorrelationId = request.PaymentId,
             PaymentId = request.PaymentId,

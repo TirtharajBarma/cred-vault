@@ -2,7 +2,6 @@ using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Shared.Contracts.Events.Identity;
-using Shared.Contracts.Events.Card;
 using Shared.Contracts.Events.Billing;
 using Shared.Contracts.Events.Payment;
 using Shared.Contracts.Events.Saga;
@@ -11,7 +10,7 @@ using NotificationService.Application.Commands;
 namespace NotificationService.Application.Consumers;
 
 public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer> logger) 
-    : IConsumer<IUserRegistered>, IConsumer<IUserOtpGenerated>, IConsumer<ICardAdded>, IConsumer<IBillGenerated>, 
+    : IConsumer<IUserRegistered>, IConsumer<IUserOtpGenerated>, IConsumer<IBillGenerated>, 
       IConsumer<IPaymentOtpGenerated>, IConsumer<IPaymentCompleted>, IConsumer<IPaymentFailed>,
       IConsumer<IUserDeleted>, IConsumer<IOtpFailed>
 {
@@ -27,13 +26,6 @@ public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer
         logger.LogDebug("UserOtpGenerated: {Email}, Purpose={Purpose}", context.Message.Email, context.Message.Purpose);
         await mediator.Send(new ProcessNotificationCommand("UserOtpGenerated", context.Message.Email, context.Message.FullName,
             new { context.Message.OtpCode, context.Message.ExpiresAtUtc, context.Message.Purpose }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
-    }
-
-    public async Task Consume(ConsumeContext<ICardAdded> context)
-    {
-        logger.LogDebug("CardAdded: {CardId}, Last4={Last4}", context.Message.CardId, context.Message.CardNumberLast4);
-        await mediator.Send(new ProcessNotificationCommand("CardAdded", context.Message.Email, context.Message.FullName,
-            new { context.Message.CardId, context.Message.CardNumberLast4, context.Message.CardHolderName, context.Message.AddedAt }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 
     public async Task Consume(ConsumeContext<IBillGenerated> context)

@@ -77,7 +77,7 @@ public class StatementsController(IMediator mediator) : BaseApiController
         if (userId is null) return UnauthorizedResponse();
 
         var result = await mediator.Send(new GetStatementByBillIdQuery(userId.Value, billId), cancellationToken);
-        return CreateResponse(result.Success, result.Statement, result.Message);
+        return CreateResponse(result.Success, result.Statements, result.Message);
     }
 }
 

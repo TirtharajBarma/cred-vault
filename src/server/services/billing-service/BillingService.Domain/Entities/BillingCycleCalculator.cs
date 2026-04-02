@@ -5,21 +5,6 @@ public static class BillingCycleCalculator
     public const int GracePeriodDays = 12;
     public const decimal MonthlyInterestRate = 0.035m;
 
-    public static DateTime CalculateNextBillingDate(DateTime billingDate, DateTime referenceDate)
-    {
-        var safeDay = Math.Min(billingDate.Day, DateTime.DaysInMonth(referenceDate.Year, referenceDate.Month));
-        var nextBilling = new DateTime(referenceDate.Year, referenceDate.Month, safeDay, 0, 0, 0, DateTimeKind.Utc);
-        
-        if (nextBilling <= referenceDate)
-        {
-            nextBilling = nextBilling.AddMonths(1);
-            safeDay = Math.Min(billingDate.Day, DateTime.DaysInMonth(nextBilling.Year, nextBilling.Month));
-            nextBilling = new DateTime(nextBilling.Year, nextBilling.Month, safeDay, 0, 0, 0, DateTimeKind.Utc);
-        }
-        
-        return nextBilling;
-    }
-
     public static DateTime CalculateDueDate(DateTime billingDate)
     {
         return billingDate.AddDays(GracePeriodDays);
