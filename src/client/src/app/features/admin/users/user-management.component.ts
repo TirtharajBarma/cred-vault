@@ -1,7 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 
 @Component({
@@ -12,136 +11,83 @@ import { AdminService } from '../../../core/services/admin.service';
 })
 export class UserManagementComponent implements OnInit, OnDestroy {
   private adminService = inject(AdminService);
-  private route = inject(ActivatedRoute);
-  Math = Math;
   
-  activeTab = signal<'search' | 'list'>('list');
-  searchQuery = '';
-  isLoading = signal(false);
-  selectedUser = signal<any>(null);
-  selectedUserCards = signal<any[]>([]);
-  isLoadingCards = signal(false);
-  selectedCard = signal<any>(null);
-  isUpdatingCard = signal(false);
-  cardUpdateMessage = signal<string | null>(null);
+  Math = Math;
   toastMessage = signal<string | null>(null);
-  private panelMessageHandle: ReturnType<typeof setTimeout> | null = null;
   private toastHandle: ReturnType<typeof setTimeout> | null = null;
-  pendingOpenCardId: string | null = null;
-  editCreditLimit: number | null = null;
-  editOutstandingBalance: number | null = null;
-  editBillingCycleStartDay: number | null = null;
-  error = signal<string | null>(null);
-  successMessage = signal<string | null>(null);
 
+  // Search & List
+  searchQuery = '';
   users = signal<any[]>([]);
   totalUsers = signal(0);
   currentPage = signal(1);
   pageSize = 10;
-
+  isLoading = signal(false);
   statusFilter = signal<string>('all');
-  cardListMode = signal<'pending' | 'all'>('pending');
+
+  // Selected User
+  selectedUser = signal<any>(null);
+  activeTab = signal<'cards' | 'bills' | 'statements' | 'logs' | 'audit'>('cards');
+
+  // User Data
+  selectedUserCards = signal<any[]>([]);
+  userBills = signal<any[]>([]);
+  userStatements = signal<any[]>([]);
+  userLogs = signal<any[]>([]);
+  userAudit = signal<any[]>([]);
+  cardViolations = signal<any[]>([]);
+
+  // Loading states
+  isLoadingCards = signal(false);
+  isLoadingBills = signal(false);
+  isLoadingStatements = signal(false);
+  isLoadingLogs = signal(false);
+  isLoadingAudit = signal(false);
+  isLoadingViolations = signal(false);
+
+  // Card Modal
+  selectedCard = signal<any>(null);
+  editCreditLimit: number | null = null;
+  editOutstandingBalance: number | null = null;
+  editBillingCycleStartDay: number | null = null;
+  isUpdatingCard = signal(false);
+  cardUpdateMessage = signal<string | null>(null);
+
+  // Messages
+  error = signal<string | null>(null);
+  successMessage = signal<string | null>(null);
+  private panelMessageHandle: ReturnType<typeof setTimeout> | null = null;
 
   statusFilters = [
-    { value: 'all', label: 'All', activeClass: 'bg-charcoal text-white' },
-    { value: 'active', label: 'Active', activeClass: 'bg-emerald-500 text-white' },
-    { value: 'pendingverification', label: 'Pending', activeClass: 'bg-amber-500 text-white' },
-    { value: 'suspended', label: 'Suspended', activeClass: 'bg-red-500 text-white' },
-    { value: 'blocked', label: 'Blocked', activeClass: 'bg-red-700 text-white' }
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'pendingverification', label: 'Pending' },
+    { value: 'suspended', label: 'Suspended' },
+    { value: 'blocked', label: 'Blocked' }
   ];
 
-  getCountForFilter(filter: string): number {
-    const counts = this.getAllStatusCounts();
-    if (filter === 'all') return counts.total;
-    return counts[filter as keyof typeof counts] || 0;
-  }
+  tabs = [
+    { id: 'cards' as const, label: 'Cards', icon: '💳' },
+    { id: 'bills' as const, label: 'Bills', icon: '📄' },
+    { id: 'statements' as const, label: 'Statements', icon: '📊' },
+    { id: 'logs' as const, label: 'Logs', icon: '📋' },
+    { id: 'audit' as const, label: 'Audit', icon: '🔍' }
+  ];
 
-  filteredUsers = computed(() => {
-    const filter = this.statusFilter();
-    const allUsers = this.users();
-    if (filter === 'all') return allUsers;
-    return allUsers.filter(u => u.status?.toLowerCase() === filter.toLowerCase());
-  });
-
-  visibleCards = computed(() => {
-    const cards = [...this.selectedUserCards()];
-    if (this.cardListMode() === 'all') return cards;
-    return cards.sort((a, b) => Number((b.creditLimit ?? 0) <= 0) - Number((a.creditLimit ?? 0) <= 0));
-  });
-
-  constructor() {
+  ngOnInit() {
     this.loadUsers();
   }
 
-  ngOnInit() {
-    this.route.queryParamMap.subscribe(params => {
-      const userId = params.get('userId');
-      this.pendingOpenCardId = params.get('cardId');
-      if (userId) {
-        this.openUserFromAlert(userId);
-        return;
-      }
-    });
-  }
-
   ngOnDestroy() {
-    if (this.toastHandle) {
-      clearTimeout(this.toastHandle);
-    }
-    if (this.panelMessageHandle) {
-      clearTimeout(this.panelMessageHandle);
-    }
-  }
-
-  private openUserFromAlert(userId: string) {
-    this.isLoading.set(true);
-    this.error.set(null);
-    this.successMessage.set(null);
-
-    this.adminService.getUserDetails(userId).subscribe({
-      next: (res: any) => {
-        const user = res?.data?.data?.user || res?.data?.user || res?.data;
-        if (!user?.id) {
-          this.showError('User not found for selected alert.');
-          this.isLoading.set(false);
-          return;
-        }
-
-        this.users.set([user]);
-        this.totalUsers.set(1);
-        this.currentPage.set(1);
-        this.selectUser(user);
-        this.showSuccess('Alert user opened.');
-        this.isLoading.set(false);
-      },
-      error: () => {
-        this.showError('Failed to open alert user.');
-        this.isLoading.set(false);
-      }
-    });
-  }
-
-  switchTab(tab: 'search' | 'list') {
-    this.activeTab.set(tab);
-    this.selectedUser.set(null);
-    this.selectedUserCards.set([]);
-    if (tab === 'list') {
-      this.loadUsers();
-    }
-  }
-
-  setStatusFilter(status: string) {
-    this.statusFilter.set(status);
+    if (this.toastHandle) clearTimeout(this.toastHandle);
+    if (this.panelMessageHandle) clearTimeout(this.panelMessageHandle);
   }
 
   loadUsers(page: number = 1) {
     this.isLoading.set(true);
     this.error.set(null);
-    
     const params: any = { page, pageSize: this.pageSize };
-    if (this.statusFilter() !== 'all') {
-      params.status = this.statusFilter();
-    }
+    if (this.statusFilter() !== 'all') params.status = this.statusFilter();
     
     this.adminService.getAllUsers(params).subscribe({
       next: (res) => {
@@ -151,67 +97,21 @@ export class UserManagementComponent implements OnInit, OnDestroy {
         this.currentPage.set(data.page || 1);
         this.isLoading.set(false);
       },
-      error: (err) => {
-        console.error('Load users error:', err);
+      error: () => {
         this.showError('Failed to load users');
         this.isLoading.set(false);
       }
     });
   }
 
-  nextPage() {
-    const totalPages = Math.ceil(this.totalUsers() / this.pageSize);
-    if (this.currentPage() < totalPages) {
-      this.loadUsers(this.currentPage() + 1);
-    }
-  }
-
-  prevPage() {
-    if (this.currentPage() > 1) {
-      this.loadUsers(this.currentPage() - 1);
-    }
-  }
-  
-  selectUser(user: any) {
-    this.selectedUser.set(user);
-    this.selectedUserCards.set([]);
-    this.isLoadingCards.set(true);
-    this.error.set(null);
-    this.successMessage.set(null);
-    this.cardListMode.set('pending');
-
-    this.adminService.getCardsByUser(user.id).subscribe({
-      next: (res) => {
-        const cards = res.data?.data || res.data || [];
-        this.selectedUserCards.set(cards);
-
-        if (this.pendingOpenCardId) {
-          const targetCard = cards.find((c: any) => c.id === this.pendingOpenCardId);
-          if (targetCard) {
-            this.showCardDetails(targetCard);
-          }
-          this.pendingOpenCardId = null;
-        }
-
-        this.isLoadingCards.set(false);
-      },
-      error: () => {
-        this.selectedUserCards.set([]);
-        this.isLoadingCards.set(false);
-      }
-    });
-  }
-  
   searchUser() {
     const query = this.searchQuery.trim();
-    if (!query) return;
+    if (!query) {
+      this.loadUsers();
+      return;
+    }
     
     this.isLoading.set(true);
-    this.error.set(null);
-    this.selectedUser.set(null);
-    this.selectedUserCards.set([]);
-    this.successMessage.set(null);
-
     const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(query);
 
     if (isGuid) {
@@ -221,97 +121,141 @@ export class UserManagementComponent implements OnInit, OnDestroy {
           if (user?.id) {
             this.users.set([user]);
             this.totalUsers.set(1);
-            this.currentPage.set(1);
             this.selectUser(user);
-            this.showSuccess('User found by ID.');
           } else {
-            this.showError('User not found by ID.');
+            this.users.set([]);
+            this.totalUsers.set(0);
           }
           this.isLoading.set(false);
         },
         error: () => {
-          this.showError('User not found by ID.');
+          this.users.set([]);
+          this.totalUsers.set(0);
           this.isLoading.set(false);
         }
       });
-      return;
+    } else {
+      this.adminService.getAllUsers({ search: query, page: 1, pageSize: 50 }).subscribe({
+        next: (res) => {
+          const data = res.data?.data || res.data || {};
+          const users = data.users || [];
+          this.users.set(users);
+          this.totalUsers.set(data.total || 0);
+          this.currentPage.set(1);
+          this.isLoading.set(false);
+        },
+        error: () => this.isLoading.set(false)
+      });
     }
+  }
 
-    this.adminService.getAllUsers({ search: query, page: 1, pageSize: 50 }).subscribe({
+  selectUser(user: any) {
+    this.selectedUser.set(user);
+    this.activeTab.set('cards');
+    this.loadUserData();
+  }
+
+  loadUserData() {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.loadCards();
+  }
+
+  switchTab(tab: 'cards' | 'bills' | 'statements' | 'logs' | 'audit') {
+    this.activeTab.set(tab);
+    const user = this.selectedUser();
+    if (!user) return;
+
+    switch (tab) {
+      case 'cards': this.loadCards(); break;
+      case 'bills': this.loadBills(); break;
+      case 'statements': this.loadStatements(); break;
+      case 'logs': this.loadLogs(); break;
+      case 'audit': this.loadAudit(); break;
+    }
+  }
+
+  loadCards() {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.isLoadingCards.set(true);
+    this.adminService.getCardsByUser(user.id).subscribe({
       next: (res) => {
-        const data = res.data?.data || res.data || {};
-        const users = data.users || [];
-
-        this.users.set(users);
-        this.totalUsers.set(users.length);
-        this.currentPage.set(1);
-
-        if (users.length > 0) {
-          this.selectUser(users[0]);
-          this.showSuccess(`Found ${users.length} user${users.length === 1 ? '' : 's'}.`);
-        } else {
-          this.showError('No user found for this search value.');
-        }
-
-        this.isLoading.set(false);
+        this.selectedUserCards.set(res.data?.data || res.data || []);
+        this.isLoadingCards.set(false);
       },
-      error: (err) => {
-        console.error('User search error:', err);
-        this.showError('Search failed. Please try again.');
-        this.isLoading.set(false);
+      error: () => {
+        this.selectedUserCards.set([]);
+        this.isLoadingCards.set(false);
       }
     });
   }
 
-  updateStatus(status: string) {
-    if (!this.selectedUser()) return;
-    
-    this.error.set(null);
-    this.successMessage.set(null);
-    
-    this.adminService.updateUserStatus(this.selectedUser().id, status).subscribe({
+  loadBills() {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.isLoadingBills.set(true);
+    this.adminService.getUserBills(user.id).subscribe({
       next: (res) => {
-        if (res.success) {
-          this.selectedUser.update(u => ({ ...u, status: status }));
-          this.loadUsers();
-          this.showSuccess(`User status updated to ${this.getStatusLabel(status)}`);
-        } else {
-          this.showError(res.message || 'Failed to update status');
-        }
+        this.userBills.set(res.data?.data || res.data || []);
+        this.isLoadingBills.set(false);
       },
-      error: (err) => {
-        this.showError('Failed to update user status');
+      error: () => {
+        this.userBills.set([]);
+        this.isLoadingBills.set(false);
       }
     });
   }
 
-  updateRole(role: string) {
-    if (!this.selectedUser()) return;
-    
-    this.error.set(null);
-    this.successMessage.set(null);
-    
-    this.adminService.updateUserRole(this.selectedUser().id, role).subscribe({
+  loadStatements() {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.isLoadingStatements.set(true);
+    this.adminService.getUserStatements(user.id).subscribe({
       next: (res) => {
-        if (res.success) {
-          this.selectedUser.update(u => ({ ...u, role: role }));
-          this.loadUsers();
-          this.showSuccess(`User role updated to ${role}`);
-        } else {
-          this.showError(res.message || 'Failed to update role');
-        }
+        const data = res.data?.data || res.data || res;
+        this.userStatements.set(Array.isArray(data) ? data : (data.statements || []));
+        this.isLoadingStatements.set(false);
       },
-      error: (err) => {
-        this.showError('Failed to update user role');
+      error: () => {
+        this.userStatements.set([]);
+        this.isLoadingStatements.set(false);
       }
     });
   }
 
-  toggleRole() {
-    if (!this.selectedUser()) return;
-    const currentRole = this.selectedUser().role?.toLowerCase();
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
-    this.updateRole(newRole);
+  loadLogs() {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.isLoadingLogs.set(true);
+    this.adminService.getUserNotificationLogs(user.email, 1, 200).subscribe({
+      next: (res) => {
+        const data = res.data?.data || res.data || res;
+        this.userLogs.set(Array.isArray(data.logs) ? data.logs : (Array.isArray(data) ? data : []));
+        this.isLoadingLogs.set(false);
+      },
+      error: () => {
+        this.userLogs.set([]);
+        this.isLoadingLogs.set(false);
+      }
+    });
+  }
+
+  loadAudit() {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.isLoadingAudit.set(true);
+    this.adminService.getUserAuditLogs(user.id, 1, 200).subscribe({
+      next: (res) => {
+        const data = res.data?.data || res.data || res;
+        this.userAudit.set(Array.isArray(data.logs) ? data.logs : (Array.isArray(data) ? data : []));
+        this.isLoadingAudit.set(false);
+      },
+      error: () => {
+        this.userAudit.set([]);
+        this.isLoadingAudit.set(false);
+      }
+    });
   }
 
   showCardDetails(card: any) {
@@ -320,11 +264,27 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     this.editCreditLimit = Number(card.creditLimit ?? 0);
     this.editOutstandingBalance = Number(card.outstandingBalance ?? 0);
     this.editBillingCycleStartDay = Number(card.billingCycleStartDay ?? 1);
+    this.loadCardViolations(card.id);
+  }
+
+  loadCardViolations(cardId: string) {
+    this.isLoadingViolations.set(true);
+    this.adminService.getCardViolations(cardId).subscribe({
+      next: (res) => {
+        const violations = res.data?.data || res.data || [];
+        this.cardViolations.set((Array.isArray(violations) ? violations : []).filter((v: any) => v?.isActive));
+        this.isLoadingViolations.set(false);
+      },
+      error: () => {
+        this.cardViolations.set([]);
+        this.isLoadingViolations.set(false);
+      }
+    });
   }
 
   closeCardDetails() {
     this.selectedCard.set(null);
-    this.cardUpdateMessage.set(null);
+    this.cardViolations.set([]);
   }
 
   updateSelectedCard() {
@@ -332,91 +292,157 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     if (!card) return;
 
     const creditLimit = Number(this.editCreditLimit ?? 0);
-    const outstandingBalance = this.editOutstandingBalance === null ? null : Number(this.editOutstandingBalance);
-    const billingCycleStartDay = this.editBillingCycleStartDay === null ? null : Number(this.editBillingCycleStartDay);
-
     if (!Number.isFinite(creditLimit) || creditLimit <= 0) {
       this.cardUpdateMessage.set('Credit limit must be greater than 0.');
       return;
     }
 
-    if (outstandingBalance !== null && (!Number.isFinite(outstandingBalance) || outstandingBalance < 0)) {
-      this.cardUpdateMessage.set('Outstanding balance cannot be negative.');
-      return;
-    }
-
-    if (billingCycleStartDay !== null && (!Number.isFinite(billingCycleStartDay) || billingCycleStartDay < 1 || billingCycleStartDay > 31)) {
-      this.cardUpdateMessage.set('Billing cycle day must be between 1 and 31.');
-      return;
-    }
-
     this.isUpdatingCard.set(true);
-    this.cardUpdateMessage.set(null);
-
     this.adminService.updateCardByAdmin(card.id, {
       creditLimit,
-      outstandingBalance,
-      billingCycleStartDay
+      outstandingBalance: this.editOutstandingBalance,
+      billingCycleStartDay: this.editBillingCycleStartDay
     }).subscribe({
       next: (res) => {
         this.isUpdatingCard.set(false);
-        if (!res.success || !res.data) {
-          this.cardUpdateMessage.set(res.message || 'Failed to update card.');
-          return;
+        if (res.success) {
+          const updatedCard = res.data;
+          this.selectedCard.set(updatedCard);
+          this.selectedUserCards.update(cards => cards.map(c => c.id === updatedCard.id ? updatedCard : c));
+          this.showToast('Card updated successfully');
+          this.closeCardDetails();
+        } else {
+          this.cardUpdateMessage.set(res.message || 'Failed to update');
         }
-
-        const updatedCard = res.data;
-        this.selectedCard.set(updatedCard);
-        this.selectedUserCards.update(cards => cards.map(c => c.id === updatedCard.id ? updatedCard : c));
-        window.dispatchEvent(new Event('admin-alerts-refresh'));
-        this.showSuccess('Card details updated successfully.');
-        this.showToast('Card details updated.');
-        this.closeCardDetails();
       },
       error: () => {
         this.isUpdatingCard.set(false);
-        this.cardUpdateMessage.set('Failed to update card.');
+        this.cardUpdateMessage.set('Failed to update card');
       }
     });
   }
 
-  setCardListMode(mode: 'pending' | 'all') {
-    this.cardListMode.set(mode);
+  clearCardViolations(cardId: string) {
+    if (!confirm('Clear all violations for this card?')) return;
+    this.adminService.clearCardViolations(cardId).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.cardViolations.set([]);
+          this.showToast('Violations cleared');
+        }
+      }
+    });
+  }
+
+  unblockCard(cardId: string) {
+    this.adminService.unblockCard(cardId).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.loadCards();
+          this.showToast('Card unblocked');
+        }
+      }
+    });
+  }
+
+  updateStatus(status: string) {
+    if (!this.selectedUser()) return;
+    this.adminService.updateUserStatus(this.selectedUser().id, status).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.selectedUser.update(u => ({ ...u, status }));
+          this.loadUsers();
+        }
+      }
+    });
+  }
+
+  updateRole(role: string) {
+    if (!this.selectedUser()) return;
+    this.adminService.updateUserRole(this.selectedUser().id, role).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.selectedUser.update(u => ({ ...u, role }));
+          this.loadUsers();
+        }
+      }
+    });
+  }
+
+  nextPage() {
+    if (this.currentPage() < this.getTotalPages()) {
+      this.loadUsers(this.currentPage() + 1);
+    }
+  }
+
+  prevPage() {
+    if (this.currentPage() > 1) this.loadUsers(this.currentPage() - 1);
+  }
+
+  goToPage(page: number) {
+    if (page >= 1 && page <= this.getTotalPages() && page !== this.currentPage()) {
+      this.loadUsers(page);
+    }
+  }
+
+  getTotalPages(): number {
+    return Math.max(1, Math.ceil(this.totalUsers() / this.pageSize));
+  }
+
+  getVisiblePages(): number[] {
+    const totalPages = this.getTotalPages();
+    const current = this.currentPage();
+    const maxVisible = 7;
+
+    if (totalPages <= maxVisible) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const half = Math.floor(maxVisible / 2);
+    let start = Math.max(1, current - half);
+    let end = start + maxVisible - 1;
+
+    if (end > totalPages) {
+      end = totalPages;
+      start = end - maxVisible + 1;
+    }
+
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }
+
+  canUpdateStatus(status: string): boolean {
+    const user = this.selectedUser();
+    if (!user?.status) return false;
+    return user.status.toLowerCase() !== status.toLowerCase();
+  }
+
+  canPromoteToAdmin(): boolean {
+    const user = this.selectedUser();
+    return !!user && user.role !== 'admin';
   }
 
   private showToast(message: string) {
     this.toastMessage.set(message);
-    if (this.toastHandle) {
-      clearTimeout(this.toastHandle);
-    }
+    if (this.toastHandle) clearTimeout(this.toastHandle);
     this.toastHandle = setTimeout(() => this.toastMessage.set(null), 2000);
   }
 
   private showSuccess(message: string) {
     this.successMessage.set(message);
-    this.error.set(null);
-    if (this.panelMessageHandle) {
-      clearTimeout(this.panelMessageHandle);
-    }
+    if (this.panelMessageHandle) clearTimeout(this.panelMessageHandle);
     this.panelMessageHandle = setTimeout(() => this.successMessage.set(null), 2500);
   }
 
   private showError(message: string) {
     this.error.set(message);
-    this.successMessage.set(null);
-    if (this.panelMessageHandle) {
-      clearTimeout(this.panelMessageHandle);
-    }
+    if (this.panelMessageHandle) clearTimeout(this.panelMessageHandle);
     this.panelMessageHandle = setTimeout(() => this.error.set(null), 3000);
   }
 
   getStatusLabel(status: string): string {
     const labels: { [key: string]: string } = {
-      'active': 'Active',
-      'suspended': 'Suspended',
-      'pendingverification': 'Pending Verification',
-      'deleted': 'Deleted',
-      'blocked': 'Blocked'
+      'active': 'Active', 'suspended': 'Suspended',
+      'pendingverification': 'Pending', 'deleted': 'Deleted', 'blocked': 'Blocked'
     };
     return labels[status?.toLowerCase()] || status || 'Unknown';
   }
@@ -432,20 +458,27 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     return colors[status?.toLowerCase()] || 'bg-slate-500/10 text-slate-600 border-slate-500/20';
   }
 
-  getStatusFilterCount(status: string): number {
-    const allUsers = this.users();
-    if (status === 'all') return allUsers.length;
-    return allUsers.filter(u => u.status?.toLowerCase() === status.toLowerCase()).length;
+  getBillStatusColor(status: number): string {
+    const colors: { [key: number]: string } = {
+      0: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+      1: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+      2: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+      3: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+      4: 'bg-red-500/10 text-red-600 border-red-500/20',
+      5: 'bg-teal-500/10 text-teal-600 border-teal-500/20'
+    };
+    return colors[status] || 'bg-slate-500/10 text-slate-600 border-slate-500/20';
   }
 
-  getAllStatusCounts(): { active: number; suspended: number; pendingverification: number; blocked: number; total: number } {
-    const allUsers = this.users();
-    return {
-      active: allUsers.filter(u => u.status?.toLowerCase() === 'active').length,
-      suspended: allUsers.filter(u => u.status?.toLowerCase() === 'suspended').length,
-      pendingverification: allUsers.filter(u => u.status?.toLowerCase() === 'pendingverification').length,
-      blocked: allUsers.filter(u => u.status?.toLowerCase() === 'blocked').length,
-      total: allUsers.length
+  getBillStatusLabel(status: number): string {
+    const labels: { [key: number]: string } = {
+      0: 'Pending', 1: 'Paid', 2: 'Overdue', 3: 'PartiallyPaid', 4: 'Cancelled', 5: 'PartiallyPaid'
     };
+    return labels[status] || 'Unknown';
+  }
+
+  formatDate(dateStr: string): string {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 }

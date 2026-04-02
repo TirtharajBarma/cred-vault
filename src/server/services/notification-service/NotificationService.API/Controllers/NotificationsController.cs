@@ -32,9 +32,14 @@ public class NotificationsController(NotificationDbContext dbContext) : BaseApiC
     }
 
     [HttpGet("audit")]
-    public async Task<IActionResult> GetAuditLogs([FromQuery] string? traceId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetAuditLogs([FromQuery] string? userId, [FromQuery] string? traceId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var query = dbContext.AuditLogs.AsQueryable();
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            query = query.Where(l => l.UserId == userId);
+        }
 
         if (!string.IsNullOrEmpty(traceId))
         {

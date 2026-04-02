@@ -7,306 +7,469 @@
 
   <!-- Header -->
   <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Users</h1>
-    <p class="text-gray-500 text-sm">Manage user accounts and roles</p>
+    <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
+    <p class="text-gray-500 text-sm">Search, view, and manage user accounts</p>
   </div>
 
-  <!-- Filters -->
-  <div class="flex gap-2 mb-4">
-    @for (filter of statusFilters; track filter.value) {
-      <button 
-        (click)="setStatusFilter(filter.value)"
-        [class]="statusFilter() === filter.value ? filter.activeClass : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-        class="px-4 py-2 rounded-lg text-sm font-medium transition-all">
-        {{ filter.label }}
-      </button>
-    }
-  </div>
-
+  <!-- Search Bar -->
   <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6">
     <div class="flex flex-col md:flex-row gap-3">
-      <input
-        [(ngModel)]="searchQuery"
-        (keyup.enter)="searchUser()"
-        type="text"
-        placeholder="Search by email or user ID"
-        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm"
-      />
-      <button (click)="searchUser()" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700">Search</button>
-      <button (click)="searchQuery = ''; statusFilter.set('all'); loadUsers()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100">Clear</button>
+      <input [(ngModel)]="searchQuery" (keyup.enter)="searchUser()" type="text"
+             placeholder="Search by email, name, or paste user ID"
+             class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm" />
+      <button (click)="searchUser()" class="px-6 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700">
+        Search
+      </button>
+      <button (click)="searchQuery=''; statusFilter.set('all'); loadUsers()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100">
+        Clear
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-3">
+      @for (filter of statusFilters; track filter.value) {
+        <button (click)="statusFilter.set(filter.value); loadUsers()"
+                [class]="statusFilter() === filter.value ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                class="px-3 py-1 rounded-lg text-xs font-medium transition-all">
+          {{ filter.label }}
+        </button>
+      }
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
     <!-- User List -->
-    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="lg:col-span-5 bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <span class="text-sm font-semibold text-gray-700">Users ({{ totalUsers() }})</span>
+      </div>
+
       @if (isLoading()) {
-        <div class="p-4 space-y-3 animate-pulse">
-          @for (_ of [1,2,3,4,5,6]; track $index) {
-            <div class="grid grid-cols-12 gap-3 items-center py-2">
-              <div class="col-span-4 h-4 bg-gray-200 rounded"></div>
-              <div class="col-span-4 h-4 bg-gray-200 rounded hidden md:block"></div>
-              <div class="col-span-2 h-4 bg-gray-200 rounded"></div>
-              <div class="col-span-2 h-4 bg-gray-200 rounded"></div>
+        <div class="p-4 space-y-2 animate-pulse">
+          @for (_ of [1,2,3,4,5]; track $index) {
+            <div class="h-14 bg-gray-200 rounded-lg"></div>
+          }
+        </div>
+      } @else if (users().length > 0) {
+        <div class="max-h-[600px] overflow-y-auto">
+          @for (user of users(); track user.id) {
+            <div (click)="selectUser(user)"
+                 [class]="selectedUser()?.id === user.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50 border-l-4 border-l-transparent'"
+                 class="px-4 py-3 border-b border-gray-100 cursor-pointer transition-all">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                  {{ user.fullName?.charAt(0) || '?' }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-gray-900 truncate">{{ user.fullName }}</p>
+                  <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
+                </div>
+                <div class="text-right">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold border {{ getStatusColor(user.status) }}">
+                    {{ getStatusLabel(user.status) }}
+                  </span>
+                </div>
+              </div>
             </div>
           }
         </div>
-      } @else if (filteredUsers().length > 0) {
-        <table class="w-full">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">User</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Email</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Role</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (user of filteredUsers(); track user.id) {
-              <tr (click)="selectUser(user)" 
-                  [class]="selectedUser()?.id === user.id ? 'bg-blue-50' : 'hover:bg-gray-50 cursor-pointer'"
-                  class="border-b border-gray-100">
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                      {{ user.fullName?.charAt(0) || '?' }}
-                    </div>
-                    <span class="font-medium text-gray-900">{{ user.fullName }}</span>
-                  </div>
-                </td>
-                <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ user.email }}</td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded text-xs font-semibold"
-                        [class]="user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'">
-                    {{ user.role }}
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded text-xs font-semibold border"
-                        [class]="getStatusColor(user.status)">
-                    {{ getStatusLabel(user.status) }}
-                  </span>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-
         <!-- Pagination -->
         <div class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200">
-          <span class="text-sm text-gray-500">{{ filteredUsers().length }} of {{ totalUsers() }}</span>
-          <div class="flex gap-2">
-            <button (click)="prevPage()" [disabled]="currentPage() === 1"
-                    class="px-3 py-1 text-sm bg-white border rounded hover:bg-gray-100 disabled:opacity-50">Prev</button>
-            <button (click)="nextPage()" [disabled]="currentPage() >= Math.ceil(totalUsers() / pageSize)"
-                    class="px-3 py-1 text-sm bg-gray-800 text-white rounded hover:bg-gray-700">Next</button>
+          <span class="text-xs text-gray-500">Page {{ currentPage() }} of {{ getTotalPages() }}</span>
+          <div class="flex items-center gap-2">
+            <button (click)="prevPage()" [disabled]="currentPage() === 1" class="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-100 disabled:opacity-50">Prev</button>
+            <div class="hidden sm:flex items-center gap-1">
+              @for (page of getVisiblePages(); track page) {
+                <button (click)="goToPage(page)"
+                        [disabled]="page === currentPage()"
+                        [class]="page === currentPage() ? 'bg-gray-800 text-white border-gray-800 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'"
+                        class="w-7 h-7 text-xs border rounded transition-all">
+                  {{ page }}
+                </button>
+              }
+            </div>
+            <button (click)="nextPage()" [disabled]="currentPage() >= getTotalPages()" class="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50">Next</button>
           </div>
         </div>
       } @else {
-        <div class="text-center py-16 text-gray-500">
+        <div class="text-center py-12 text-gray-500">
           <p class="font-semibold">No users found</p>
-          <p class="text-sm text-gray-400 mt-1">Try resetting filters or clearing search.</p>
-          <button (click)="searchQuery=''; statusFilter.set('all'); loadUsers()" class="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-gray-800 text-white hover:bg-gray-700">Reset Filters</button>
         </div>
       }
     </div>
 
-    <!-- Details Panel -->
-    @if (selectedUser()) {
-      <div class="bg-white rounded-xl border border-gray-200 p-6 h-fit">
-        <div class="flex items-center gap-4 mb-6">
-          <div class="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center text-white font-bold text-lg">
-            {{ selectedUser().fullName?.charAt(0) || '?' }}
-          </div>
-          <div>
-            <h2 class="font-bold text-gray-900">{{ selectedUser().fullName }}</h2>
-            <p class="text-sm text-gray-500">{{ selectedUser().email }}</p>
-          </div>
-        </div>
-
-        <!-- Role Toggle -->
-        <div class="mb-6">
-          <label class="text-xs font-semibold text-gray-500 uppercase block mb-2">Role</label>
-          @if (selectedUser().role === 'admin') {
-            <div class="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg p-3">
-              <div class="flex items-center gap-2">
-                <span class="text-purple-700">👑</span>
-                <span class="font-semibold text-purple-700">Admin</span>
-              </div>
-              <button (click)="updateRole('user')"
-                      class="text-sm px-3 py-1 bg-white border border-purple-300 text-purple-700 rounded hover:bg-purple-100">
-                Remove
-              </button>
-            </div>
-          } @else {
-            <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <div class="flex items-center gap-2">
-                <span class="text-gray-600">👤</span>
-                <span class="font-semibold text-gray-700">User</span>
-              </div>
-              <button (click)="updateRole('admin')"
-                      class="text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">
-                Make Admin
-              </button>
-            </div>
-          }
-        </div>
-
-        <!-- Status -->
-        <div class="mb-6">
-          <label class="text-xs font-semibold text-gray-500 uppercase block mb-2">Status</label>
-          <select (change)="updateStatus($any($event.target).value)"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="active" [selected]="selectedUser().status === 'active'">Active</option>
-            <option value="pendingverification" [selected]="selectedUser().status === 'pendingverification'">Pending</option>
-            <option value="suspended" [selected]="selectedUser().status === 'suspended'">Suspended</option>
-            <option value="blocked" [selected]="selectedUser().status === 'blocked'">Blocked</option>
-          </select>
-        </div>
-
-        <!-- Cards -->
-        <div class="mb-6">
-          <div class="flex items-center justify-between gap-3 mb-2">
-            <label class="text-xs font-semibold text-gray-500 uppercase">Cards ({{ selectedUserCards().length }})</label>
-            <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-              <button (click)="setCardListMode('pending')" [class]="cardListMode() === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-white text-gray-600'" class="px-2.5 py-1 text-[11px] font-bold">Pending First</button>
-              <button (click)="setCardListMode('all')" [class]="cardListMode() === 'all' ? 'bg-slate-200 text-slate-800' : 'bg-white text-gray-600'" class="px-2.5 py-1 text-[11px] font-bold border-l border-gray-200">All</button>
-            </div>
-          </div>
-          @if (isLoadingCards()) {
-            <div class="text-sm text-gray-400">Loading...</div>
-          } @else if (visibleCards().length > 0) {
-            <div class="space-y-2">
-              @for (card of visibleCards(); track card.id) {
-                <div (click)="showCardDetails(card)" class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-lg p-4 text-white cursor-pointer hover:from-slate-700 hover:to-slate-800 transition-all">
-                  <div class="flex justify-between items-start mb-2">
-                    <p class="font-bold">{{ card.issuerName || 'Card' }} {{ card.network }}</p>
-                    <p class="text-sm opacity-60">•••• {{ card.last4 }}</p>
-                  </div>
-                  <p class="text-sm opacity-80">{{ card.outstandingBalance | currency }} / {{ card.creditLimit | currency }}</p>
-                  @if ((card.creditLimit ?? 0) <= 0) {
-                    <p class="mt-2 text-xs font-semibold text-amber-300">Action needed: credit limit not set.</p>
-                  }
+    <!-- User Details Panel -->
+    <div class="lg:col-span-7">
+      @if (selectedUser()) {
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <!-- User Header -->
+          <div class="px-6 py-4 bg-gradient-to-r from-gray-800 to-gray-900 text-white">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl font-bold">
+                  {{ selectedUser().fullName?.charAt(0) || '?' }}
                 </div>
+                <div>
+                  <h2 class="text-lg font-bold">{{ selectedUser().fullName }}</h2>
+                  <p class="text-gray-300 text-sm">{{ selectedUser().email }}</p>
+                  <p class="text-gray-400 text-xs mt-1">ID: {{ selectedUser().id }}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-white/20">{{ getStatusLabel(selectedUser().status) }}</span>
+                <p class="text-gray-400 text-xs mt-1">{{ selectedUser().role }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="px-6 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap gap-2">
+            <button (click)="updateStatus('active')"
+                    [disabled]="!canUpdateStatus('active')"
+                    [class]="canUpdateStatus('active') ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-emerald-100 text-emerald-700 border border-emerald-300 cursor-not-allowed'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+              Active
+            </button>
+            <button (click)="updateStatus('pendingverification')"
+                    [disabled]="!canUpdateStatus('pendingverification')"
+                    [class]="canUpdateStatus('pendingverification') ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-100 text-amber-700 border border-amber-300 cursor-not-allowed'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+              Pending
+            </button>
+            <button (click)="updateStatus('suspended')"
+                    [disabled]="!canUpdateStatus('suspended')"
+                    [class]="canUpdateStatus('suspended') ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-orange-100 text-orange-700 border border-orange-300 cursor-not-allowed'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+              Suspended
+            </button>
+            <button (click)="updateStatus('blocked')"
+                    [disabled]="!canUpdateStatus('blocked')"
+                    [class]="canUpdateStatus('blocked') ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-red-100 text-red-700 border border-red-300 cursor-not-allowed'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+              Blocked
+            </button>
+            <button (click)="updateRole('admin')"
+                    [disabled]="!canPromoteToAdmin()"
+                    [class]="canPromoteToAdmin() ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-100 text-amber-700 border border-amber-300 cursor-not-allowed'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+              {{ canPromoteToAdmin() ? 'Make Admin' : 'Already Admin' }}
+            </button>
+          </div>
+
+          <!-- Tabs -->
+          <div class="border-b border-gray-200">
+            <div class="flex overflow-x-auto">
+              @for (tab of tabs; track tab.id) {
+                <button (click)="switchTab(tab.id)"
+                        [class]="activeTab() === tab.id ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                        class="px-4 py-3 text-sm font-medium whitespace-nowrap transition-all">
+                  {{ tab.icon }} {{ tab.label }}
+                  @if (tab.id === 'cards') { <span class="ml-1 text-xs">({{ selectedUserCards().length }})</span> }
+                  @if (tab.id === 'bills') { <span class="ml-1 text-xs">({{ userBills().length }})</span> }
+                  @if (tab.id === 'statements') { <span class="ml-1 text-xs">({{ userStatements().length }})</span> }
+                </button>
               }
             </div>
-          } @else {
-            <div class="text-sm text-gray-400">No cards</div>
-          }
-        </div>
+          </div>
 
-        <!-- Messages -->
-        @if (successMessage()) {
-          <div class="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            ✓ {{ successMessage() }}
+          <!-- Tab Content -->
+          <div class="p-6 min-h-[400px]">
+            <!-- CARDS TAB -->
+            @if (activeTab() === 'cards') {
+              @if (isLoadingCards()) {
+                <div class="animate-pulse space-y-3">
+                  @for (_ of [1,2,3]; track $index) { <div class="h-24 bg-gray-200 rounded-lg"></div> }
+                </div>
+              } @else if (selectedUserCards().length > 0) {
+                <div class="space-y-3">
+                  @for (card of selectedUserCards(); track card.id) {
+                    <div (click)="showCardDetails(card)"
+                         class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-4 text-white cursor-pointer hover:from-slate-700 hover:to-slate-800 transition-all">
+                      <div class="flex justify-between items-start mb-3">
+                        <div>
+                          <p class="font-bold text-lg">{{ card.issuerName || 'Card' }}</p>
+                          <p class="text-gray-300 text-sm">{{ card.network }} •••• {{ card.last4 }}</p>
+                        </div>
+                        @if (card.isBlocked) {
+                          <span class="px-2 py-1 bg-red-500 rounded text-xs font-bold">BLOCKED</span>
+                        } @else if ((card.creditLimit ?? 0) <= 0) {
+                          <span class="px-2 py-1 bg-amber-500 rounded text-xs font-bold">NEEDS SETUP</span>
+                        } @else {
+                          <span class="px-2 py-1 bg-emerald-500 rounded text-xs font-bold">ACTIVE</span>
+                        }
+                      </div>
+                      <div class="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p class="text-gray-400 text-xs">Credit Limit</p>
+                          <p class="font-semibold">{{ card.creditLimit | currency }}</p>
+                        </div>
+                        <div>
+                          <p class="text-gray-400 text-xs">Outstanding</p>
+                          <p class="font-semibold text-red-300">{{ card.outstandingBalance | currency }}</p>
+                        </div>
+                        <div>
+                          <p class="text-gray-400 text-xs">Available</p>
+                          <p class="font-semibold text-emerald-300">{{ (card.creditLimit - card.outstandingBalance) | currency }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="text-center py-12 text-gray-500">
+                  <p class="text-4xl mb-2">💳</p>
+                  <p>No cards found for this user</p>
+                </div>
+              }
+            }
+
+            <!-- BILLS TAB -->
+            @if (activeTab() === 'bills') {
+              @if (isLoadingBills()) {
+                <div class="animate-pulse space-y-3">
+                  @for (_ of [1,2,3]; track $index) { <div class="h-16 bg-gray-200 rounded-lg"></div> }
+                </div>
+              } @else if (userBills().length > 0) {
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Bill ID</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Due Date</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (bill of userBills(); track bill.id) {
+                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                          <td class="px-3 py-3 font-mono text-xs">{{ bill.id?.slice(0, 8) }}...</td>
+                          <td class="px-3 py-3 font-semibold">{{ bill.amount | currency }}</td>
+                          <td class="px-3 py-3">{{ formatDate(bill.dueDate) }}</td>
+                          <td class="px-3 py-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold border {{ getBillStatusColor(bill.status) }}">
+                              {{ getBillStatusLabel(bill.status) }}
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="text-center py-12 text-gray-500">
+                  <p class="text-4xl mb-2">📄</p>
+                  <p>No bills found for this user</p>
+                </div>
+              }
+            }
+
+            <!-- STATEMENTS TAB -->
+            @if (activeTab() === 'statements') {
+              @if (isLoadingStatements()) {
+                <div class="animate-pulse space-y-3">
+                  @for (_ of [1,2]; track $index) { <div class="h-20 bg-gray-200 rounded-lg"></div> }
+                </div>
+              } @else if (userStatements().length > 0) {
+                <div class="space-y-3">
+                  @for (stmt of userStatements(); track stmt.id) {
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                      <div class="flex justify-between items-start mb-2">
+                        <div>
+                          <p class="font-semibold">Statement #{{ stmt.id?.slice(0, 8) }}</p>
+                          <p class="text-sm text-gray-500">{{ stmt.statementPeriod }}</p>
+                        </div>
+                        <span class="text-sm font-bold">{{ stmt.totalAmount | currency }}</span>
+                      </div>
+                      <div class="grid grid-cols-3 gap-4 text-xs text-gray-500 mt-2">
+                        <div>Cards: {{ stmt.cardLast4 || '-' }}</div>
+                        <div>Network: {{ stmt.cardNetwork || '-' }}</div>
+                        <div>Issuer: {{ stmt.issuerName || '-' }}</div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="text-center py-12 text-gray-500">
+                  <p class="text-4xl mb-2">📊</p>
+                  <p>No statements found for this user</p>
+                </div>
+              }
+            }
+
+            <!-- LOGS TAB -->
+            @if (activeTab() === 'logs') {
+              @if (isLoadingLogs()) {
+                <div class="animate-pulse space-y-2">
+                  @for (_ of [1,2,3,4,5]; track $index) { <div class="h-12 bg-gray-200 rounded"></div> }
+                </div>
+              } @else if (userLogs().length > 0) {
+                <div class="space-y-2 max-h-[400px] overflow-y-auto">
+                  @for (log of userLogs(); track log.id) {
+                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div class="flex-shrink-0 mt-0.5">
+                        @if (log.isSuccess) {
+                          <span class="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs">✓</span>
+                        } @else {
+                          <span class="w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xs">✗</span>
+                        }
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">{{ log.subject }}</p>
+                        <p class="text-xs text-gray-500">{{ log.type }} • {{ formatDate(log.createdAtUtc) }}</p>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="text-center py-12 text-gray-500">
+                  <p class="text-4xl mb-2">📋</p>
+                  <p>No notification logs for this user</p>
+                </div>
+              }
+            }
+
+            <!-- AUDIT TAB -->
+            @if (activeTab() === 'audit') {
+              @if (isLoadingAudit()) {
+                <div class="animate-pulse space-y-2">
+                  @for (_ of [1,2,3,4,5]; track $index) { <div class="h-12 bg-gray-200 rounded"></div> }
+                </div>
+              } @else if (userAudit().length > 0) {
+                <div class="space-y-2 max-h-[400px] overflow-y-auto">
+                  @for (audit of userAudit(); track audit.id) {
+                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div class="flex-shrink-0 mt-0.5">
+                        @if (audit.isSuccess) {
+                          <span class="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs">✓</span>
+                        } @else {
+                          <span class="w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xs">✗</span>
+                        }
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900">{{ audit.action }}</p>
+                        <p class="text-xs text-gray-500">{{ audit.entityName }}: {{ audit.entityId?.slice(0, 8) }}...</p>
+                        <p class="text-xs text-gray-400">{{ formatDate(audit.createdAtUtc) }}</p>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="text-center py-12 text-gray-500">
+                  <p class="text-4xl mb-2">🔍</p>
+                  <p>No audit logs for this user</p>
+                </div>
+              }
+            }
           </div>
-        }
-        @if (error()) {
-          <div class="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            ✗ {{ error() }}
-          </div>
-        }
-      </div>
-    } @else {
-      <div class="bg-white rounded-xl border border-gray-200 p-10 text-center">
-        <div class="text-4xl mb-3">👆</div>
-        <p class="text-gray-500">Select a user to view details</p>
-      </div>
-    }
+        </div>
+      } @else {
+        <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div class="text-6xl mb-4">👆</div>
+          <p class="text-gray-500 font-medium">Select a user to view details</p>
+          <p class="text-gray-400 text-sm mt-2">Click on a user from the list</p>
+        </div>
+      }
+    </div>
   </div>
 
   <!-- Card Details Modal -->
   @if (selectedCard()) {
     <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" (click)="closeCardDetails()">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" (click)="$event.stopPropagation()">
-        <!-- Card Header -->
-        <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold">{{ selectedCard().issuerName || 'Credit Card' }}</h3>
-            <button (click)="closeCardDetails()" class="text-white/60 hover:text-white">✕</button>
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+        <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white sticky top-0">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-lg font-bold">{{ selectedCard().issuerName || 'Credit Card' }}</h3>
+              <p class="text-gray-300 text-sm">•••• {{ selectedCard().last4 }}</p>
+            </div>
+            <button (click)="closeCardDetails()" class="text-white/60 hover:text-white text-xl">✕</button>
           </div>
-          <p class="text-2xl tracking-widest font-mono">{{ selectedCard().maskedNumber || '•••• •••• •••• ••••' }}</p>
         </div>
         
-        <!-- Card Body -->
         <div class="p-6 space-y-4">
           <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-xs text-gray-500 uppercase">Card Holder</label>
-              <p class="font-medium">{{ selectedCard().cardholderName }}</p>
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 uppercase">Last 4</label>
-              <p class="font-medium">•••• {{ selectedCard().last4 }}</p>
-            </div>
             <div>
               <label class="text-xs text-gray-500 uppercase">Network</label>
               <p class="font-medium">{{ selectedCard().network }}</p>
             </div>
             <div>
               <label class="text-xs text-gray-500 uppercase">Expires</label>
-              <p class="font-medium">{{ selectedCard().expMonth | number:'2.0-0' }}/{{ selectedCard().expYear }}</p>
+              <p class="font-medium">{{ selectedCard().expMonth }}/{{ selectedCard().expYear }}</p>
             </div>
           </div>
 
           <hr class="border-gray-200">
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-3 gap-4 text-center">
             <div>
               <label class="text-xs text-gray-500 uppercase">Credit Limit</label>
-              <p class="font-bold text-lg">{{ selectedCard().creditLimit | currency }}</p>
-              @if ((selectedCard().creditLimit ?? 0) <= 0) {
-                <p class="text-xs font-semibold text-amber-600 mt-1">Action needed: set a credit limit.</p>
-              }
+              <p class="text-xl font-bold text-gray-900">{{ selectedCard().creditLimit | currency }}</p>
             </div>
             <div>
               <label class="text-xs text-gray-500 uppercase">Outstanding</label>
-              <p class="font-bold text-lg text-red-600">{{ selectedCard().outstandingBalance | currency }}</p>
+              <p class="text-xl font-bold text-red-600">{{ selectedCard().outstandingBalance | currency }}</p>
             </div>
             <div>
               <label class="text-xs text-gray-500 uppercase">Available</label>
-              <p class="font-bold text-lg text-green-600">{{ selectedCard().availableCredit | currency }}</p>
+              <p class="text-xl font-bold text-emerald-600">{{ (selectedCard().creditLimit - selectedCard().outstandingBalance) | currency }}</p>
             </div>
           </div>
+
+          <!-- Violations -->
+          <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-semibold text-red-700">Violations ({{ cardViolations().length }})</label>
+              @if (cardViolations().length > 0) {
+                <button (click)="clearCardViolations(selectedCard().id)" class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">Clear All</button>
+              }
+            </div>
+            @if (isLoadingViolations()) {
+              <p class="text-sm text-gray-500">Loading...</p>
+            } @else if (cardViolations().length > 0) {
+              <div class="space-y-1">
+                @for (v of cardViolations(); track v.id) {
+                  <p class="text-xs text-red-600">⚠️ {{ v.reason }} - {{ v.penaltyAmount | currency }}</p>
+                }
+              </div>
+            } @else {
+              <p class="text-sm text-green-600">✓ No violations</p>
+            }
+          </div>
+
+          @if (selectedCard().isBlocked) {
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+              <p class="text-amber-700 font-semibold">This card is blocked</p>
+              <button (click)="unblockCard(selectedCard().id)" class="mt-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">
+                Unblock Card
+              </button>
+            </div>
+          }
 
           <hr class="border-gray-200">
 
           <div class="space-y-3">
-            <label class="text-xs text-gray-500 uppercase">Admin Card Controls</label>
-            @if ((selectedCard().creditLimit ?? 0) <= 0) {
-              <div class="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
-                This card has no credit limit configured. Set it before demos and billing flows.
-              </div>
-            }
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label class="text-xs font-semibold text-gray-500 uppercase">Admin Controls</label>
+            <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="text-[11px] text-gray-500">Credit Limit</label>
-                <input [(ngModel)]="editCreditLimit" type="number" min="1" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <input [(ngModel)]="editCreditLimit" type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
               <div>
                 <label class="text-[11px] text-gray-500">Outstanding</label>
-                <input [(ngModel)]="editOutstandingBalance" type="number" min="0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <input [(ngModel)]="editOutstandingBalance" type="number" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
               <div>
                 <label class="text-[11px] text-gray-500">Billing Day</label>
-                <input [(ngModel)]="editBillingCycleStartDay" type="number" min="1" max="31" step="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                <p class="text-[10px] text-gray-400 mt-1">Allowed range: 1 to 31</p>
+                <input [(ngModel)]="editBillingCycleStartDay" type="number" min="1" max="31" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
             </div>
-
-            <div class="flex items-center justify-between gap-3">
-              @if (cardUpdateMessage()) {
-                <p class="text-sm text-gray-600">{{ cardUpdateMessage() }}</p>
-              } @else {
-                <span></span>
-              }
-              <button (click)="updateSelectedCard()" [disabled]="isUpdatingCard()" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 disabled:opacity-60">
-                {{ isUpdatingCard() ? 'Saving...' : 'Save Card Changes' }}
-              </button>
-            </div>
+            @if (cardUpdateMessage()) {
+              <p class="text-sm text-red-600">{{ cardUpdateMessage() }}</p>
+            }
+            <button (click)="updateSelectedCard()" [disabled]="isUpdatingCard()"
+                    class="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 disabled:opacity-60">
+              {{ isUpdatingCard() ? 'Saving...' : 'Save Changes' }}
+            </button>
           </div>
-
         </div>
       </div>
     </div>

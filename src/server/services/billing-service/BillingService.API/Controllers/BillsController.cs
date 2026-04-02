@@ -16,12 +16,16 @@ namespace BillingService.API.Controllers;
 public class BillsController(IMediator mediator) : BaseApiController
 {
     [HttpGet]
-    public async Task<IActionResult> ListMyBills(CancellationToken cancellationToken)
+    public async Task<IActionResult> ListMyBills(
+        [FromQuery] Guid? userId,
+        CancellationToken cancellationToken)
     {
-        var userId = GetUserIdFromToken();
-        if (userId is null) return UnauthorizedResponse();
+        var currentUserId = GetUserIdFromToken();
+        if (currentUserId is null) return UnauthorizedResponse();
 
-        var result = await mediator.Send(new GetMyBillsQuery(userId.Value), cancellationToken);
+        var targetUserId = (User.IsInRole("admin") && userId.HasValue) ? userId.Value : currentUserId.Value;
+
+        var result = await mediator.Send(new GetMyBillsQuery(targetUserId), cancellationToken);
         return CreateResponse(result.Success, result.Data, result.Message);
     }
 

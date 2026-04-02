@@ -80,7 +80,19 @@ export const routes: Routes = [
       },
       {
         path: 'users',
-        loadComponent: () => import('./features/admin/users/user-management.component').then(m => m.UserManagementComponent)
+        loadComponent: () => import('./features/admin/users/admin-users.component').then(m => m.AdminUsersComponent)
+      },
+      {
+        path: 'users/:id',
+        loadComponent: () => import('./features/admin/users/user-detail.component').then(m => m.UserDetailComponent)
+      },
+      {
+        path: 'users/:userId/cards/:cardId',
+        loadComponent: () => import('./features/admin/users/admin-card-detail.component').then(m => m.AdminCardDetailComponent)
+      },
+      {
+        path: 'users/:userId/cards/:cardId/statements/:statementId',
+        loadComponent: () => import('./features/admin/users/admin-statement-detail.component').then(m => m.AdminStatementDetailComponent)
       },
       {
         path: 'issuers',

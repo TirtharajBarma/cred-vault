@@ -8,8 +8,10 @@ public record GetMyStatementsQuery(Guid UserId) : IRequest<StatementsResult>;
 public record GetStatementByIdQuery(Guid UserId, Guid StatementId) : IRequest<StatementDetailResult>;
 public record GetStatementByBillIdQuery(Guid UserId, Guid BillId) : IRequest<StatementsResult>;
 public record GetAllStatementsQuery : IRequest<StatementsResult>;
+public record GetStatementTransactionsQuery(Guid StatementId) : IRequest<StatementTransactionsResult>;
 
 public record StatementsResult(bool Success, List<StatementDto> Statements, string Message);
+public record StatementTransactionsResult(bool Success, List<StatementTransactionDto> Transactions, string Message);
 public record StatementDetailResult(bool Success, StatementDetailDto? Statement, string Message);
 
 public record StatementDto(
@@ -144,5 +146,19 @@ public class GetAllStatementsQueryHandler(IStatementRepository statementReposito
         )).ToList();
 
         return new StatementsResult(true, dtos, "All statements fetched successfully");
+    }
+}
+
+public class GetStatementTransactionsQueryHandler(IStatementRepository statementRepository)
+    : IRequestHandler<GetStatementTransactionsQuery, StatementTransactionsResult>
+{
+    public async Task<StatementTransactionsResult> Handle(GetStatementTransactionsQuery request, CancellationToken ct)
+    {
+        var transactions = await statementRepository.GetTransactionsAsync(request.StatementId, ct);
+        var dtos = transactions.Select(t => new StatementTransactionDto(
+            t.Id, t.Type, t.Amount, t.Description, t.DateUtc
+        )).ToList();
+
+        return new StatementTransactionsResult(true, dtos, "Transactions fetched successfully");
     }
 }

@@ -171,4 +171,41 @@ export class AdminService {
   checkOverdue(): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/bills/admin/check-overdue`, {});
   }
+
+  // User-specific data (reuses existing endpoints with userId filter)
+  getUserBills(userId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/bills`, { params: { userId } });
+  }
+
+  getUserStatements(userId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/statements`, { params: { userId } });
+  }
+
+  getUserNotificationLogs(email: string, page: number = 1, pageSize: number = 200): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/notifications/logs`, { params: { email, page, pageSize } });
+  }
+
+  getUserAuditLogs(userId: string, page: number = 1, pageSize: number = 200): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/notifications/audit`, { params: { userId, page, pageSize } });
+  }
+
+  getCardStatements(cardId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/statements`, { params: { cardId } });
+  }
+
+  getAllStatementsForAdmin(): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/statements/admin/all`);
+  }
+
+  getAdminCardTransactions(cardId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/cards/admin/${cardId}/transactions`);
+  }
+
+  getUserRewardTransactions(userId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/rewards/transactions`, { params: { userId } });
+  }
+
+  getAdminStatementFull(statementId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/statements/admin/${statementId}/full`);
+  }
 }

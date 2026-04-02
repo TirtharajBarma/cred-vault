@@ -60,4 +60,8 @@ export class BillingService {
       default: return 'badge-neutral';
     }
   }
+
+  getStatementTransactions(statementId: string): Observable<ApiResponse<any>> {
+    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/statements/${statementId}/transactions`);
+  }
 }
