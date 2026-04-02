@@ -7,6 +7,7 @@ const API_GATEWAY = 'http://localhost:5006';
 
 export interface Statement {
   id: string;
+  billId: string | null;
   cardId: string;
   statementPeriod: string;
   cardLast4: string;
@@ -98,6 +99,10 @@ export class RewardsService {
 
   getRewardTiers(): Observable<ApiResponse<RewardTier[]>> {
     return this.http.get<ApiResponse<RewardTier[]>>(`${this.baseUrl}/rewards/tiers`);
+  }
+
+  getRewardHistory(): Observable<ApiResponse<RewardTransaction[]>> {
+    return this.http.get<ApiResponse<RewardTransaction[]>>(`${this.baseUrl}/rewards/transactions`);
   }
 }
 

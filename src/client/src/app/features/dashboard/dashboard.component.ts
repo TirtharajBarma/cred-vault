@@ -28,6 +28,9 @@ export class DashboardComponent implements OnInit {
   
   user = this.authService.currentUser;
   
+  transactionPage = signal(1);
+  itemsPerPage = 7;
+  
   showAddCardModal = signal(false);
   addCardForm: FormGroup;
   isSubmitting = signal(false);
@@ -128,8 +131,51 @@ export class DashboardComponent implements OnInit {
   }
 
   getCardGradient(index: number): string {
-    const gradients = ['card-gradient-1', 'card-gradient-2', 'card-gradient-3'];
+    const gradients = ['card-gradient-1', 'card-gradient-2', 'card-gradient-3', 'card-gradient-4', 'card-gradient-5', 'card-gradient-6', 'card-gradient-7'];
     return gradients[index % gradients.length];
+  }
+
+  getCardStyle(index: number): string {
+    const gradients = [
+      'background: linear-gradient(135deg, #1e1b13 0%, #4a4228 100%)',
+      'background: linear-gradient(135deg, #eebd2b 0%, #8c6d1a 100%)',
+      'background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)',
+      'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      'background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      'background: linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+    ];
+    const shadows = [
+      'box-shadow: 0 20px 50px -10px rgba(30, 27, 19, 0.5)',
+      'box-shadow: 0 20px 50px -10px rgba(238, 189, 43, 0.4)',
+      'box-shadow: 0 20px 50px -10px rgba(45, 45, 45, 0.5)',
+      'box-shadow: 0 20px 50px -10px rgba(102, 126, 234, 0.4)',
+      'box-shadow: 0 20px 50px -10px rgba(240, 147, 251, 0.4)',
+      'box-shadow: 0 20px 50px -10px rgba(79, 172, 254, 0.4)',
+      'box-shadow: 0 20px 50px -10px rgba(250, 112, 154, 0.4)'
+    ];
+    return gradients[index % gradients.length] + '; ' + shadows[index % shadows.length];
+  }
+
+  paginatedTransactions() {
+    const start = (this.transactionPage() - 1) * this.itemsPerPage;
+    return this.transactions().slice(start, start + this.itemsPerPage);
+  }
+
+  totalTransactionPages(): number {
+    return Math.ceil(this.transactions().length / this.itemsPerPage);
+  }
+
+  nextTransactionPage(): void {
+    if (this.transactionPage() < this.totalTransactionPages()) {
+      this.transactionPage.set(this.transactionPage() + 1);
+    }
+  }
+
+  prevTransactionPage(): void {
+    if (this.transactionPage() > 1) {
+      this.transactionPage.set(this.transactionPage() - 1);
+    }
   }
 
   getIssuerLabel(issuer: any): string {

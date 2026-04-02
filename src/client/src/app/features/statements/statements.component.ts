@@ -1,5 +1,7 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { StatementService, Statement, StatementDetail } from '../../core/services/rewards.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { CreditCard } from '../../core/models/card.models';
@@ -7,13 +9,14 @@ import { CreditCard } from '../../core/models/card.models';
 @Component({
   selector: 'app-statements',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './statements.component.html',
   styleUrls: ['./statements.component.css']
 })
 export class StatementsComponent implements OnInit {
   private statementService = inject(StatementService);
   private dashboardService = inject(DashboardService);
+  private route = inject(ActivatedRoute);
 
   statements = signal<Statement[]>([]);
   cards = signal<CreditCard[]>([]);
@@ -22,9 +25,69 @@ export class StatementsComponent implements OnInit {
   showDetailModal = signal(false);
   isGenerating = signal(false);
   generateCardId = signal<string | null>(null);
+  
+  selectedCardFilter = signal<string>('all');
+  showFilterDropdown = signal(false);
+
+  currentPage = signal(1);
+  itemsPerPage = 7;
+
+  sortedStatements = computed(() => {
+    let filtered = this.statements();
+    const cardFilter = this.selectedCardFilter();
+    if (cardFilter !== 'all') {
+      filtered = filtered.filter(s => s.cardId === cardFilter);
+    }
+    return [...filtered].sort(
+      (a, b) => new Date(b.periodEndUtc).getTime() - new Date(a.periodEndUtc).getTime()
+    );
+  });
+
+  cardOptions = computed(() => {
+    const cardMap = new Map<string, { last4: string; issuerName: string; network: string }>();
+    this.statements().forEach(s => {
+      if (!cardMap.has(s.cardId)) {
+        cardMap.set(s.cardId, {
+          last4: s.cardLast4,
+          issuerName: s.issuerName,
+          network: s.cardNetwork
+        });
+      }
+    });
+    return Array.from(cardMap.entries()).map(([id, info]) => ({ id, ...info }));
+  });
+
+  getCardDisplay(cardId: string): string {
+    const card = this.cards().find(c => c.id === cardId);
+    if (card) {
+      return `${card.issuerName} ${card.network} *${card.last4}`;
+    }
+    const stmt = this.statements().find(s => s.cardId === cardId);
+    if (stmt) {
+      return `${stmt.issuerName} *${stmt.cardLast4}`;
+    }
+    return 'Unknown Card';
+  }
 
   ngOnInit(): void {
     this.loadData();
+    
+    this.route.queryParams.subscribe(params => {
+      if (params['cardId']) {
+        this.selectedCardFilter.set(params['cardId']);
+      }
+      
+      // Auto-open statement detail if billId is provided
+      if (params['billId']) {
+        setTimeout(() => {
+          const billId = params['billId'];
+          const statement = this.statements().find(s => s.billId === billId);
+          if (statement) {
+            this.viewStatement(statement.id);
+          }
+        }, 1000);
+      }
+    });
   }
 
   loadData(): void {
@@ -36,6 +99,17 @@ export class StatementsComponent implements OnInit {
           next: (res) => {
             this.statements.set(res.data || []);
             this.isLoading.set(false);
+            
+            // Check for query params again after statements loaded
+            this.route.queryParams.subscribe(params => {
+              if (params['billId']) {
+                const billId = params['billId'];
+                const statement = this.statements().find(s => s.billId === billId);
+                if (statement) {
+                  this.viewStatement(statement.id);
+                }
+              }
+            });
           },
           error: () => this.isLoading.set(false)
         });
@@ -44,25 +118,52 @@ export class StatementsComponent implements OnInit {
     });
   }
 
-  getCardName(cardId: string): string {
+  toggleFilterDropdown(): void {
+    this.showFilterDropdown.set(!this.showFilterDropdown());
+  }
+
+  selectCardFilter(cardId: string): void {
+    this.selectedCardFilter.set(cardId);
+    this.showFilterDropdown.set(false);
+  }
+
+  getSelectedCardLabel(): string {
+    const cardId = this.selectedCardFilter();
+    if (cardId === 'all') return 'All Cards';
     const card = this.cards().find(c => c.id === cardId);
-    if (!card) return 'Unknown Card';
-    return `${card.issuerName} ${card.network} *${card.last4}`;
+    if (card) return `${card.issuerName} *${card.last4}`;
+    return 'All Cards';
   }
 
-  getStatusLabel(status: number): string {
-    const labels: Record<number, string> = { 1: 'Generated', 2: 'Paid', 3: 'Overdue', 4: 'Partially Paid' };
-    return labels[status] || 'Unknown';
+  paginatedStatements() {
+    const start = (this.currentPage() - 1) * this.itemsPerPage;
+    return this.sortedStatements().slice(start, start + this.itemsPerPage);
   }
 
-  getStatusClass(status: number): string {
-    const classes: Record<number, string> = {
-      1: 'bg-blue-100 text-blue-700',
-      2: 'bg-green-100 text-green-700',
-      3: 'bg-red-100 text-red-700',
-      4: 'bg-amber-100 text-amber-700'
-    };
-    return classes[status] || 'bg-slate-100 text-slate-700';
+  totalPages(): number {
+    return Math.ceil(this.sortedStatements().length / this.itemsPerPage);
+  }
+
+  nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.set(this.currentPage() + 1);
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.set(this.currentPage() - 1);
+    }
+  }
+
+  getStatementBadgeLabel(status: number): string {
+    return status === 2 ? 'Paid' : 'Archived';
+  }
+
+  getStatementBadgeClass(status: number): string {
+    return status === 2
+      ? 'bg-[#ffdcbd]/30 text-[#693c00]'
+      : 'bg-[#e4e2e1] text-[#615e5c]';
   }
 
   viewStatement(id: string): void {
@@ -91,23 +192,5 @@ export class StatementsComponent implements OnInit {
       },
       error: () => this.isGenerating.set(false)
     });
-  }
-
-  getTxnTypeClass(type: string): string {
-    switch (type) {
-      case 'Purchase': return 'text-red-600';
-      case 'Payment': return 'text-green-600';
-      case 'Refund': return 'text-blue-600';
-      default: return 'text-slate-600';
-    }
-  }
-
-  getTxnSign(type: string): string {
-    switch (type) {
-      case 'Purchase': return '+';
-      case 'Payment': return '-';
-      case 'Refund': return '-';
-      default: return '';
-    }
   }
 }

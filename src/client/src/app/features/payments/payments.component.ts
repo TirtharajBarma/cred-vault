@@ -1,6 +1,7 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { PaymentService, Payment } from '../../core/services/payment.service';
@@ -18,12 +19,16 @@ export class PaymentsComponent implements OnInit {
   private paymentService = inject(PaymentService);
   private billingService = inject(BillingService);
   private dashboardService = inject(DashboardService);
+  private route = inject(ActivatedRoute);
 
   activeTab = signal<'bills' | 'history'>('bills');
   bills = signal<Bill[]>([]);
   payments = signal<Payment[]>([]);
   cards = signal<CreditCard[]>([]);
   isLoading = signal(true);
+
+  currentPage = signal(1);
+  itemsPerPage = 7;
 
   showPaymentModal = signal(false);
   selectedBill = signal<Bill | null>(null);
@@ -47,6 +52,19 @@ export class PaymentsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadData();
+    
+    // Handle billId query parameter
+    this.route.queryParams.subscribe(params => {
+      if (params['billId']) {
+        const billId = params['billId'];
+        setTimeout(() => {
+          const bill = this.bills().find(b => b.id === billId);
+          if (bill) {
+            this.openPayment(bill);
+          }
+        }, 500);
+      }
+    });
   }
 
   loadData(): void {
@@ -66,6 +84,38 @@ export class PaymentsComponent implements OnInit {
 
   pendingBills(): Bill[] {
     return this.bills().filter(b => b.status === 1 || b.status === 3);
+  }
+
+  paginatedBills(): Bill[] {
+    const pending = this.pendingBills();
+    const start = (this.currentPage() - 1) * this.itemsPerPage;
+    return pending.slice(start, start + this.itemsPerPage);
+  }
+
+  paginatedPayments(): Payment[] {
+    const start = (this.currentPage() - 1) * this.itemsPerPage;
+    return this.payments().slice(start, start + this.itemsPerPage);
+  }
+
+  totalBillPages(): number {
+    return Math.ceil(this.pendingBills().length / this.itemsPerPage);
+  }
+
+  totalPaymentPages(): number {
+    return Math.ceil(this.payments().length / this.itemsPerPage);
+  }
+
+  nextPage(): void {
+    const total = this.activeTab() === 'bills' ? this.totalBillPages() : this.totalPaymentPages();
+    if (this.currentPage() < total) {
+      this.currentPage.set(this.currentPage() + 1);
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.set(this.currentPage() - 1);
+    }
   }
 
   getCardName(bill: Bill | null): string {

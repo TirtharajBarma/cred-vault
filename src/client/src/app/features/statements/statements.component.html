@@ -1,208 +1,282 @@
-<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-  <!-- Header -->
-  <div class="bg-white border-b border-slate-200 px-6 py-5">
-    <div class="max-w-6xl mx-auto flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-slate-900">My Statements</h1>
-        <p class="text-sm text-slate-500 mt-1">View your billing statements with full transaction details</p>
-      </div>
-      <button (click)="loadData()" class="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-        </svg>
-      </button>
-    </div>
+<div class="statements-page relative min-h-screen overflow-hidden bg-[#F0EDEB] text-[#1b1c1c]">
+  <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div class="glow-cloud glow-cloud-1"></div>
+    <div class="glow-cloud glow-cloud-2"></div>
+    <div class="absolute inset-0 bg-gradient-to-b from-[#dcd9d9]/20 to-[#fbf9f8]"></div>
   </div>
 
-  <div class="p-6 max-w-6xl mx-auto">
-    @if (isLoading()) {
-      <div class="grid gap-4 md:grid-cols-2">
-        @for (i of [1,2,3,4]; track i) {
-          <div class="bg-white rounded-2xl p-6 animate-pulse">
-            <div class="h-4 w-32 bg-slate-200 rounded mb-3"></div>
-            <div class="h-3 w-48 bg-slate-100 rounded"></div>
-          </div>
-        }
+  <main class="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-24 md:px-8 md:pt-28">
+    <header class="mb-14 flex flex-col justify-between gap-8 md:mb-20 md:flex-row md:items-end">
+      <div class="max-w-2xl">
+        <span class="mb-4 block text-xs font-bold uppercase tracking-[0.05em] text-[#8a5100]">Archive</span>
+        <h1 class="mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-[3.5rem] text-[#1b1c1c]">
+          Financial <span class="text-[#8a5100] italic font-[Georgia,Times,serif] font-light">Statements</span>
+        </h1>
+        <p class="max-w-lg text-lg leading-relaxed text-[#534437]">
+          Access your comprehensive billing cycles and transaction records with refined transparency.
+        </p>
       </div>
-    } @else if (statements().length === 0) {
-      <div class="bg-white rounded-2xl p-12 text-center">
-        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-        </div>
-        <h3 class="text-lg font-semibold text-slate-900 mb-2">No Statements Yet</h3>
-        <p class="text-slate-500 mb-6">Generate statements for your cards to see detailed billing summaries.</p>
-        <div class="flex flex-wrap gap-3 justify-center">
-          @for (card of cards(); track card.id) {
-            <button (click)="generateStatement(card.id)" [disabled]="isGenerating()"
-                    class="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">
-              @if (isGenerating() && generateCardId() === card.id) {
-                <span class="flex items-center gap-2">
-                  <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                  Generating...
-                </span>
-              } @else {
-                Generate: {{ card.issuerName }} *{{ card.last4 }}
+      <div class="flex items-center gap-4">
+        <!-- Filter Dropdown -->
+        <div class="relative">
+          <button 
+            (click)="toggleFilterDropdown()"
+            class="mist-blur flex items-center gap-2 rounded-full bg-[#f6f3f2] px-6 py-3 font-medium text-[#615e5c] transition-all duration-300 hover:bg-[#eae8e7]"
+          >
+            <span class="material-symbols-outlined text-sm transition-transform hover:rotate-12">filter_list</span>
+            {{ getSelectedCardLabel() }}
+          </button>
+          @if (showFilterDropdown()) {
+            <div class="absolute top-full mt-2 right-0 w-64 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden z-50">
+              <button 
+                (click)="selectCardFilter('all')"
+                class="w-full px-6 py-3 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-2"
+                [class.bg-primary-container/20]="selectedCardFilter() === 'all'"
+              >
+                <span class="material-symbols-outlined text-sm">credit_card</span>
+                All Cards
+              </button>
+              @for (card of cardOptions(); track card.id) {
+                <button 
+                  (click)="selectCardFilter(card.id)"
+                  class="w-full px-6 py-3 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-2"
+                  [class.bg-primary-container/20]="selectedCardFilter() === card.id"
+                >
+                  <span class="material-symbols-outlined text-sm">credit_card</span>
+                  {{ card.issuerName }} *{{ card.last4 }}
+                </button>
               }
-            </button>
+            </div>
           }
         </div>
+        <button class="rounded-full bg-[#8a5100] px-8 py-3 font-semibold text-white shadow-lg shadow-[#8a5100]/20 transition-all duration-300 hover:scale-[1.02]">
+          Export All
+        </button>
+      </div>
+    </header>
+
+    @if (isLoading()) {
+      <div class="grid grid-cols-1 gap-6">
+        @for (i of [1,2,3,4]; track i) {
+          <div class="skeleton h-36 rounded-3xl"></div>
+        }
+      </div>
+    } @else if (sortedStatements().length === 0) {
+      <div class="mist-blur flex flex-col items-center justify-center rounded-[3rem] border border-dashed border-[#d8c3b2]/40 bg-white/40 py-28 text-center">
+        <div class="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-[#f6f3f2]">
+          <span class="material-symbols-outlined text-5xl text-[#857465]/30">description</span>
+        </div>
+        <h3 class="mb-2 text-2xl font-bold">No Statements Available</h3>
+        <p class="max-w-sm text-[#534437]">Select a card above to generate your first consolidated billing statement.</p>
       </div>
     } @else {
-      <div class="space-y-4">
-        @for (stmt of statements(); track stmt.id) {
-          <div class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-indigo-300 hover:shadow-lg transition-all cursor-pointer"
-               (click)="viewStatement(stmt.id)">
-            <div class="flex items-center justify-between">
-              <div class="flex-1">
-                <div class="flex items-center gap-3 mb-2">
-                  <span class="px-2.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
-                    {{ stmt.statementPeriod }}
-                  </span>
-                  <span [class]="getStatusClass(stmt.status) + ' px-2.5 py-0.5 text-xs font-semibold rounded-full'">
-                    {{ getStatusLabel(stmt.status) }}
-                  </span>
-                </div>
-                <p class="text-sm font-medium text-slate-700">{{ getCardName(stmt.cardId) }}</p>
-                <div class="flex items-center gap-6 mt-3">
-                  <div>
-                    <p class="text-xs text-slate-500">Closing Balance</p>
-                    <p class="text-lg font-bold text-slate-900">${{ stmt.closingBalance | number:'1.2-2' }}</p>
-                  </div>
-                  <div>
-                    <p class="text-xs text-slate-500">Minimum Due</p>
-                    <p class="text-lg font-semibold text-amber-600">${{ stmt.minimumDue | number:'1.2-2' }}</p>
-                  </div>
-                  @if (stmt.amountPaid > 0) {
-                    <div>
-                      <p class="text-xs text-slate-500">Amount Paid</p>
-                      <p class="text-lg font-semibold text-green-600">${{ stmt.amountPaid | number:'1.2-2' }}</p>
-                    </div>
-                  }
-                </div>
+      <div class="grid grid-cols-1 gap-6">
+        @for (stmt of paginatedStatements(); track stmt.id; let i = $index) {
+          <article
+            (click)="viewStatement(stmt.id)"
+            class="statement-row mist-blur flex cursor-pointer flex-col justify-between gap-7 rounded-3xl border border-white/40 p-8 transition-all duration-300 md:flex-row md:items-center"
+            [ngClass]="i === 0 ? 'bg-white/70 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)]' : 'bg-white/55 hover:bg-white/70'"
+          >
+            <div class="flex items-center gap-6">
+              <div
+                class="flex h-16 w-16 items-center justify-center rounded-2xl"
+                [ngClass]="i === 0 ? 'bg-[#ffdcbd]/40 text-[#8a5100]' : 'bg-[#e7e1df]/50 text-[#615e5c]'"
+              >
+                <span class="material-symbols-outlined text-3xl">{{ i === 0 ? 'description' : 'folder_zip' }}</span>
               </div>
-              <div class="flex items-center gap-2 text-indigo-500">
-                <span class="text-sm font-medium">View Details</span>
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
+              <div>
+                <h3 class="text-xl font-semibold">{{ stmt.statementPeriod }}</h3>
+                <p class="text-sm text-[#615e5c]">
+                  <span class="font-medium">{{ getCardDisplay(stmt.cardId) }}</span> • 
+                  <span class="uppercase tracking-wide">Cycle Ends {{ stmt.periodEndUtc | date:'MMM dd' }}</span>
+                </p>
               </div>
             </div>
-          </div>
+
+            <div class="flex flex-col md:text-right">
+              <span class="text-sm font-medium text-[#534437]">Total Amount</span>
+              <span [ngClass]="i === 0 ? 'text-3xl font-bold' : 'text-2xl font-semibold'">{{ stmt.closingBalance | currency:'USD' }}</span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-4 md:gap-6">
+              <span
+                class="rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest"
+                [ngClass]="getStatementBadgeClass(stmt.status)"
+              >
+                {{ getStatementBadgeLabel(stmt.status) }}
+              </span>
+              <button
+                (click)="viewStatement(stmt.id); $event.stopPropagation()"
+                class="group flex items-center gap-3 rounded-full px-6 py-3 font-medium transition-all duration-300"
+                [ngClass]="i === 0 ? 'bg-[#1b1c1c] text-[#fbf9f8] hover:bg-[#8a5100]' : 'border border-[#d8c3b2]/30 text-[#1b1c1c] hover:bg-[#f6f3f2]'"
+              >
+                View Details
+                <span class="material-symbols-outlined text-lg transition-transform group-hover:translate-y-0.5">arrow_forward</span>
+              </button>
+            </div>
+          </article>
         }
       </div>
-    }
-  </div>
 
-  <!-- STATEMENT DETAIL MODAL -->
-  @if (showDetailModal() && selectedStatement()) {
-    <div class="fixed inset-0 bg-black/60 flex items-start justify-center p-4 z-50 overflow-y-auto" (click)="closeDetail()">
-      <div class="bg-white rounded-2xl w-full max-w-3xl my-8 overflow-hidden shadow-2xl" (click)="$event.stopPropagation()">
-        <!-- Modal Header -->
-        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-xl font-bold text-white">Statement Details</h2>
-              <p class="text-white/80 text-sm mt-1">{{ selectedStatement()?.statementPeriod }}</p>
-            </div>
-            <button (click)="closeDetail()" class="text-white/80 hover:text-white">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
+      @if (totalPages() > 1) {
+        <div class="mt-12 flex items-center justify-between pt-8 border-t border-[#d8c3b2]/20">
+          <span class="text-sm font-medium text-[#534437]">Page {{ currentPage() }} of {{ totalPages() }}</span>
+          <div class="flex gap-3">
+            <button (click)="prevPage()" [disabled]="currentPage() === 1" class="flex items-center gap-2 px-6 py-3 rounded-full border border-[#d8c3b2]/30 text-sm font-semibold text-[#534437] hover:bg-white/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+              <span class="material-symbols-outlined text-lg">chevron_left</span>
+              Previous
+            </button>
+            <button (click)="nextPage()" [disabled]="currentPage() === totalPages()" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[#8a5100] text-white text-sm font-semibold hover:bg-[#7a4600] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#8a5100]/20">
+              Next
+              <span class="material-symbols-outlined text-lg">chevron_right</span>
             </button>
           </div>
         </div>
-
-        <div class="p-6 max-h-[70vh] overflow-y-auto">
-          <!-- Card & Summary -->
-          <div class="grid grid-cols-2 gap-4 mb-6">
-            <div class="bg-slate-50 rounded-xl p-4">
-              <p class="text-xs text-slate-500 mb-1">Card</p>
-              <p class="font-semibold text-slate-900">{{ selectedStatement()?.cardNetwork }} *{{ selectedStatement()?.cardLast4 }}</p>
-              <p class="text-sm text-slate-600">{{ selectedStatement()?.issuerName }}</p>
-            </div>
-            <div class="bg-slate-50 rounded-xl p-4">
-              <p class="text-xs text-slate-500 mb-1">Credit Limit</p>
-              <p class="font-semibold text-slate-900">${{ selectedStatement()?.creditLimit | number:'1.2-2' }}</p>
-              <p class="text-sm text-slate-600">Available: ${{ selectedStatement()?.availableCredit | number:'1.2-2' }}</p>
-            </div>
-          </div>
-
-          <!-- Financial Summary -->
-          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-5 mb-6">
-            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Financial Summary</h3>
-            <div class="space-y-3">
-              <div class="flex justify-between">
-                <span class="text-slate-600">Opening Balance</span>
-                <span class="font-medium">${{ selectedStatement()?.openingBalance | number:'1.2-2' }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-red-600">Purchases</span>
-                <span class="font-medium text-red-600">+${{ selectedStatement()?.totalPurchases | number:'1.2-2' }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-green-600">Payments</span>
-                <span class="font-medium text-green-600">-${{ selectedStatement()?.totalPayments | number:'1.2-2' }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-blue-600">Refunds</span>
-                <span class="font-medium text-blue-600">-${{ selectedStatement()?.totalRefunds | number:'1.2-2' }}</span>
-              </div>
-              @if ((selectedStatement()?.penaltyCharges || 0) > 0) {
-                <div class="flex justify-between">
-                  <span class="text-orange-600">Penalty Charges</span>
-                  <span class="font-medium text-orange-600">+${{ selectedStatement()?.penaltyCharges | number:'1.2-2' }}</span>
-                </div>
-              }
-              @if ((selectedStatement()?.interestCharges || 0) > 0) {
-                <div class="flex justify-between">
-                  <span class="text-orange-600">Interest Charges</span>
-                  <span class="font-medium text-orange-600">+${{ selectedStatement()?.interestCharges | number:'1.2-2' }}</span>
-                </div>
-              }
-              <div class="border-t border-slate-300 pt-3 flex justify-between">
-                <span class="font-bold text-slate-900">Closing Balance</span>
-                <span class="font-bold text-lg text-slate-900">${{ selectedStatement()?.closingBalance | number:'1.2-2' }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-amber-600 font-medium">Minimum Due</span>
-                <span class="font-bold text-amber-600">${{ selectedStatement()?.minimumDue | number:'1.2-2' }}</span>
-              </div>
-              @if ((selectedStatement()?.amountPaid || 0) > 0) {
-                <div class="flex justify-between">
-                  <span class="text-green-600 font-medium">Amount Paid</span>
-                  <span class="font-bold text-green-600">${{ selectedStatement()?.amountPaid | number:'1.2-2' }}</span>
-                </div>
-              }
-            </div>
-          </div>
-
-          <!-- Transactions -->
-          @if (selectedStatement()?.transactions && selectedStatement()!.transactions.length > 0) {
-            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Transaction History</h3>
-            <div class="space-y-2">
-              @for (txn of selectedStatement()?.transactions; track txn.id) {
-                <div class="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                  <div class="flex-1">
-                    <p class="font-medium text-slate-900 text-sm">{{ txn.description }}</p>
-                    <p class="text-xs text-slate-500">{{ txn.dateUtc | date:'MMM d, y' }}</p>
-                  </div>
-                  <div class="text-right">
-                    <span [class]="getTxnTypeClass(txn.type) + ' font-semibold text-sm'">
-                      {{ getTxnSign(txn.type) }}${{ txn.amount | number:'1.2-2' }}
-                    </span>
-                    <p class="text-xs text-slate-500">{{ txn.type }}</p>
-                  </div>
-                </div>
-              }
-            </div>
-          }
-        </div>
-      </div>
-    </div>
-  }
+      }
+    }
+  </main>
 </div>
+
+<!-- STATEMENT DETAIL MODAL -->
+@if (showDetailModal() && selectedStatement()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-6 md:p-12 animate-in fade-in duration-300" (click)="closeDetail()">
+    <div class="absolute inset-0 bg-charcoal/40 backdrop-blur-2xl"></div>
+    
+    <div class="relative bg-mist-cream w-full max-w-5xl h-[90vh] rounded-[3.5rem] shadow-[0_50px_150px_-30px_rgba(0,0,0,0.5)] border border-white overflow-hidden flex flex-col" 
+         (click)="$event.stopPropagation()">
+     
+      <!-- Modal Header -->
+      <div class="p-10 md:px-16 border-b border-charcoal/5 flex justify-between items-center bg-white/40 sticky top-0 z-20">
+        <div class="flex items-center gap-6">
+          <div class="w-16 h-16 bg-charcoal rounded-[1.5rem] flex items-center justify-center text-white shadow-xl">
+             <span class="material-symbols-outlined text-3xl">receipt</span>
+          </div>
+          <div>
+            <h2 class="text-3xl font-black text-charcoal tracking-tight">{{ selectedStatement()?.statementPeriod }}</h2>
+            <p class="text-misty-gray font-bold text-sm">
+              {{ getCardDisplay(selectedStatement()?.cardId || '') }} • Ref: #ST-{{ selectedStatement()?.id?.slice(0,8)?.toUpperCase() }}
+            </p>
+          </div>
+        </div>
+        <button (click)="closeDetail()" class="p-4 hover:bg-mist-ivory rounded-3xl transition-all group">
+          <span class="material-symbols-outlined text-charcoal/40 group-hover:text-charcoal group-hover:rotate-90 transition-all">close</span>
+        </button>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-10 md:px-16 pb-20">
+        
+        <!-- Top Financial Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-10 mb-16">
+          
+          <!-- Balance Widget -->
+          <div class="md:col-span-2 bg-charcoal rounded-[2.5rem] p-10 text-white relative overflow-hidden group">
+            <div class="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[80px] -mr-20 -mt-20"></div>
+            <div class="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 mb-3">Total Outstanding</p>
+                <h3 class="text-7xl font-black tracking-tighter mb-4">{{ selectedStatement()?.closingBalance | currency:'USD' }}</h3>
+              </div>
+              <div class="flex items-center gap-10">
+                <div class="space-y-1">
+                  <p class="text-[9px] font-bold text-white/40 uppercase tracking-widest">Min Amount Due</p>
+                  <p class="text-xl font-black text-primary">{{ selectedStatement()?.minimumDue | currency:'USD' }}</p>
+                </div>
+                <div class="space-y-1">
+                  <p class="text-[9px] font-bold text-white/40 uppercase tracking-widest">Due Date</p>
+                  <p class="text-xl font-black">{{ (selectedStatement()?.dueDateUtc || '2026-04-15') | date:'MMM dd' }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Snapshot -->
+          <div class="bg-white/80 rounded-[2.5rem] p-10 border border-charcoal/5 flex flex-col justify-between">
+            <div class="space-y-4">
+              <div class="flex justify-between items-start">
+                <span class="text-[10px] font-black text-misty-gray uppercase tracking-widest">{{ selectedStatement()?.issuerName }}</span>
+                <span class="material-symbols-outlined text-primary">credit_card</span>
+              </div>
+              <p class="text-2xl font-black text-charcoal tracking-widest">**** **** **** {{ selectedStatement()?.cardLast4 }}</p>
+            </div>
+            <div class="pt-6 border-t border-charcoal/5">
+               <div class="flex justify-between text-xs font-bold">
+                 <span class="text-misty-gray">Credit Limit</span>
+                 <span class="text-charcoal">{{ selectedStatement()?.creditLimit | currency:'USD' }}</span>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Breakdown Table -->
+        <div class="mb-16">
+          <h3 class="text-xl font-black text-charcoal mb-8 tracking-tight">Statement Breakdown</h3>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-mist-ivory p-6 rounded-3xl border border-charcoal/5">
+              <p class="text-[9px] font-bold text-misty-gray uppercase tracking-widest mb-2">Opening Balance</p>
+              <p class="text-2xl font-black text-charcoal">{{ selectedStatement()?.openingBalance | currency:'USD' }}</p>
+            </div>
+            <div class="bg-red-50/50 p-6 rounded-3xl border border-red-100">
+              <p class="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-2 text-red-500">New Purchases</p>
+              <p class="text-2xl font-black text-red-600">+{{ selectedStatement()?.totalPurchases | currency:'USD' }}</p>
+            </div>
+            <div class="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100">
+              <p class="text-[9px] font-bold uppercase tracking-widest mb-2 text-emerald-500">Payments/Credits</p>
+              <p class="text-2xl font-black text-emerald-600">-{{ selectedStatement()?.totalPayments | currency:'USD' }}</p>
+            </div>
+            <div class="bg-mist-ivory p-6 rounded-3xl border border-charcoal/5">
+              <p class="text-[9px] font-bold text-misty-gray uppercase tracking-widest mb-2">Adjustments</p>
+              <p class="text-2xl font-black text-charcoal">{{ (selectedStatement()?.penaltyCharges || 0) + (selectedStatement()?.interestCharges || 0) | currency:'USD' }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Feed -->
+        <div>
+          <div class="flex items-center justify-between mb-8">
+            <h3 class="text-xl font-black text-charcoal tracking-tight">Transaction Detail</h3>
+            <span class="text-xs font-bold text-misty-gray">{{ selectedStatement()?.transactions?.length || 0 }} Entries</span>
+          </div>
+          
+          <div class="space-y-4">
+            @for (txn of selectedStatement()?.transactions; track txn.id) {
+              <div class="flex items-center justify-between p-6 bg-white/40 border border-charcoal/5 rounded-3xl hover:bg-white transition-all group">
+                <div class="flex items-center gap-5">
+                   <div class="size-12 bg-mist-ivory rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                     <span class="material-symbols-outlined text-misty-gray group-hover:text-primary transition-colors">
+                        {{ txn.amount > 0 ? 'shopping_cart' : 'payments' }}
+                     </span>
+                   </div>
+                   <div>
+                     <p class="font-bold text-charcoal">{{ txn.description }}</p>
+                     <p class="text-[10px] font-bold text-misty-gray uppercase tracking-widest">{{ txn.dateUtc | date:'MMM dd, yyyy' }} • {{ txn.type }}</p>
+                   </div>
+                </div>
+                <div class="text-right">
+                  <p [class]="'font-black text-lg ' + (txn.amount > 0 ? 'text-charcoal' : 'text-emerald-500')">
+                    {{ txn.amount > 0 ? '' : '-' }}{{ (txn.amount < 0 ? -txn.amount : txn.amount) | currency:'USD' }}
+                  </p>
+                </div>
+              </div>
+            } @empty {
+              <div class="py-20 text-center text-misty-gray font-bold">No transactions recorded for this period.</div>
+            }
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Actions -->
+      <div class="p-10 md:px-16 border-t border-charcoal/5 bg-white/40 flex justify-end gap-4">
+        <button (click)="closeDetail()" class="h-14 px-8 border border-charcoal/10 text-charcoal font-bold rounded-2xl hover:bg-mist-ivory transition-all">
+          Close Preview
+        </button>
+        <button class="h-14 px-10 bg-charcoal text-white font-bold rounded-2xl flex items-center gap-3 hover:bg-primary hover:text-charcoal transition-all shadow-xl shadow-charcoal/20">
+          <span class="material-symbols-outlined text-sm">download</span>
+          Download PDF
+        </button>
+      </div>
+
+    </div>
+  </div>
+}

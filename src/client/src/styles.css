@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -11,8 +13,57 @@
   --color-background-light: #ffffff;
   --color-background-dark: #181611;
   --color-misty-blue: #f1f5f9;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-variant: #e4e2e1;
+  --color-primary-fixed-dim: #ffb86e;
+  --color-on-secondary-fixed: #1d1b1a;
+  --color-on-primary: #ffffff;
+  --color-tertiary-container: #b4b1ad;
+  --color-outline-variant: #d8c3b2;
+  --color-on-surface-variant: #534437;
+  --color-tertiary-fixed-dim: #c9c6c1;
+  --color-on-tertiary-fixed-variant: #484743;
+  --color-secondary-fixed-dim: #cac6c3;
+  --color-on-tertiary-fixed: #1c1c19;
+  --color-surface-tint: #8a5100;
+  --color-on-error-container: #93000a;
+  --color-surface-container-high: #eae8e7;
+  --color-on-secondary: #ffffff;
+  --color-on-tertiary-container: #454441;
+  --color-inverse-primary: #ffb86e;
+  --color-on-surface: #1b1c1c;
+  --color-background: #fbf9f8;
+  --color-secondary-container: #e7e1df;
+  --color-secondary-fixed: #e7e1df;
+  --color-inverse-surface: #303030;
+  --color-on-primary-fixed-variant: #693c00;
+  --color-surface: #fbf9f8;
+  --color-primary-container: #f0a046;
+  --color-error-container: #ffdad6;
+  --color-on-tertiary: #ffffff;
+  --color-primary: #8a5100;
+  --color-on-primary-fixed: #2c1600;
+  --color-on-background: #1b1c1c;
+  --color-surface-container-highest: #e4e2e1;
+  --color-surface-bright: #fbf9f8;
+  --color-surface-dim: #dcd9d9;
+  --color-tertiary-fixed: #e6e2dd;
+  --color-on-primary-container: #653a00;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-surface-container-low: #f6f3f2;
+  --color-surface-container: #f0eded;
+  --color-primary-fixed: #ffdcbd;
+  --color-outline: #857465;
+  --color-on-secondary-container: #676462;
+  --color-inverse-on-surface: #f3f0f0;
+  --color-secondary: #615e5c;
+  --color-tertiary: #605e5b;
+  --color-on-secondary-fixed-variant: #494645;
   --font-sans: "Plus Jakarta Sans", Manrope, sans-serif;
   --font-display: Manrope, sans-serif;
+  --font-headline: Manrope, sans-serif;
+  --font-body: Manrope, sans-serif;
   --animate-slow-drift: drift 20s ease-in-out infinite alternate;
   --animate-slow-pulse: pulse-ring 8s ease-in-out infinite;
   --animate-fade-in-down: fade-in-down 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -42,13 +93,14 @@
 @layer base {
 
   body {
-    @apply antialiased text-charcoal bg-mist-cream;
+    @apply antialiased text-[#1b1c1c] bg-[#F0EDEB];
   }
 }
 
 @layer components {
   .glass-card {
-    @apply bg-white/80 backdrop-blur-2xl border border-white/50 shadow-2xl shadow-charcoal/5;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
   }
 
   .glass-card-premium {
@@ -86,14 +138,37 @@
 
   .card-gradient-1 {
     background: linear-gradient(135deg, #1e1b13 0%, #4a4228 100%);
+    box-shadow: 0 20px 50px -10px rgba(30, 27, 19, 0.5);
   }
 
   .card-gradient-2 {
     background: linear-gradient(135deg, #eebd2b 0%, #8c6d1a 100%);
+    box-shadow: 0 20px 50px -10px rgba(238, 189, 43, 0.4);
   }
 
   .card-gradient-3 {
     background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+    box-shadow: 0 20px 50px -10px rgba(45, 45, 45, 0.5);
+  }
+
+  .card-gradient-4 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 20px 50px -10px rgba(102, 126, 234, 0.4);
+  }
+
+  .card-gradient-5 {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    box-shadow: 0 20px 50px -10px rgba(240, 147, 251, 0.4);
+  }
+
+  .card-gradient-6 {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    box-shadow: 0 20px 50px -10px rgba(79, 172, 254, 0.4);
+  }
+
+  .card-gradient-7 {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    box-shadow: 0 20px 50px -10px rgba(250, 112, 154, 0.4);
   }
 
   .premium-button {
@@ -111,11 +186,11 @@
   }
 
   .glow-cloud-amber {
-    @apply absolute w-64 h-64 rounded-full bg-honey-amber/30 blur-[80px];
+    @apply fixed w-96 h-96 rounded-full bg-primary-fixed-dim/30 blur-[150px] -top-40 -left-40;
   }
 
   .glow-cloud-blue {
-    @apply absolute w-80 h-80 rounded-full bg-misty-gray/20 blur-[100px];
+    @apply fixed w-[500px] h-[500px] rounded-full bg-secondary-fixed-dim/30 blur-[150px] top-20 -right-40;
   }
 
   .skeleton {

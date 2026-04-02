@@ -1,6 +1,7 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RewardsService, RewardAccount, RewardTransaction, RewardTier } from '../../core/services/rewards.service';
+import { RewardsService, RewardAccount, RewardTransaction } from '../../core/services/rewards.service';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-rewards',
@@ -13,8 +14,9 @@ export class RewardsComponent implements OnInit {
   private rewardsService = inject(RewardsService);
 
   rewardAccount = signal<RewardAccount | null>(null);
-  tiers = signal<RewardTier[]>([]);
+  transactions = signal<RewardTransaction[]>([]);
   isLoading = signal(true);
+  error = signal<string | null>(null);
 
   ngOnInit(): void {
     this.loadData();
@@ -22,31 +24,28 @@ export class RewardsComponent implements OnInit {
 
   loadData(): void {
     this.isLoading.set(true);
-    this.rewardsService.getRewardAccount().subscribe({
+    this.error.set(null);
+
+    forkJoin({
+      account: this.rewardsService.getRewardAccount(),
+      history: this.rewardsService.getRewardHistory()
+    }).subscribe({
       next: (res) => {
-        if (res.data) this.rewardAccount.set(res.data);
-        this.rewardsService.getRewardTiers().subscribe({
-          next: (res) => {
-            this.tiers.set(res.data || []);
-            this.isLoading.set(false);
-          },
-          error: () => this.isLoading.set(false)
-        });
+        if (res.account.data) {
+          this.rewardAccount.set(res.account.data);
+        }
+        this.transactions.set(res.history.data || []);
+        this.isLoading.set(false);
       },
-      error: () => this.isLoading.set(false)
+      error: (err) => {
+        console.error('Error loading rewards data:', err);
+        this.error.set('Failed to load rewards data');
+        this.isLoading.set(false);
+      }
     });
   }
 
-  getNetworkName(network: number): string {
-    return network === 1 ? 'Visa' : network === 2 ? 'Mastercard' : 'Unknown';
-  }
-
-  getTierStatus(tier: RewardTier): { label: string; class: string } {
-    const now = new Date();
-    const from = new Date(tier.effectiveFromUtc);
-    const to = tier.effectiveToUtc ? new Date(tier.effectiveToUtc) : null;
-    if (now < from) return { label: 'Scheduled', class: 'bg-blue-100 text-blue-700' };
-    if (to && now > to) return { label: 'Expired', class: 'bg-slate-100 text-slate-600' };
-    return { label: 'Active', class: 'bg-green-100 text-green-700' };
+  refresh(): void {
+    this.loadData();
   }
 }

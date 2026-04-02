@@ -1,37 +1,25 @@
-<!-- Premium Navbar -->
-<nav class="sticky top-0 z-50 w-full bg-white/70 backdrop-blur-2xl border-b border-charcoal/5 px-4 md:px-12 py-3.5 flex items-center justify-between">
+<!-- Premium Pill Navbar -->
+<nav class="fixed top-5 left-1/2 -translate-x-1/2 w-[95%] max-w-7xl rounded-full bg-[#fbf9f8]/80 backdrop-blur-xl shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] flex justify-between items-center px-8 py-3 z-50 transition-all duration-300">
   
-  <!-- Left Side: Hamburger & Brand -->
-  <div class="flex items-center gap-4">
-    <!-- Mobile Menu Toggle (Hamburger) -->
-    <button (click)="toggleMobileMenu()" 
-            class="flex lg:hidden w-10 h-10 items-center justify-center text-charcoal/60 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
-      <span class="material-symbols-outlined">{{ isMobileMenuOpen() ? 'close' : 'menu' }}</span>
-    </button>
-
-    <!-- Brand -->
-    <div class="flex items-center gap-3 cursor-pointer group" routerLink="/dashboard">
-      <div class="w-10 h-10 bg-gradient-to-br from-honey-amber to-[#d4a820] rounded-xl flex items-center justify-center shadow-lg shadow-honey-amber/20 transform group-hover:scale-105 transition-transform duration-300 shrink-0">
-        <span class="material-symbols-outlined text-charcoal font-bold">account_balance_wallet</span>
-      </div>
-      <span class="text-xl font-black tracking-tighter text-charcoal md:block">CredVault</span>
-    </div>
+  <!-- Brand -->
+  <div class="flex items-center gap-3 cursor-pointer group" routerLink="/dashboard">
+    <span class="text-2xl font-bold tracking-tighter text-[#1b1c1c] font-headline">CredVault</span>
   </div>
 
   <!-- Center Side: Desktop Tabs (Hidden on mobile) -->
-  <div class="hidden lg:flex items-center gap-2">
+  <div class="hidden md:flex items-center gap-8">
     @if (user()?.role !== 'admin') {
-      <a routerLink="/dashboard" routerLinkActive="nav-pill-active" [routerLinkActiveOptions]="{exact: true}" 
-         class="nav-pill nav-pill-hover text-charcoal/60">Dashboard</a>
-      <a routerLink="/payments" routerLinkActive="nav-pill-active" 
-         class="nav-pill nav-pill-hover text-charcoal/60">Payments</a>
-      <a routerLink="/statements" routerLinkActive="nav-pill-active" 
-         class="nav-pill nav-pill-hover text-charcoal/60">Statements</a>
-      <a routerLink="/rewards" routerLinkActive="nav-pill-active" 
-         class="nav-pill nav-pill-hover text-charcoal/60">Rewards</a>
+      <a routerLink="/dashboard" routerLinkActive="text-[#1b1c1c]" [routerLinkActiveOptions]="{exact: true}" 
+         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Dashboard</a>
+      <a routerLink="/bills" routerLinkActive="text-[#1b1c1c]" 
+         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Payments</a>
+      <a routerLink="/statements" routerLinkActive="text-[#1b1c1c]" 
+         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Statements</a>
+      <a routerLink="/rewards" routerLinkActive="text-[#1b1c1c]" 
+         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Rewards</a>
     } @else {
-      <a routerLink="/admin/dashboard" routerLinkActive="nav-pill-active" 
-         class="nav-pill nav-pill-hover !text-primary !bg-primary/5 font-black flex items-center gap-2">
+      <a routerLink="/admin/dashboard" routerLinkActive="text-[#1b1c1c]" 
+         class="text-[#615e5c] font-black font-manrope text-sm tracking-wide flex items-center gap-2 text-[#8a5100]">
         <span class="material-symbols-outlined text-sm">shield_person</span>
         Admin Console
       </a>
@@ -39,105 +27,96 @@
   </div>
 
   <!-- Right Side: Tools & Profile -->
-  <div class="flex items-center gap-2 md:gap-5">
-    <!-- Search Bar (Hidden on smaller screens) -->
-    <div class="relative hidden xl:block group">
-      <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-misty-gray text-xl group-focus-within:text-honey-amber transition-colors">search</span>
-      <input type="text" 
-             placeholder="Search transactions..." 
-             class="premium-input w-64 group-focus-within:w-80 pl-12 pr-4 text-sm font-semibold transition-all duration-500">
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="flex items-center gap-1 md:gap-2">
-      <button routerLink="/notifications" class="w-10 h-10 flex items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all relative">
-        <span class="material-symbols-outlined">notifications</span>
-        <span class="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+  <div class="flex items-center gap-4">
+    <!-- Notifications -->
+    <button routerLink="/notifications" class="p-2 text-[#8a5100] hover:scale-95 duration-200 ease-out">
+      <span class="material-symbols-outlined">notifications</span>
+    </button>
+    
+    <!-- Profile Avatar -->
+    <div class="relative">
+      <button (click)="toggleProfile()" 
+              class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/20 hover:ring-2 hover:ring-[#8a5100]/20 transition-all">
+        @if (user()) {
+          <img class="w-full h-full object-cover" 
+               [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=e5e1da&color=181611'" 
+               alt="User Profile">
+        } @else {
+          <span class="text-xs font-bold text-[#615e5c]">??</span>
+        }
       </button>
       
-      <button class="hidden sm:flex w-10 h-10 items-center justify-center text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-full transition-all">
-        <span class="material-symbols-outlined">settings</span>
-      </button>
-
-      <!-- Profile Avatar -->
-      <div class="relative ml-1 md:ml-2">
-        <button (click)="toggleProfile()" 
-                class="w-10 h-10 rounded-full bg-mist-ivory border-2 border-white shadow-sm overflow-hidden flex items-center justify-center hover:ring-4 hover:ring-honey-amber/10 transition-all active:scale-95 shrink-0">
-          @if (user()) {
-            <img class="w-full h-full object-cover" 
-                 [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=e5e1da&color=181611'" 
-                 alt="User Profile">
-          } @else {
-            <span class="text-xs font-bold text-misty-gray">??</span>
-          }
-        </button>
-        
-        <!-- Dropdown Menu -->
-        @if (isProfileOpen()) {
-          <div class="absolute right-0 top-full mt-4 w-72 glass-card-premium rounded-3xl p-2 animate-scale-in z-50 overflow-hidden shadow-2xl">
-            <!-- User Info Header -->
-            <div class="px-5 py-5 bg-charcoal/[0.02] rounded-2xl mb-2">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-full bg-white border-2 border-honey-amber/20 shadow-sm flex items-center justify-center overflow-hidden">
-                   <img class="w-full h-full object-cover" 
-                        [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=fdfbf7&color=181611'" 
-                        alt="User Profile Large">
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-black text-charcoal truncate">{{ user()?.fullName }}</p>
-                  <p class="text-xs font-medium text-charcoal/60 truncate tracking-tight lowercase mt-0.5">{{ user()?.email }}</p>
-                </div>
+      <!-- Dropdown Menu -->
+      @if (isProfileOpen()) {
+        <div class="absolute right-0 top-full mt-4 w-72 bg-white/90 backdrop-blur-xl rounded-3xl p-2 animate-scale-in z-50 overflow-hidden shadow-2xl border border-white/50">
+          <!-- User Info Header -->
+          <div class="px-5 py-5 bg-[#f6f3f2] rounded-2xl mb-2">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-full bg-white border-2 border-[#eebd2b]/20 shadow-sm flex items-center justify-center overflow-hidden">
+                 <img class="w-full h-full object-cover" 
+                      [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=fdfbf7&color=181611'" 
+                      alt="User Profile Large">
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-black text-[#1b1c1c] truncate">{{ user()?.fullName }}</p>
+                <p class="text-xs font-medium text-[#615e5c] truncate tracking-tight lowercase mt-0.5">{{ user()?.email }}</p>
               </div>
             </div>
-
-            <!-- Menu Sections -->
-            <div class="space-y-1">
-              @if (user()?.role === 'admin') {
-                <button routerLink="/admin/dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-primary hover:bg-primary/5 rounded-xl transition-all">
-                  <span class="material-symbols-outlined text-lg">admin_panel_settings</span>
-                  Admin Control Center
-                </button>
-              }
-              <button routerLink="/profile" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
-                <span class="material-symbols-outlined text-lg">person_outline</span>
-                Account Settings
-              </button>
-              <button routerLink="/notifications" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
-                <span class="material-symbols-outlined text-lg">notifications</span>
-                Notifications
-              </button>
-              <button routerLink="/statements" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
-                <span class="material-symbols-outlined text-lg">receipt_long</span>
-                Statements
-              </button>
-              <button routerLink="/rewards" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-charcoal/70 hover:text-charcoal hover:bg-charcoal/5 rounded-xl transition-all">
-                <span class="material-symbols-outlined text-lg">stars</span>
-                Rewards
-              </button>
-              <div class="h-px bg-charcoal/5 my-2 mx-4"></div>
-              <button (click)="logout()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-red-500 hover:bg-red-50 rounded-xl transition-all group">
-                <span class="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">logout</span>
-                Sign Out
-              </button>
-            </div>
           </div>
-        }
-      </div>
+
+          <!-- Menu Sections -->
+          <div class="space-y-1">
+            @if (user()?.role === 'admin') {
+              <button routerLink="/admin/dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#8a5100] hover:bg-[#8a5100]/5 rounded-xl transition-all">
+                <span class="material-symbols-outlined text-lg">admin_panel_settings</span>
+                Admin Control Center
+              </button>
+            }
+            <button routerLink="/profile" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f6f3f2] rounded-xl transition-all">
+              <span class="material-symbols-outlined text-lg">person_outline</span>
+              Account Settings
+            </button>
+            <button routerLink="/notifications" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f6f3f2] rounded-xl transition-all">
+              <span class="material-symbols-outlined text-lg">notifications</span>
+              Notifications
+            </button>
+            <button routerLink="/statements" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f6f3f2] rounded-xl transition-all">
+              <span class="material-symbols-outlined text-lg">receipt_long</span>
+              Statements
+            </button>
+            <button routerLink="/rewards" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f6f3f2] rounded-xl transition-all">
+              <span class="material-symbols-outlined text-lg">stars</span>
+              Rewards
+            </button>
+            <div class="h-px bg-[#d8c3b2]/20 my-2 mx-4"></div>
+            <button (click)="logout()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#ba1a1a] hover:bg-red-50 rounded-xl transition-all group">
+              <span class="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">logout</span>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      }
     </div>
   </div>
 </nav>
 
+<!-- Mobile Menu Button (visible on small screens) -->
+<button (click)="toggleMobileMenu()" 
+        class="md:hidden fixed top-6 left-6 z-50 w-10 h-10 flex items-center justify-center text-[#1b1c1c] bg-white/80 backdrop-blur-xl rounded-full shadow-lg">
+  <span class="material-symbols-outlined">{{ isMobileMenuOpen() ? 'close' : 'menu' }}</span>
+</button>
+
 <!-- Mobile Menu Drawer Overlay -->
 @if (isMobileMenuOpen()) {
-  <div class="fixed inset-0 z-[100] lg:hidden animate-fade-in">
+  <div class="fixed inset-0 z-[100] md:hidden animate-fade-in">
     <div (click)="toggleMobileMenu()" class="absolute inset-0 bg-charcoal/40 backdrop-blur-sm"></div>
     
     <div class="absolute inset-y-0 left-0 w-[80%] max-w-sm bg-mist-cream shadow-2xl p-6 flex flex-col transform animate-scale-in">
       <!-- Header -->
-      <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center justify-between mb-8 mt-12">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-            <span class="material-symbols-outlined text-charcoal font-black">shield_with_heart</span>
+          <div class="w-10 h-10 bg-[#8a5100] rounded-xl flex items-center justify-center">
+            <span class="material-symbols-outlined text-white font-black">shield_with_heart</span>
           </div>
           <span class="text-xl font-black text-charcoal">Menu</span>
         </div>
@@ -154,7 +133,12 @@
             <span class="material-symbols-outlined">dashboard</span>
             Dashboard
           </a>
-          <a routerLink="/payments" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+          <a routerLink="/cards" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
+             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
+            <span class="material-symbols-outlined">credit_card</span>
+            Cards
+          </a>
+          <a routerLink="/bills" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
              class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
             <span class="material-symbols-outlined">payments</span>
             Payments

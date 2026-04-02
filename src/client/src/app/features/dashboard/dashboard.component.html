@@ -1,32 +1,34 @@
 <!-- Main Dashboard Content -->
-<div class="relative w-full overflow-x-hidden bg-mist-cream/20 font-display">
+<div class="relative w-full overflow-x-hidden bg-[#F0EDEB] font-display">
   
   <!-- Backdrop Atmospheric Glows -->
   <div class="glow-cloud-amber top-[-10%] left-[-5%] opacity-30"></div>
   <div class="glow-cloud-blue bottom-[10%] right-[-5%] opacity-20"></div>
 
-  <div class="px-6 md:px-12 py-10 max-w-7xl mx-auto w-full relative z-10">
+  <div class="px-6 md:px-12 pt-28 max-w-7xl mx-auto w-full relative z-10">
     
     <!-- Hero / Action Bar -->
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
       <div>
-        <h1 class="text-5xl font-black tracking-tight text-charcoal mb-3">My Cards</h1>
-        <p class="text-misty-gray font-medium text-lg max-w-lg leading-relaxed">
+        <h1 class="text-5xl font-extrabold leading-tight tracking-tight md:text-[3.5rem] text-[#1b1c1c]">
+          My <span class="text-[#8a5100] italic font-[Georgia,Times,serif] font-light">Cards</span>
+        </h1>
+        <p class="max-w-2xl text-base font-light leading-relaxed text-[#534437] md:text-lg mt-4">
           Manage your premium assets, monitor spending, and configure security limits.
         </p>
       </div>
-      <button (click)="toggleAddCardModal()" class="h-14 px-8 bg-primary hover:bg-primary/90 text-charcoal font-bold rounded-2xl shadow-xl shadow-primary/20 flex items-center gap-3 transition-all transform hover:-translate-y-1 active:scale-95">
+      <button (click)="toggleAddCardModal()" class="h-14 px-8 bg-[#8a5100] hover:bg-[#8a5100]/90 text-white font-bold rounded-2xl shadow-xl shadow-[#8a5100]/20 flex items-center gap-3 transition-all transform hover:-translate-y-1 active:scale-95">
         <span class="material-symbols-outlined font-bold">add_card</span>
         Add New Card
       </button>
     </div>
 
     <!-- Category Filters -->
-    <div class="flex items-center gap-6 mb-10 border-b border-charcoal/5 overflow-x-auto no-scrollbar">
-      <button class="pb-4 text-sm font-bold text-primary border-b-2 border-primary whitespace-nowrap">All Cards ({{isLoading() ? '...' : cards().length}})</button>
-      <button class="pb-4 text-sm font-semibold text-misty-gray hover:text-charcoal transition-colors whitespace-nowrap">Credit Cards</button>
-      <button class="pb-4 text-sm font-semibold text-misty-gray hover:text-charcoal transition-colors whitespace-nowrap">Debit Cards</button>
-      <button class="pb-4 text-sm font-semibold text-misty-gray hover:text-charcoal transition-colors whitespace-nowrap">Virtual Cards</button>
+    <div class="flex items-center gap-6 mb-10 border-b border-[#d8c3b2]/20 overflow-x-auto no-scrollbar">
+      <button class="pb-4 text-sm font-bold text-[#8a5100] border-b-2 border-[#8a5100] whitespace-nowrap">All Cards ({{isLoading() ? '...' : cards().length}})</button>
+      <button class="pb-4 text-sm font-semibold text-[#615e5c] hover:text-[#1b1c1c] transition-colors whitespace-nowrap">Credit Cards</button>
+      <button class="pb-4 text-sm font-semibold text-[#615e5c] hover:text-[#1b1c1c] transition-colors whitespace-nowrap">Debit Cards</button>
+      <button class="pb-4 text-sm font-semibold text-[#615e5c] hover:text-[#1b1c1c] transition-colors whitespace-nowrap">Virtual Cards</button>
     </div>
 
     <!-- Cards Grid -->
@@ -45,7 +47,7 @@
         @for (card of cards(); track card.id; let i = $index) {
           <div [routerLink]="['/cards', card.id]" class="group relative transition-all duration-500 hover:-translate-y-2 cursor-pointer perspective">
             <!-- Glass/Gradient Card Visual -->
-            <div [class]="'w-full aspect-[1.6/1] rounded-[2rem] p-8 flex flex-col justify-between text-white shadow-2xl relative overflow-hidden group-hover:rotate-y-12 ' + getCardGradient(i)">
+            <div [style]="getCardStyle(i)" class="w-full aspect-[1.6/1] rounded-[2rem] p-8 flex flex-col justify-between text-white shadow-2xl relative overflow-hidden group-hover:rotate-y-12">
               
               <div class="relative z-10 flex justify-between items-start">
                 <div class="space-y-3 flex flex-col">
@@ -86,20 +88,20 @@
             <!-- Card Footer Info -->
             <div class="mt-5 flex justify-between items-start px-2">
               <div>
-                <h3 class="font-bold text-charcoal">{{ card.issuerName || 'Premium Asset' }}</h3>
-                <p class="text-2xl font-black text-charcoal mt-1">
+                <h3 class="font-bold text-[#1b1c1c]">{{ card.issuerName || 'Premium Asset' }}</h3>
+                <p class="text-2xl font-black text-[#1b1c1c] mt-1">
                   {{ (card.creditLimit - card.outstandingBalance) | currency:'USD' }}
-                  <span class="text-[10px] font-bold text-misty-gray uppercase tracking-[0.2em] ml-1">Available</span>
+                  <span class="text-[10px] font-bold text-[#615e5c] uppercase tracking-[0.2em] ml-1">Available</span>
                 </p>
               </div>
               <div class="flex items-center gap-1">
                 <button (click)="confirmDeleteCard(card.id, card.issuerName + ' *' + card.last4, $event)" 
                         class="p-2 hover:bg-red-50 rounded-full transition-colors group/delete"
                         title="Delete this card">
-                  <span class="material-symbols-outlined text-charcoal/30 group-hover/delete:text-red-500 transition-colors">delete</span>
+                  <span class="material-symbols-outlined text-[#615e5c]/30 group-hover/delete:text-red-500 transition-colors">delete</span>
                 </button>
-                <button class="p-2 hover:bg-mist-ivory rounded-full transition-colors">
-                  <span class="material-symbols-outlined text-charcoal/30">more_vert</span>
+                <button class="p-2 hover:bg-[#f6f3f2] rounded-full transition-colors">
+                  <span class="material-symbols-outlined text-[#615e5c]/30">more_vert</span>
                 </button>
               </div>
             </div>
@@ -108,11 +110,11 @@
 
         <!-- Add Generic Card Button -->
         <button (click)="toggleAddCardModal()" 
-                class="w-full aspect-[1.6/1] rounded-[2rem] border-2 border-dashed border-charcoal/10 flex flex-col items-center justify-center gap-4 group hover:bg-white hover:border-primary/40 hover:shadow-xl transition-all duration-500">
-          <div class="w-14 h-14 bg-mist-ivory rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/10 transition-all">
-            <span class="material-symbols-outlined text-charcoal/30 group-hover:text-primary font-bold">add</span>
+                class="w-full aspect-[1.6/1] rounded-[2rem] border-2 border-dashed border-[#d8c3b2]/20 flex flex-col items-center justify-center gap-4 group hover:bg-white hover:border-[#8a5100]/40 hover:shadow-xl transition-all duration-500">
+          <div class="w-14 h-14 bg-[#f6f3f2] rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-[#8a5100]/10 transition-all">
+            <span class="material-symbols-outlined text-[#615e5c]/30 group-hover:text-[#8a5100] font-bold">add</span>
           </div>
-          <span class="text-sm font-bold text-misty-gray group-hover:text-charcoal">Connect Another Card</span>
+          <span class="text-sm font-bold text-[#615e5c] group-hover:text-[#1b1c1c]">Connect Another Card</span>
         </button>
       }
     </div>
@@ -121,17 +123,17 @@
     <section>
       <div class="flex items-center justify-between mb-8">
         <div>
-          <h2 class="text-3xl font-black tracking-tight text-charcoal mb-1">Card Activity</h2>
-          <p class="text-misty-gray font-medium">Consolidated feed from all your CredVault accounts</p>
+          <h2 class="text-3xl font-black tracking-tight text-[#1b1c1c] mb-1">Card Activity</h2>
+          <p class="text-[#615e5c] font-medium">Consolidated feed from all your CredVault accounts</p>
         </div>
-        <a href="#" class="flex items-center gap-2 text-sm font-bold text-primary group">
+        <a href="#" class="flex items-center gap-2 text-sm font-bold text-[#8a5100] group">
           View All Statements
           <span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
         </a>
       </div>
 
       <!-- Transaction List -->
-      <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2.5rem] p-4 md:p-8 space-y-2 shadow-sm">
+      <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2.5rem] p-4 md:p-8 shadow-sm max-h-[500px] overflow-y-auto">
         @if (isLoading()) {
           @for (i of [1,2,3,4,5]; track i) {
             <div class="flex items-center gap-5 p-4">
@@ -143,19 +145,19 @@
               <div class="h-6 w-20 skeleton"></div>
             </div>
           }
-        } @else if (transactions().length > 0) {
-          @for (tx of transactions(); track tx.id) {
-            <div class="flex items-center gap-5 p-5 hover:bg-mist-cream rounded-3xl transition-all duration-300 group cursor-pointer border border-transparent hover:border-charcoal/5">
+        } @else if (paginatedTransactions().length > 0) {
+          @for (tx of paginatedTransactions(); track tx.id) {
+            <div class="flex items-center gap-5 p-5 hover:bg-[#f6f3f2] rounded-3xl transition-all duration-300 group cursor-pointer border border-transparent hover:border-[#d8c3b2]/10">
               <!-- Icon Container -->
-              <div class="w-14 h-14 bg-mist-ivory rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:bg-white transition-colors">
-                <span class="material-symbols-outlined text-misty-gray group-hover:text-primary transition-colors">
+              <div class="w-14 h-14 bg-[#f6f3f2] rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:bg-white transition-colors">
+                <span class="material-symbols-outlined text-[#615e5c] group-hover:text-[#8a5100] transition-colors">
                   {{ getTransactionIcon(tx.type) }}
                 </span>
               </div>
               <!-- Text Info -->
               <div class="flex-1 min-w-0">
-                <h4 class="font-bold text-charcoal truncate text-lg">{{ tx.description }}</h4>
-                <p class="text-xs font-semibold text-misty-gray mt-1">
+                <h4 class="font-bold text-[#1b1c1c] truncate text-lg">{{ tx.description }}</h4>
+                <p class="text-xs font-semibold text-[#615e5c] mt-1">
                   {{ tx.dateUtc | date:'EEEE, hh:mm a' }}
                 </p>
               </div>
@@ -164,18 +166,28 @@
                 <p [class]="'font-black text-xl ' + (tx.type === 1 ? 'text-red-500' : 'text-emerald-500')">
                   {{ tx.type === 1 ? '-' : '+' }}{{ tx.amount | currency:'USD' }}
                 </p>
-                <p class="text-[10px] font-bold text-misty-gray uppercase tracking-widest mt-1">
+                <p class="text-[10px] font-bold text-[#615e5c] uppercase tracking-widest mt-1">
                   {{ tx.type === 1 ? 'Purchase' : (tx.type === 2 ? 'Payment' : 'Refund') }}
                 </p>
               </div>
             </div>
           }
+
+          @if (totalTransactionPages() > 1) {
+            <div class="flex items-center justify-between mt-6 pt-4 border-t border-[#d8c3b2]/10">
+              <span class="text-sm font-medium text-[#615e5c]">Page {{ transactionPage() }} of {{ totalTransactionPages() }}</span>
+              <div class="flex gap-2">
+                <button (click)="prevTransactionPage()" [disabled]="transactionPage() === 1" class="px-4 py-2 text-sm font-medium text-[#615e5c] bg-white border border-[#d8c3b2]/20 rounded-xl hover:bg-[#f6f3f2] disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                <button (click)="nextTransactionPage()" [disabled]="transactionPage() === totalTransactionPages()" class="px-4 py-2 text-sm font-medium text-white bg-[#8a5100] rounded-xl hover:bg-[#7a4600] disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+              </div>
+            </div>
+          }
         } @else {
           <div class="flex flex-col items-center justify-center py-20 text-center">
-            <div class="size-20 bg-mist-ivory rounded-full flex items-center justify-center mb-6">
-              <span class="material-symbols-outlined text-misty-gray text-4xl">history_toggle_off</span>
+            <div class="size-20 bg-[#f6f3f2] rounded-full flex items-center justify-center mb-6">
+              <span class="material-symbols-outlined text-[#615e5c] text-4xl">history_toggle_off</span>
             </div>
-            <p class="text-lg font-bold text-charcoal/40">No card activity found yet.</p>
+            <p class="text-lg font-bold text-[#1b1c1c]/40">No card activity found yet.</p>
           </div>
         }
       </div>

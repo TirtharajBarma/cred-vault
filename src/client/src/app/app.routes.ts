@@ -35,11 +35,6 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
-    path: 'payments',
-    canActivate: [authGuard],
-    loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent)
-  },
-  {
     path: 'cards/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./features/cards/card-details/card-details.component').then(m => m.CardDetailsComponent)
@@ -53,6 +48,11 @@ export const routes: Routes = [
     path: 'statements',
     canActivate: [authGuard],
     loadComponent: () => import('./features/statements/statements.component').then(m => m.StatementsComponent)
+  },
+  {
+    path: 'bills',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/bills/bills.component').then(m => m.BillsComponent)
   },
   {
     path: 'rewards',

@@ -24,6 +24,10 @@ export class CardDetailsComponent implements OnInit {
   isLoading = signal(true);
   error = signal<string | null>(null);
 
+  // Pagination
+  currentPage = signal(1);
+  itemsPerPage = 7;
+
   // Form Signals
   isSubmitting = signal(false);
   submitSuccess = signal(false);
@@ -194,6 +198,29 @@ export class CardDetailsComponent implements OnInit {
       case 2: return 'account_balance_wallet';
       case 3: return 'keyboard_return';
       default: return 'payments';
+    }
+  }
+
+  page() { return this.currentPage(); }
+  
+  paginatedTransactions() {
+    const start = (this.currentPage() - 1) * this.itemsPerPage;
+    return this.transactions().slice(start, start + this.itemsPerPage);
+  }
+
+  totalPages(): number {
+    return Math.ceil(this.transactions().length / this.itemsPerPage);
+  }
+
+  nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.set(this.currentPage() + 1);
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.set(this.currentPage() - 1);
     }
   }
 
