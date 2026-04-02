@@ -9,6 +9,8 @@ using BillingService.Infrastructure.Persistence.Sql.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
+using Shared.Contracts.Events.Identity;
+using Shared.Contracts.Events.Saga;
 using MassTransit;
 using Serilog;
 using Serilog.Events;
@@ -69,6 +71,12 @@ try
             {
                 e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
                 e.UseInMemoryOutbox();
+                e.ConfigureConsumeTopology = false;
+
+                e.Bind<IUserDeleted>();
+                e.Bind<IBillUpdateRequested>();
+                e.Bind<IRevertBillUpdateRequested>();
+
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<BillUpdateSagaConsumer>(ctx);
                 e.ConfigureConsumer<RevertBillSagaConsumer>(ctx);

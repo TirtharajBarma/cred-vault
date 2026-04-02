@@ -8,6 +8,9 @@ using CardService.Infrastructure.Persistence.Sql;
 using CardService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using MassTransit;
+using Shared.Contracts.Events.Identity;
+using Shared.Contracts.Events.Payment;
+using Shared.Contracts.Events.Saga;
 using Serilog;
 using Serilog.Events;
 
@@ -66,6 +69,14 @@ try
             {
                 e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
                 e.UseInMemoryOutbox();
+                e.ConfigureConsumeTopology = false;
+
+                e.Bind<IUserDeleted>();
+                e.Bind<ICardDeductionRequested>();
+                e.Bind<IBillUpdateSucceeded>();
+                e.Bind<IBillOverdueDetected>();
+                e.Bind<IPaymentReversed>();
+
                 e.ConfigureConsumer<PaymentReversedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<CardDeductionSagaConsumer>(ctx);

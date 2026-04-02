@@ -79,4 +79,14 @@ public class RewardsController(IMediator mediator) : BaseApiController
         var result = await mediator.Send(new GetMyRewardAccountQuery(userId.Value), cancellationToken);
         return Ok(result);
     }
+
+    [HttpGet("transactions")]
+    public async Task<IActionResult> GetMyTransactions(CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId is null) return UnauthorizedResponse();
+
+        var result = await mediator.Send(new GetRewardTransactionsQuery(userId.Value), cancellationToken);
+        return Ok(result);
+    }
 }
