@@ -15,7 +15,7 @@ namespace PaymentService.API.Controllers;
 [ApiController]
 [Route("api/v1/payments")]
 [Authorize]
-public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : BaseApiController
+public class PaymentsController(IMediator mediator) : BaseApiController
 {
     [HttpPost("initiate")]
     public async Task<IActionResult> Initiate([FromBody] InitiatePaymentRequest request, CancellationToken cancellationToken)
@@ -32,9 +32,8 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(Fail(result.Error ?? "Payment initiation failed."));
+            return Fail(result.Error ?? "Payment initiation failed.");
 
-        var isDevelopment = env.IsDevelopment();
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
         {
             Success = true,
@@ -63,7 +62,7 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(Fail(result.Error ?? "OTP verification failed."));
+            return Fail(result.Error ?? "OTP verification failed.");
 
         return Ok(new ApiResponse<object>
         {

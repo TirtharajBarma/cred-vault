@@ -53,8 +53,6 @@ try
     builder.Services.AddMassTransit(x =>
     {
         x.SetKebabCaseEndpointNameFormatter();
-        x.AddConsumer<PaymentCompletedConsumer>();
-        x.AddConsumer<PaymentReversedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<BillUpdateSagaConsumer>();
         x.AddConsumer<RevertBillSagaConsumer>();
@@ -71,8 +69,6 @@ try
             {
                 e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
                 e.UseInMemoryOutbox();
-                e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
-                e.ConfigureConsumer<PaymentReversedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<BillUpdateSagaConsumer>(ctx);
                 e.ConfigureConsumer<RevertBillSagaConsumer>(ctx);

@@ -68,38 +68,6 @@ public class BillsController(IMediator mediator) : BaseApiController
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    public sealed class MarkPaidRequest
-    {
-        public decimal Amount { get; set; }
-    }
-
-    /// <summary>
-    /// Internal endpoint — called only by the PaymentCompletedConsumer (RabbitMQ).
-    /// Users must initiate payments via POST /api/v1/payments/initiate instead.
-    /// Kept for admin/testing purposes only.
-    /// </summary>
-    [HttpPost("{billId:guid}/mark-paid")]
-    [Authorize(Roles = "admin")]
-    public async Task<IActionResult> MarkBillPaid(
-        Guid billId,
-        [FromBody] MarkPaidRequest request,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null) return UnauthorizedResponse();
-
-        var command = new MarkBillPaidCommand(userId.Value, billId, request.Amount);
-        var result = await mediator.Send(command, cancellationToken);
-
-        if (!result.Success)
-        {
-            if (result.Message == "Bill not found.") return NotFound(result);
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
     [HttpPost("admin/check-overdue")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> CheckOverdueBills(CancellationToken cancellationToken)

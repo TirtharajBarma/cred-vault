@@ -153,6 +153,15 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<CardTransaction>> GetTransactionsByCardIdAsync(Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardTransactions
+            .AsNoTracking()
+            .Where(x => x.CardId == cardId)
+            .OrderByDescending(x => x.DateUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<List<CardTransaction>> GetTransactionsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return dbContext.CardTransactions

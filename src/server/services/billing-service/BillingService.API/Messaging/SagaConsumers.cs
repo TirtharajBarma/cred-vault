@@ -35,7 +35,7 @@ public class BillUpdateSagaConsumer(
                 {
                     CorrelationId = message.CorrelationId,
                     BillId = message.BillId,
-                    CardId = message.CardId,
+                    CardId = result.Data?.CardId ?? message.CardId,
                     SucceededAt = DateTime.UtcNow
                 });
             }

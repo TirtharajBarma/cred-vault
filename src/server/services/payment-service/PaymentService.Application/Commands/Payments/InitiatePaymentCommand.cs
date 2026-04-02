@@ -19,7 +19,7 @@ public record InitiatePaymentCommand(
     PaymentType PaymentType,
     string AuthorizationHeader) : IRequest<InitiatePaymentResult>;
 
-public record InitiatePaymentResult(bool Success, Guid? PaymentId, string? Error, bool OtpRequired = true, string? OtpCode = null);
+public record InitiatePaymentResult(bool Success, Guid? PaymentId, string? Error, bool OtpRequired = true);
 
 public record UserDto(Guid Id, string Email, string FullName);
 
@@ -129,7 +129,7 @@ public class InitiatePaymentCommandHandler(
 
         logger.LogInformation("SAGA orchestration started: PaymentId={PaymentId}, OTP={OtpCode}", payment.Id, otpCode);
 
-        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: true, OtpCode: otpCode);
+        return new InitiatePaymentResult(true, payment.Id, null, OtpRequired: true);
     }
 
     private static string GenerateOtp()

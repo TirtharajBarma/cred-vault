@@ -79,7 +79,7 @@ public class GenerateAdminBillCommandHandler(
         };
 
         await bills.AddAsync(bill, ct);
-        await EnsureStatementForBillAsync(bill, card, now, ct);
+        await EnsureStatementForBillAsync(bill, card, request.AuthorizationHeader, now, ct);
         await uow.SaveChangesAsync(ct);
         logger.LogInformation("Bill created: {BillId}, Amount={Amount}, DueDate={DueDate}", bill.Id, bill.Amount, bill.DueDateUtc);
 
@@ -141,8 +141,12 @@ public class GenerateAdminBillCommandHandler(
             var resp = await client.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode) return (false, null, $"User service error: {resp.StatusCode}");
             var content = await resp.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<ApiResponse<UserDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return (result?.Success ?? false, result?.Data, result?.Message);
+            var result = JsonSerializer.Deserialize<UserResponseWrapper>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (result?.Data?.User is null)
+            {
+                return (false, null, "User service returned empty payload");
+            }
+            return (result.Success, result.Data.User, result.Message);
         }
         catch (Exception ex)
         {
@@ -151,7 +155,33 @@ public class GenerateAdminBillCommandHandler(
         }
     }
 
-    private async Task EnsureStatementForBillAsync(Bill bill, CardDto card, DateTime now, CancellationToken ct)
+    private async Task<List<CardTransactionDto>> GetCardTransactionsAsync(Guid cardId, string auth, CancellationToken ct)
+    {
+        try
+        {
+            var client = http.CreateClient();
+            client.BaseAddress = new Uri(config["Services:CardService:BaseUrl"] ?? "http://localhost:5002/");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"api/v1/cards/admin/{cardId}/transactions");
+            if (!string.IsNullOrEmpty(auth)) req.Headers.Authorization = AuthenticationHeaderValue.Parse(auth);
+            var resp = await client.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Card admin transactions API returned {Status} for {CardId}", resp.StatusCode, cardId);
+                return [];
+            }
+
+            var content = await resp.Content.ReadAsStringAsync(ct);
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CardTransactionDto>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return result?.Data ?? [];
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception fetching admin card transactions for {CardId}", cardId);
+            return [];
+        }
+    }
+
+    private async Task EnsureStatementForBillAsync(Bill bill, CardDto card, string auth, DateTime now, CancellationToken ct)
     {
         var existing = await statements.GetByBillIdAsync(bill.Id, ct);
         if (existing is not null)
@@ -192,8 +222,49 @@ public class GenerateAdminBillCommandHandler(
         };
 
         await statements.AddAsync(statement, ct);
+
+        var txns = await GetCardTransactionsAsync(bill.CardId, auth, ct);
+        var lines = txns
+            .Where(t => t.DateUtc >= bill.BillingDateUtc && t.DateUtc <= now)
+            .OrderBy(t => t.DateUtc)
+            .Select(t => new StatementTransaction
+            {
+                Id = Guid.NewGuid(),
+                StatementId = statement.Id,
+                SourceTransactionId = t.Id,
+                Type = t.Type switch
+                {
+                    1 => "Purchase",
+                    2 => "Payment",
+                    3 => "Refund",
+                    _ => "Unknown"
+                },
+                Amount = t.Amount,
+                Description = t.Description,
+                DateUtc = t.DateUtc,
+                CreatedAtUtc = now
+            })
+            .ToList();
+
+        if (lines.Count > 0)
+        {
+            await statements.AddTransactionsAsync(lines, ct);
+        }
     }
 
     private record CardDto(Guid Id, Guid UserId, string Network, Guid IssuerId, decimal CreditLimit, decimal OutstandingBalance, int BillingCycleStartDay);
     private record UserDto(Guid Id, string Email, string FullName);
+    private record CardTransactionDto(Guid Id, int Type, decimal Amount, string Description, DateTime DateUtc);
+
+    private class UserResponseWrapper
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public UserPayload? Data { get; set; }
+    }
+
+    private class UserPayload
+    {
+        public UserDto? User { get; set; }
+    }
 }

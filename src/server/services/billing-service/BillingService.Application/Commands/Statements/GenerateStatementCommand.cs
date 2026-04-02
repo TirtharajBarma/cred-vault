@@ -23,6 +23,13 @@ public class GenerateStatementCommandHandler(
     {
         logger.LogInformation("GenerateStatement: CardId={CardId}, UserId={UserId}", request.CardId, request.UserId);
 
+        var existingStatements = await statementRepository.GetByCardIdAsync(request.CardId, ct);
+        if (existingStatements.Count > 0)
+        {
+            var latest = existingStatements.OrderByDescending(s => s.GeneratedAtUtc).First();
+            return new StatementResult(true, latest.Id, "Statement already exists for this card");
+        }
+
         var card = await FetchCardAsync(request.CardId, request.AuthorizationHeader, ct);
         if (card == null)
         {
@@ -42,12 +49,6 @@ public class GenerateStatementCommandHandler(
 
         var periodStart = transactions.Min(t => t.dateUtc).Date;
         var periodEnd = DateTime.UtcNow.Date;
-
-        var existingStatements = await statementRepository.GetByCardIdAsync(request.CardId, ct);
-        if (existingStatements.Any(s => s.PeriodStartUtc == periodStart))
-        {
-            return new StatementResult(false, null, "Statement already exists for this period");
-        }
 
         // type: 1=Purchase, 2=Payment, 3=Refund
         var purchases = transactions.Where(t => t.type == 1).ToList();
@@ -215,5 +216,4 @@ public class GenerateStatementCommandHandler(
     private record ApiResponseWrapper<T>(bool Success, string Message, T? Data);
     public record CardDto(Guid Id, Guid UserId, string network, Guid issuerId, string issuerName, string last4, decimal creditLimit, decimal availableCredit, decimal outstandingBalance);
     public record TransactionDto(Guid Id, Guid CardId, Guid UserId, int type, decimal amount, string description, DateTime dateUtc);
-    private record CardTransactionRef(Guid Id, int type, decimal amount, string description, DateTime dateUtc);
 }

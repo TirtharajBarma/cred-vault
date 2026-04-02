@@ -185,6 +185,20 @@ public class CardsController(IMediator mediator) : BaseApiController
         return CreateResponse(true, CardMapping.ToDto(card), "Card fetched successfully.");
     }
 
+    [HttpGet("admin/{cardId:guid}/transactions")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> AdminGetCardTransactions(
+        Guid cardId,
+        [FromServices] ICardRepository cardRepository,
+        CancellationToken cancellationToken)
+    {
+        var card = await cardRepository.GetByIdAsync(cardId, cancellationToken);
+        if (card is null) return CreateResponse(false, (object?)null, "Card not found.", "CardNotFound");
+
+        var txns = await cardRepository.GetTransactionsByCardIdAsync(cardId, cancellationToken);
+        return CreateResponse(true, txns, "Transactions fetched successfully.");
+    }
+
     public sealed class UpdateCardByAdminRequest
     {
         public decimal CreditLimit { get; set; }
