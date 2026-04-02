@@ -114,6 +114,25 @@
     },
 
     {
+      "DownstreamPathTemplate": "/api/v1/billing/statements",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "localhost", "Port": 5003 }
+      ],
+      "UpstreamPathTemplate": "/api/v1/billing/statements",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/statements/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "localhost", "Port": 5003 }
+      ],
+      "UpstreamPathTemplate": "/api/v1/billing/statements/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ]
+    },
+
+    {
       "DownstreamPathTemplate": "/api/v1/payments",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [

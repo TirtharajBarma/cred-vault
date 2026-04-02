@@ -88,7 +88,7 @@
                 <div>
                   <p class="text-[11px] font-black uppercase tracking-[0.3em] text-[#615e5c] mb-2">Total Outstanding</p>
                   <h1 class="text-5xl font-black text-[#1b1c1c] tracking-tighter">
-                    {{ c.outstandingBalance | currency:'USD' }}
+                    {{ c.outstandingBalance | currency:'INR' }}
                   </h1>
                 </div>
                 <div class="flex flex-wrap items-center gap-4 justify-center md:justify-start">
@@ -101,11 +101,11 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
                 <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest mb-3">Credit Limit</p>
-                <p class="text-2xl font-black text-[#1b1c1c]">{{ c.creditLimit | currency:'USD' }}</p>
+                <p class="text-2xl font-black text-[#1b1c1c]">{{ c.creditLimit | currency:'INR' }}</p>
               </div>
               <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
                 <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest mb-3">Available</p>
-                <p class="text-2xl font-black text-emerald-500">{{ (c.creditLimit - c.outstandingBalance) | currency:'USD' }}</p>
+                <p class="text-2xl font-black text-emerald-500">{{ (c.creditLimit - c.outstandingBalance) | currency:'INR' }}</p>
               </div>
               <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
                 <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest mb-3">Rewards</p>
@@ -154,7 +154,7 @@
                       </div>
                       <div class="text-right shrink-0">
                         <p [class]="'font-black text-xl ' + (tx.type === 1 ? 'text-red-500' : 'text-emerald-500')">
-                          {{ tx.type === 1 ? '-' : '+' }}{{ tx.amount | currency:'USD' }}
+                          {{ tx.type === 1 ? '-' : '+' }}{{ tx.amount | currency:'INR' }}
                         </p>
                         <p class="text-[10px] font-bold text-[#615e5c] uppercase tracking-widest mt-1">
                           {{ tx.type === 1 ? 'Purchase' : (tx.type === 2 ? 'Payment' : 'Refund') }}
@@ -262,7 +262,7 @@
                       <div class="space-y-2 group">
                         <div class="flex justify-between text-xs font-black uppercase tracking-widest transition-transform origin-left">
                           <span class="text-[#615e5c]">{{ item.name }}</span>
-                          <span class="text-[#1b1c1c]">{{ item.amount | currency:'USD' }}</span>
+                          <span class="text-[#1b1c1c]">{{ item.amount | currency:'INR' }}</span>
                         </div>
                         <div class="h-2 w-full bg-mist-ivory rounded-full overflow-hidden">
                           <div [class]="'h-full rounded-full transition-all duration-1000 ' + getProgressBarColor(item.name)" 

@@ -26,6 +26,7 @@ public static class CardMapping
             BillingCycleStartDay = card.BillingCycleStartDay,
             IsDefault = card.IsDefault,
             IsVerified = card.IsVerified,
+            IsDeleted = card.IsDeleted,
             CreatedAtUtc = card.CreatedAtUtc,
             UpdatedAtUtc = card.UpdatedAtUtc
         };

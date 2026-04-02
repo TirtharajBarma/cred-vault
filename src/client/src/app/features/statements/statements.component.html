@@ -27,23 +27,32 @@
             {{ getSelectedCardLabel() }}
           </button>
           @if (showFilterDropdown()) {
-            <div class="absolute top-full mt-2 right-0 w-64 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden z-50">
+            <div class="absolute top-full mt-2 right-0 w-72 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden z-50">
               <button 
                 (click)="selectCardFilter('all')"
-                class="w-full px-6 py-3 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-2"
-                [class.bg-primary-container/20]="selectedCardFilter() === 'all'"
+                class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
+                [class.bg-[#8a5100]/10]="selectedCardFilter() === 'all'"
               >
-                <span class="material-symbols-outlined text-sm">credit_card</span>
-                All Cards
+                <span class="material-symbols-outlined text-lg text-[#8a5100]">credit_card</span>
+                <div class="flex flex-col">
+                  <span class="font-bold text-[#1b1c1c]">All Cards</span>
+                  <span class="text-xs text-[#615e5c]">View all statements</span>
+                </div>
               </button>
               @for (card of cardOptions(); track card.id) {
                 <button 
                   (click)="selectCardFilter(card.id)"
-                  class="w-full px-6 py-3 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-2"
-                  [class.bg-primary-container/20]="selectedCardFilter() === card.id"
+                  class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
+                  [class.bg-[#8a5100]/10]="selectedCardFilter() === card.id"
                 >
-                  <span class="material-symbols-outlined text-sm">credit_card</span>
-                  {{ card.issuerName }} *{{ card.last4 }}
+                  <div [class]="card.network === 'Mastercard' ? 'bg-[#eb001b]/10 text-[#eb001b]' : 'bg-[#1a1f71]/10 text-[#1a1f71]'"
+                       class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold">
+                    {{ card.network === 'Mastercard' ? 'M' : card.network === 'Visa' ? 'V' : 'C' }}
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="font-bold text-[#1b1c1c]">{{ card.issuerName }}</span>
+                    <span class="text-xs text-[#615e5c]">•••• {{ card.last4 }} • {{ card.network }}</span>
+                  </div>
                 </button>
               }
             </div>
@@ -86,16 +95,20 @@
               </div>
               <div>
                 <h3 class="text-xl font-semibold">{{ stmt.statementPeriod }}</h3>
-                <p class="text-sm text-[#615e5c]">
-                  <span class="font-medium">{{ getCardDisplay(stmt.cardId) }}</span> • 
-                  <span class="uppercase tracking-wide">Cycle Ends {{ stmt.periodEndUtc | date:'MMM dd' }}</span>
-                </p>
+                <div class="flex items-center gap-3 mt-1">
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-[#f6f3f2] rounded-full">
+                    <span class="material-symbols-outlined text-sm text-[#8a5100]">credit_card</span>
+                    <span class="text-sm font-bold text-[#1b1c1c]">{{ getCardDisplay(stmt.cardId) }}</span>
+                  </span>
+                  <span class="text-[#d8c3b2]">|</span>
+                  <span class="text-sm text-[#615e5c]">Due {{ stmt.periodEndUtc | date:'MMM dd' }}</span>
+                </div>
               </div>
             </div>
 
             <div class="flex flex-col md:text-right">
               <span class="text-sm font-medium text-[#534437]">Total Amount</span>
-              <span [ngClass]="i === 0 ? 'text-3xl font-bold' : 'text-2xl font-semibold'">{{ stmt.closingBalance | currency:'USD' }}</span>
+              <span [ngClass]="i === 0 ? 'text-3xl font-bold' : 'text-2xl font-semibold'">{{ getDisplayAmount(stmt) | currency:'INR' }}</span>
             </div>
 
             <div class="flex flex-wrap items-center gap-4 md:gap-6">
@@ -136,147 +149,3 @@
     }
   </main>
 </div>
-
-<!-- STATEMENT DETAIL MODAL -->
-@if (showDetailModal() && selectedStatement()) {
-  <div class="fixed inset-0 z-[100] flex items-center justify-center p-6 md:p-12 animate-in fade-in duration-300" (click)="closeDetail()">
-    <div class="absolute inset-0 bg-charcoal/40 backdrop-blur-2xl"></div>
-    
-    <div class="relative bg-mist-cream w-full max-w-5xl h-[90vh] rounded-[3.5rem] shadow-[0_50px_150px_-30px_rgba(0,0,0,0.5)] border border-white overflow-hidden flex flex-col" 
-         (click)="$event.stopPropagation()">
-     
-      <!-- Modal Header -->
-      <div class="p-10 md:px-16 border-b border-charcoal/5 flex justify-between items-center bg-white/40 sticky top-0 z-20">
-        <div class="flex items-center gap-6">
-          <div class="w-16 h-16 bg-charcoal rounded-[1.5rem] flex items-center justify-center text-white shadow-xl">
-             <span class="material-symbols-outlined text-3xl">receipt</span>
-          </div>
-          <div>
-            <h2 class="text-3xl font-black text-charcoal tracking-tight">{{ selectedStatement()?.statementPeriod }}</h2>
-            <p class="text-misty-gray font-bold text-sm">
-              {{ getCardDisplay(selectedStatement()?.cardId || '') }} • Ref: #ST-{{ selectedStatement()?.id?.slice(0,8)?.toUpperCase() }}
-            </p>
-          </div>
-        </div>
-        <button (click)="closeDetail()" class="p-4 hover:bg-mist-ivory rounded-3xl transition-all group">
-          <span class="material-symbols-outlined text-charcoal/40 group-hover:text-charcoal group-hover:rotate-90 transition-all">close</span>
-        </button>
-      </div>
-
-      <!-- Scrollable Content -->
-      <div class="flex-1 overflow-y-auto custom-scrollbar p-10 md:px-16 pb-20">
-        
-        <!-- Top Financial Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-10 mb-16">
-          
-          <!-- Balance Widget -->
-          <div class="md:col-span-2 bg-charcoal rounded-[2.5rem] p-10 text-white relative overflow-hidden group">
-            <div class="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[80px] -mr-20 -mt-20"></div>
-            <div class="relative z-10 flex flex-col h-full justify-between">
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 mb-3">Total Outstanding</p>
-                <h3 class="text-7xl font-black tracking-tighter mb-4">{{ selectedStatement()?.closingBalance | currency:'USD' }}</h3>
-              </div>
-              <div class="flex items-center gap-10">
-                <div class="space-y-1">
-                  <p class="text-[9px] font-bold text-white/40 uppercase tracking-widest">Min Amount Due</p>
-                  <p class="text-xl font-black text-primary">{{ selectedStatement()?.minimumDue | currency:'USD' }}</p>
-                </div>
-                <div class="space-y-1">
-                  <p class="text-[9px] font-bold text-white/40 uppercase tracking-widest">Due Date</p>
-                  <p class="text-xl font-black">{{ (selectedStatement()?.dueDateUtc || '2026-04-15') | date:'MMM dd' }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card Snapshot -->
-          <div class="bg-white/80 rounded-[2.5rem] p-10 border border-charcoal/5 flex flex-col justify-between">
-            <div class="space-y-4">
-              <div class="flex justify-between items-start">
-                <span class="text-[10px] font-black text-misty-gray uppercase tracking-widest">{{ selectedStatement()?.issuerName }}</span>
-                <span class="material-symbols-outlined text-primary">credit_card</span>
-              </div>
-              <p class="text-2xl font-black text-charcoal tracking-widest">**** **** **** {{ selectedStatement()?.cardLast4 }}</p>
-            </div>
-            <div class="pt-6 border-t border-charcoal/5">
-               <div class="flex justify-between text-xs font-bold">
-                 <span class="text-misty-gray">Credit Limit</span>
-                 <span class="text-charcoal">{{ selectedStatement()?.creditLimit | currency:'USD' }}</span>
-               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Breakdown Table -->
-        <div class="mb-16">
-          <h3 class="text-xl font-black text-charcoal mb-8 tracking-tight">Statement Breakdown</h3>
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="bg-mist-ivory p-6 rounded-3xl border border-charcoal/5">
-              <p class="text-[9px] font-bold text-misty-gray uppercase tracking-widest mb-2">Opening Balance</p>
-              <p class="text-2xl font-black text-charcoal">{{ selectedStatement()?.openingBalance | currency:'USD' }}</p>
-            </div>
-            <div class="bg-red-50/50 p-6 rounded-3xl border border-red-100">
-              <p class="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-2 text-red-500">New Purchases</p>
-              <p class="text-2xl font-black text-red-600">+{{ selectedStatement()?.totalPurchases | currency:'USD' }}</p>
-            </div>
-            <div class="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100">
-              <p class="text-[9px] font-bold uppercase tracking-widest mb-2 text-emerald-500">Payments/Credits</p>
-              <p class="text-2xl font-black text-emerald-600">-{{ selectedStatement()?.totalPayments | currency:'USD' }}</p>
-            </div>
-            <div class="bg-mist-ivory p-6 rounded-3xl border border-charcoal/5">
-              <p class="text-[9px] font-bold text-misty-gray uppercase tracking-widest mb-2">Adjustments</p>
-              <p class="text-2xl font-black text-charcoal">{{ (selectedStatement()?.penaltyCharges || 0) + (selectedStatement()?.interestCharges || 0) | currency:'USD' }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Transaction Feed -->
-        <div>
-          <div class="flex items-center justify-between mb-8">
-            <h3 class="text-xl font-black text-charcoal tracking-tight">Transaction Detail</h3>
-            <span class="text-xs font-bold text-misty-gray">{{ selectedStatement()?.transactions?.length || 0 }} Entries</span>
-          </div>
-          
-          <div class="space-y-4">
-            @for (txn of selectedStatement()?.transactions; track txn.id) {
-              <div class="flex items-center justify-between p-6 bg-white/40 border border-charcoal/5 rounded-3xl hover:bg-white transition-all group">
-                <div class="flex items-center gap-5">
-                   <div class="size-12 bg-mist-ivory rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
-                     <span class="material-symbols-outlined text-misty-gray group-hover:text-primary transition-colors">
-                        {{ txn.amount > 0 ? 'shopping_cart' : 'payments' }}
-                     </span>
-                   </div>
-                   <div>
-                     <p class="font-bold text-charcoal">{{ txn.description }}</p>
-                     <p class="text-[10px] font-bold text-misty-gray uppercase tracking-widest">{{ txn.dateUtc | date:'MMM dd, yyyy' }} • {{ txn.type }}</p>
-                   </div>
-                </div>
-                <div class="text-right">
-                  <p [class]="'font-black text-lg ' + (txn.amount > 0 ? 'text-charcoal' : 'text-emerald-500')">
-                    {{ txn.amount > 0 ? '' : '-' }}{{ (txn.amount < 0 ? -txn.amount : txn.amount) | currency:'USD' }}
-                  </p>
-                </div>
-              </div>
-            } @empty {
-              <div class="py-20 text-center text-misty-gray font-bold">No transactions recorded for this period.</div>
-            }
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Modal Actions -->
-      <div class="p-10 md:px-16 border-t border-charcoal/5 bg-white/40 flex justify-end gap-4">
-        <button (click)="closeDetail()" class="h-14 px-8 border border-charcoal/10 text-charcoal font-bold rounded-2xl hover:bg-mist-ivory transition-all">
-          Close Preview
-        </button>
-        <button class="h-14 px-10 bg-charcoal text-white font-bold rounded-2xl flex items-center gap-3 hover:bg-primary hover:text-charcoal transition-all shadow-xl shadow-charcoal/20">
-          <span class="material-symbols-outlined text-sm">download</span>
-          Download PDF
-        </button>
-      </div>
-
-    </div>
-  </div>
-}

@@ -69,6 +69,16 @@ public class StatementsController(IMediator mediator) : BaseApiController
         var result = await mediator.Send(new GetAllStatementsQuery(), cancellationToken);
         return CreateResponse(result.Success, result.Statements, result.Message);
     }
+
+    [HttpGet("bill/{billId:guid}")]
+    public async Task<IActionResult> GetStatementByBillId(Guid billId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId is null) return UnauthorizedResponse();
+
+        var result = await mediator.Send(new GetStatementByBillIdQuery(userId.Value, billId), cancellationToken);
+        return CreateResponse(result.Success, result.Statement, result.Message);
+    }
 }
 
 public record GenerateStatementRequest(Guid CardId);

@@ -197,6 +197,10 @@ export class DashboardComponent implements OnInit {
     return null;
   }
 
+  isCardConfigured(card: CreditCard): boolean {
+    return card.isDeleted !== true && card.creditLimit > 0;
+  }
+
   getTotalAssets(): number {
     return this.cards().reduce((acc, card) => acc + card.creditLimit, 0);
   }
@@ -233,5 +237,13 @@ export class DashboardComponent implements OnInit {
         this.cancelDelete();
       }
     });
+  }
+
+  showNotConfiguredModal = signal(false);
+  notConfiguredCard = signal<CreditCard | null>(null);
+
+  openCardNotConfigured(event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
   }
 }

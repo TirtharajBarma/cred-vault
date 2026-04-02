@@ -19,6 +19,8 @@ export interface CreditCard {
   creditLimit: number;
   outstandingBalance: number;
   availableCredit: number;
+  isVerified: boolean;
+  isDeleted: boolean;
 }
 
 export enum TransactionType {

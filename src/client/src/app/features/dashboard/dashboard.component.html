@@ -23,14 +23,6 @@
       </button>
     </div>
 
-    <!-- Category Filters -->
-    <div class="flex items-center gap-6 mb-10 border-b border-[#d8c3b2]/20 overflow-x-auto no-scrollbar">
-      <button class="pb-4 text-sm font-bold text-[#8a5100] border-b-2 border-[#8a5100] whitespace-nowrap">All Cards ({{isLoading() ? '...' : cards().length}})</button>
-      <button class="pb-4 text-sm font-semibold text-[#615e5c] hover:text-[#1b1c1c] transition-colors whitespace-nowrap">Credit Cards</button>
-      <button class="pb-4 text-sm font-semibold text-[#615e5c] hover:text-[#1b1c1c] transition-colors whitespace-nowrap">Debit Cards</button>
-      <button class="pb-4 text-sm font-semibold text-[#615e5c] hover:text-[#1b1c1c] transition-colors whitespace-nowrap">Virtual Cards</button>
-    </div>
-
     <!-- Cards Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
       
@@ -45,67 +37,116 @@
       } @else {
         <!-- Real Cards -->
         @for (card of cards(); track card.id; let i = $index) {
-          <div [routerLink]="['/cards', card.id]" class="group relative transition-all duration-500 hover:-translate-y-2 cursor-pointer perspective">
-            <!-- Glass/Gradient Card Visual -->
-            <div [style]="getCardStyle(i)" class="w-full aspect-[1.6/1] rounded-[2rem] p-8 flex flex-col justify-between text-white shadow-2xl relative overflow-hidden group-hover:rotate-y-12">
-              
-              <div class="relative z-10 flex justify-between items-start">
-                <div class="space-y-3 flex flex-col">
-                  <span class="text-[8px] uppercase tracking-[0.2em] font-black opacity-40 block">{{ card.issuerName || 'PLATINUM' }}</span>
-                  <div class="w-10 h-7 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20">
-                    <span class="material-symbols-outlined text-white/40 text-xl">contactless</span>
+          @if (isCardConfigured(card)) {
+            <div [routerLink]="['/cards', card.id]" class="group relative transition-all duration-500 hover:-translate-y-2 cursor-pointer perspective">
+              <!-- Glass/Gradient Card Visual -->
+              <div [style]="getCardStyle(i)" class="w-full aspect-[1.6/1] rounded-[2rem] p-8 flex flex-col justify-between text-white shadow-2xl relative overflow-hidden group-hover:rotate-y-12">
+                
+                <div class="relative z-10 flex justify-between items-start">
+                  <div class="space-y-3 flex flex-col">
+                    <span class="text-[8px] uppercase tracking-[0.2em] font-black opacity-40 block">{{ card.issuerName || 'PLATINUM' }}</span>
+                    <div class="w-10 h-7 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20">
+                      <span class="material-symbols-outlined text-white/40 text-xl">contactless</span>
+                    </div>
+                  </div>
+                  <div class="w-14 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20 px-2">
+                    @if (getNetworkLogo(card.network); as logo) {
+                      <img [src]="logo" [alt]="card.network + ' logo'" [class]="'h-8 w-auto object-contain ' + (card.network === 'Mastercard' ? 'mix-blend-multiply' : '')" loading="lazy" />
+                    } @else {
+                      <span class="material-symbols-outlined text-white/40 text-xl">credit_card</span>
+                    }
                   </div>
                 </div>
-                <div class="w-14 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/20 px-2">
-                  @if (getNetworkLogo(card.network); as logo) {
-                    <img [src]="logo" [alt]="card.network + ' logo'" [class]="'h-8 w-auto object-contain ' + (card.network === 'Mastercard' ? 'mix-blend-multiply' : '')" loading="lazy" />
-                  } @else {
-                    <span class="material-symbols-outlined text-white/40 text-xl">credit_card</span>
-                  }
+
+                <div class="relative z-10">
+                  <p class="text-2xl font-display font-medium tracking-[0.3em] mb-4">
+                    •••• •••• •••• {{ card.last4 }}
+                  </p>
+                  <div class="flex justify-between items-end">
+                    <div>
+                      <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Card Holder</p>
+                      <p class="text-xs font-bold tracking-wider uppercase">{{ card.cardholderName }}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Expires</p>
+                      <p class="text-xs font-bold tracking-wider">{{ card.expMonth | number:'2.0' }}/{{ card.expYear.toString().slice(-2) }}</p>
+                    </div>
+                  </div>
                 </div>
+
+                <!-- Atmospheric Card Blur -->
+                <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-10 -translate-y-10 blur-3xl"></div>
               </div>
 
-              <div class="relative z-10">
-                <p class="text-2xl font-display font-medium tracking-[0.3em] mb-4">
-                  •••• •••• •••• {{ card.last4 }}
-                </p>
-                <div class="flex justify-between items-end">
-                  <div>
-                    <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Card Holder</p>
-                    <p class="text-xs font-bold tracking-wider uppercase">{{ card.cardholderName }}</p>
-                  </div>
-                  <div class="text-right">
-                    <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Expires</p>
-                    <p class="text-xs font-bold tracking-wider">{{ card.expMonth | number:'2.0' }}/{{ card.expYear.toString().slice(-2) }}</p>
-                  </div>
+              <!-- Card Footer Info -->
+              <div class="mt-5 flex justify-between items-start px-2">
+                <div>
+                  <h3 class="font-bold text-[#1b1c1c]">{{ card.issuerName || 'Premium Asset' }}</h3>
+                  <p class="text-2xl font-black text-[#1b1c1c] mt-1">
+                    {{ (card.creditLimit - card.outstandingBalance) | currency:'INR' }}
+                    <span class="text-[10px] font-bold text-[#615e5c] uppercase tracking-[0.2em] ml-1">Available</span>
+                  </p>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button (click)="confirmDeleteCard(card.id, card.issuerName + ' *' + card.last4, $event)" 
+                          class="p-2 hover:bg-red-50 rounded-full transition-colors group/delete"
+                          title="Delete this card">
+                    <span class="material-symbols-outlined text-[#615e5c]/30 group-hover/delete:text-red-500 transition-colors">delete</span>
+                  </button>
+                  <button class="p-2 hover:bg-[#f6f3f2] rounded-full transition-colors">
+                    <span class="material-symbols-outlined text-[#615e5c]/30">more_vert</span>
+                  </button>
                 </div>
               </div>
-
-              <!-- Atmospheric Card Blur -->
-              <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-10 -translate-y-10 blur-3xl"></div>
             </div>
+          } @else {
+            <!-- Unconfigured Card - Show Admin Not Configured Message -->
+            <div class="group relative transition-all duration-500 cursor-not-allowed" (click)="openCardNotConfigured($event)">
+              <div class="w-full aspect-[1.6/1] rounded-[2rem] p-8 flex flex-col justify-between bg-[#e4e2e1] border-2 border-dashed border-[#615e5c]/20 shadow-inner">
+                <div class="relative z-10 flex justify-between items-start">
+                  <div class="space-y-3 flex flex-col">
+                    <span class="text-[8px] uppercase tracking-[0.2em] font-black opacity-40 block">PENDING CONFIGURATION</span>
+                    <div class="w-10 h-7 bg-[#615e5c]/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-[#615e5c]/20">
+                      <span class="material-symbols-outlined text-[#615e5c]/40 text-xl">hourglass_empty</span>
+                    </div>
+                  </div>
+                  <div class="w-14 h-10 bg-[#615e5c]/10 rounded-lg flex items-center justify-center backdrop-blur-md border border-[#615e5c]/20 px-2">
+                    <span class="material-symbols-outlined text-[#615e5c]/40 text-xl">credit_card</span>
+                  </div>
+                </div>
 
-            <!-- Card Footer Info -->
-            <div class="mt-5 flex justify-between items-start px-2">
-              <div>
-                <h3 class="font-bold text-[#1b1c1c]">{{ card.issuerName || 'Premium Asset' }}</h3>
-                <p class="text-2xl font-black text-[#1b1c1c] mt-1">
-                  {{ (card.creditLimit - card.outstandingBalance) | currency:'USD' }}
-                  <span class="text-[10px] font-bold text-[#615e5c] uppercase tracking-[0.2em] ml-1">Available</span>
-                </p>
+                <div class="relative z-10">
+                  <p class="text-2xl font-display font-medium tracking-[0.3em] mb-4 text-[#615e5c]">
+                    •••• •••• •••• {{ card.last4 }}
+                  </p>
+                  <div class="flex justify-between items-end">
+                    <div>
+                      <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Card Holder</p>
+                      <p class="text-xs font-bold tracking-wider uppercase text-[#615e5c]">{{ card.cardholderName }}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-[9px] uppercase tracking-widest opacity-50 mb-1">Status</p>
+                      <p class="text-xs font-bold tracking-wider text-red-500">NOT CONFIGURED</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="absolute top-0 right-0 w-32 h-32 bg-[#615e5c]/5 rounded-full translate-x-10 -translate-y-10 blur-3xl"></div>
               </div>
-              <div class="flex items-center gap-1">
-                <button (click)="confirmDeleteCard(card.id, card.issuerName + ' *' + card.last4, $event)" 
-                        class="p-2 hover:bg-red-50 rounded-full transition-colors group/delete"
-                        title="Delete this card">
-                  <span class="material-symbols-outlined text-[#615e5c]/30 group-hover/delete:text-red-500 transition-colors">delete</span>
-                </button>
-                <button class="p-2 hover:bg-[#f6f3f2] rounded-full transition-colors">
-                  <span class="material-symbols-outlined text-[#615e5c]/30">more_vert</span>
-                </button>
+
+              <div class="mt-5 flex justify-between items-start px-2">
+                <div>
+                  <h3 class="font-bold text-[#615e5c]">{{ card.issuerName || 'Pending Card' }}</h3>
+                  <p class="text-lg font-semibold text-[#615e5c] mt-1">
+                    Not configured by admin
+                  </p>
+                </div>
+                <span class="px-4 py-2 bg-[#615e5c]/10 text-[#615e5c] text-xs font-bold uppercase tracking-wider rounded-full">
+                  Pending
+                </span>
               </div>
             </div>
-          </div>
+          }
         }
 
         <!-- Add Generic Card Button -->
@@ -164,7 +205,7 @@
               <!-- Amount -->
               <div class="text-right shrink-0">
                 <p [class]="'font-black text-xl ' + (tx.type === 1 ? 'text-red-500' : 'text-emerald-500')">
-                  {{ tx.type === 1 ? '-' : '+' }}{{ tx.amount | currency:'USD' }}
+                  {{ tx.type === 1 ? '-' : '+' }}{{ tx.amount | currency:'INR' }}
                 </p>
                 <p class="text-[10px] font-bold text-[#615e5c] uppercase tracking-widest mt-1">
                   {{ tx.type === 1 ? 'Purchase' : (tx.type === 2 ? 'Payment' : 'Refund') }}

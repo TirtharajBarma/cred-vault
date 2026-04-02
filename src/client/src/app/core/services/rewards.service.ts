@@ -121,6 +121,10 @@ export class StatementService {
     return this.http.get<ApiResponse<StatementDetail>>(`${this.baseUrl}/${statementId}`);
   }
 
+  getStatementByBillId(billId: string): Observable<ApiResponse<Statement | Statement[]>> {
+    return this.http.get<ApiResponse<Statement | Statement[]>>(`${this.baseUrl}/bill/${billId}`);
+  }
+
   generateStatement(cardId: string): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/generate`, { cardId });
   }

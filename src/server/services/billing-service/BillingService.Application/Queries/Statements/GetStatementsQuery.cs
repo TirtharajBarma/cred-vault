@@ -6,6 +6,7 @@ namespace BillingService.Application.Queries.Statements;
 
 public record GetMyStatementsQuery(Guid UserId) : IRequest<StatementsResult>;
 public record GetStatementByIdQuery(Guid UserId, Guid StatementId) : IRequest<StatementDetailResult>;
+public record GetStatementByBillIdQuery(Guid UserId, Guid BillId) : IRequest<StatementResult>;
 public record GetAllStatementsQuery : IRequest<StatementsResult>;
 
 public record StatementsResult(bool Success, List<StatementDto> Statements, string Message);
@@ -106,6 +107,28 @@ public class GetStatementByIdQueryHandler(IStatementRepository statementReposito
         );
 
         return new StatementDetailResult(true, detail, "Statement details fetched successfully");
+    }
+}
+
+public class GetStatementByBillIdQueryHandler(IStatementRepository statementRepository)
+    : IRequestHandler<GetStatementByBillIdQuery, StatementResult>
+{
+    public async Task<StatementResult> Handle(GetStatementByBillIdQuery request, CancellationToken ct)
+    {
+        var statement = await statementRepository.GetByBillIdAsync(request.BillId, ct);
+        if (statement == null || statement.UserId != request.UserId)
+        {
+            return new StatementResult(false, null!, "Statement not found for this bill");
+        }
+
+        var dto = new StatementDto(
+            statement.Id, statement.BillId, statement.CardId, statement.StatementPeriod,
+            statement.CardLast4, statement.CardNetwork, statement.IssuerName,
+            statement.ClosingBalance, statement.MinimumDue, statement.AmountPaid,
+            statement.Status, statement.PeriodEndUtc, statement.DueDateUtc
+        );
+
+        return new StatementResult(true, [dto], "Statement fetched successfully");
     }
 }
 

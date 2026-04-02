@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterModule, Router } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { BillingService, Bill, BillStatus } from '../../core/services/billing.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { PaymentService } from '../../core/services/payment.service';
@@ -18,7 +18,6 @@ export class BillsComponent implements OnInit {
   private billingService = inject(BillingService);
   private dashboardService = inject(DashboardService);
   private paymentService = inject(PaymentService);
-  private route = inject(ActivatedRoute);
   private router = inject(Router);
 
   bills = signal<Bill[]>([]);
@@ -41,6 +40,15 @@ export class BillsComponent implements OnInit {
   isVerifying = signal(false);
   otpError = signal<string | null>(null);
   paidAmount = signal(0);
+
+  paymentStage = signal<'initiated' | 'otp_sent' | 'processing' | 'completed'>('initiated');
+  canResendOtp = signal(true);
+
+  resendOtp(): void {
+    if (!this.canResendOtp()) return;
+    this.canResendOtp.set(false);
+    setTimeout(() => this.canResendOtp.set(true), 30000);
+  }
 
   totalOutstanding = computed(() => {
     return this.bills()
@@ -139,13 +147,14 @@ export class BillsComponent implements OnInit {
   }
 
   viewStatement(bill: Bill): void {
-    this.router.navigate(['/statements'], { queryParams: { cardId: bill.cardId, billId: bill.id } });
+    this.router.navigate(['/statements', bill.id]);
   }
 
   openPayment(bill: Bill): void {
     this.selectedBill.set(bill);
     this.paymentType.set('full');
     this.errorMessage.set(null);
+    this.paymentStage.set('initiated');
     this.showPaymentModal.set(true);
   }
 
@@ -169,6 +178,7 @@ export class BillsComponent implements OnInit {
     
     this.isProcessing.set(true);
     this.errorMessage.set(null);
+    this.paymentStage.set('processing');
 
     this.paymentService.initiatePayment({
       cardId: card.id,
@@ -180,15 +190,18 @@ export class BillsComponent implements OnInit {
         this.isProcessing.set(false);
         if (res.success && res.data) {
           this.paymentId.set(res.data.paymentId);
+          this.paymentStage.set('otp_sent');
           this.showPaymentModal.set(false);
           this.showOtpModal.set(true);
         } else {
           this.errorMessage.set(res.message || 'Payment initiation failed');
+          this.paymentStage.set('initiated');
         }
       },
       error: (err) => {
         this.isProcessing.set(false);
         this.errorMessage.set(err?.error?.message || 'Server error');
+        this.paymentStage.set('initiated');
       }
     });
   }

@@ -1,0 +1,34 @@
+.nav-link {
+  position: relative;
+  padding: 0.625rem 1.25rem;
+  color: #615e5c;
+  font-weight: 500;
+  font-size: 0.875rem;
+  letter-spacing: 0.025em;
+  transition: all 0.3s;
+  border-radius: 9999px;
+}
+
+.nav-link:hover {
+  color: #8a5100;
+  background-color: #f6f3f2;
+}
+
+.nav-link.active-nav-item {
+  color: #8a5100;
+  background-color: rgba(138, 81, 0, 0.1);
+  font-weight: 600;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  transition: all 0.3s;
+}
+
+.nav-link.active-nav-item::after {
+  border-color: rgba(138, 81, 0, 0.3);
+}

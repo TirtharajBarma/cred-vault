@@ -7,19 +7,19 @@
   </div>
 
   <!-- Center Side: Desktop Tabs (Hidden on mobile) -->
-  <div class="hidden md:flex items-center gap-8">
+  <div class="hidden md:flex items-center gap-2">
     @if (user()?.role !== 'admin') {
-      <a routerLink="/dashboard" routerLinkActive="text-[#1b1c1c]" [routerLinkActiveOptions]="{exact: true}" 
-         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Dashboard</a>
-      <a routerLink="/bills" routerLinkActive="text-[#1b1c1c]" 
-         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Payments</a>
-      <a routerLink="/statements" routerLinkActive="text-[#1b1c1c]" 
-         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Statements</a>
-      <a routerLink="/rewards" routerLinkActive="text-[#1b1c1c]" 
-         class="text-[#615e5c] font-medium font-manrope text-sm tracking-wide hover:text-[#8a5100] transition-colors duration-300">Rewards</a>
+      <a routerLink="/dashboard" routerLinkActive="active-nav-item" [routerLinkActiveOptions]="{exact: true}" 
+         class="nav-link">Dashboard</a>
+      <a routerLink="/bills" routerLinkActive="active-nav-item" 
+         class="nav-link">Bills</a>
+      <a routerLink="/statements" routerLinkActive="active-nav-item" 
+         class="nav-link">Statements</a>
+      <a routerLink="/rewards" routerLinkActive="active-nav-item" 
+         class="nav-link">Rewards</a>
     } @else {
-      <a routerLink="/admin/dashboard" routerLinkActive="text-[#1b1c1c]" 
-         class="text-[#615e5c] font-black font-manrope text-sm tracking-wide flex items-center gap-2 text-[#8a5100]">
+      <a routerLink="/admin/dashboard" routerLinkActive="active-nav-item" 
+         class="nav-link flex items-center gap-2 text-[#8a5100]">
         <span class="material-symbols-outlined text-sm">shield_person</span>
         Admin Console
       </a>
@@ -140,8 +140,8 @@
           </a>
           <a routerLink="/bills" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
              class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">payments</span>
-            Payments
+            <span class="material-symbols-outlined">receipt_long</span>
+            Bills
           </a>
           <a routerLink="/statements" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
              class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">

@@ -1,34 +1,27 @@
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
-import { StatementService, Statement, StatementDetail } from '../../core/services/rewards.service';
+import { Router } from '@angular/router';
+import { StatementService, Statement } from '../../core/services/rewards.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { CreditCard } from '../../core/models/card.models';
 
 @Component({
   selector: 'app-statements',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   templateUrl: './statements.component.html',
   styleUrls: ['./statements.component.css']
 })
 export class StatementsComponent implements OnInit {
   private statementService = inject(StatementService);
   private dashboardService = inject(DashboardService);
-  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   statements = signal<Statement[]>([]);
   cards = signal<CreditCard[]>([]);
   isLoading = signal(true);
-  selectedStatement = signal<StatementDetail | null>(null);
-  showDetailModal = signal(false);
-  isGenerating = signal(false);
-  generateCardId = signal<string | null>(null);
-  
   selectedCardFilter = signal<string>('all');
   showFilterDropdown = signal(false);
-
   currentPage = signal(1);
   itemsPerPage = 7;
 
@@ -60,7 +53,7 @@ export class StatementsComponent implements OnInit {
   getCardDisplay(cardId: string): string {
     const card = this.cards().find(c => c.id === cardId);
     if (card) {
-      return `${card.issuerName} ${card.network} *${card.last4}`;
+      return `${card.issuerName} *${card.last4}`;
     }
     const stmt = this.statements().find(s => s.cardId === cardId);
     if (stmt) {
@@ -69,25 +62,14 @@ export class StatementsComponent implements OnInit {
     return 'Unknown Card';
   }
 
+  getCardNetworkIcon(network: string): string {
+    if (network === 'Visa') return '🔴';
+    if (network === 'Mastercard') return '🟠';
+    return '💳';
+  }
+
   ngOnInit(): void {
     this.loadData();
-    
-    this.route.queryParams.subscribe(params => {
-      if (params['cardId']) {
-        this.selectedCardFilter.set(params['cardId']);
-      }
-      
-      // Auto-open statement detail if billId is provided
-      if (params['billId']) {
-        setTimeout(() => {
-          const billId = params['billId'];
-          const statement = this.statements().find(s => s.billId === billId);
-          if (statement) {
-            this.viewStatement(statement.id);
-          }
-        }, 1000);
-      }
-    });
   }
 
   loadData(): void {
@@ -95,24 +77,13 @@ export class StatementsComponent implements OnInit {
     this.dashboardService.getCards().subscribe({
       next: (res) => {
         this.cards.set(res.data || []);
-        this.statementService.getMyStatements().subscribe({
-          next: (res) => {
-            this.statements.set(res.data || []);
-            this.isLoading.set(false);
-            
-            // Check for query params again after statements loaded
-            this.route.queryParams.subscribe(params => {
-              if (params['billId']) {
-                const billId = params['billId'];
-                const statement = this.statements().find(s => s.billId === billId);
-                if (statement) {
-                  this.viewStatement(statement.id);
-                }
-              }
-            });
-          },
-          error: () => this.isLoading.set(false)
-        });
+      },
+      error: () => this.isLoading.set(false)
+    });
+    this.statementService.getMyStatements().subscribe({
+      next: (res) => {
+        this.statements.set(res.data || []);
+        this.isLoading.set(false);
       },
       error: () => this.isLoading.set(false)
     });
@@ -166,31 +137,15 @@ export class StatementsComponent implements OnInit {
       : 'bg-[#e4e2e1] text-[#615e5c]';
   }
 
+  getDisplayAmount(statement: Statement): number {
+    return statement.closingBalance > 0
+      ? statement.closingBalance
+      : statement.amountPaid > 0
+        ? statement.amountPaid
+        : statement.minimumDue;
+  }
+
   viewStatement(id: string): void {
-    this.statementService.getStatementById(id).subscribe({
-      next: (res) => {
-        if (res.data) {
-          this.selectedStatement.set(res.data);
-          this.showDetailModal.set(true);
-        }
-      }
-    });
-  }
-
-  closeDetail(): void {
-    this.showDetailModal.set(false);
-    this.selectedStatement.set(null);
-  }
-
-  generateStatement(cardId: string): void {
-    this.isGenerating.set(true);
-    this.generateCardId.set(cardId);
-    this.statementService.generateStatement(cardId).subscribe({
-      next: () => {
-        this.isGenerating.set(false);
-        this.loadData();
-      },
-      error: () => this.isGenerating.set(false)
-    });
+    this.router.navigate(['/statements', id]);
   }
 }

@@ -18,6 +18,7 @@ public sealed class CardDto
     public int BillingCycleStartDay { get; set; }
     public bool IsDefault { get; set; }
     public bool IsVerified { get; set; }
+    public bool IsDeleted { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }
