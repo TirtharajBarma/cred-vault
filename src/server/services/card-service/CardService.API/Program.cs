@@ -5,7 +5,6 @@ using CardService.Application.Commands.Cards;
 using CardService.Application.Queries.Cards;
 using CardService.API.Messaging;
 using CardService.Infrastructure.Persistence.Sql;
-using CardService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using MassTransit;
 using Shared.Contracts.Events.Identity;
@@ -51,10 +50,12 @@ try
         cfg.RegisterServicesFromAssemblyContaining<CreateCardCommand>();
         cfg.RegisterServicesFromAssemblyContaining<ListMyCardsQuery>();
     });
-    builder.Services.AddDbContext<CardDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("CardDb")));
+    builder.Services.AddDbContext<CardDbContext>(o =>
+    {
+        o.UseSqlServer(builder.Configuration.GetConnectionString("CardDb"));
+        o.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    });
     builder.Services.AddScoped<ICardRepository, SqlCardRepository>();
-    builder.Services.AddScoped<IViolationRepository, SqlViolationRepository>();
-    builder.Services.AddScoped<ICardDbContextAccessor, CardDbContextAccessor>();
 
     builder.Services.AddMassTransit(x =>
     {
@@ -63,7 +64,6 @@ try
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<CardDeductionSagaConsumer>();
         x.AddConsumer<BillPaidConsumer>();
-        x.AddConsumer<BillOverdueConsumer>();
 
         x.UsingRabbitMq((ctx, cfg) =>
         {
@@ -82,14 +82,12 @@ try
                 e.Bind<IUserDeleted>();
                 e.Bind<ICardDeductionRequested>();
                 e.Bind<IBillUpdateSucceeded>();
-                e.Bind<IBillOverdueDetected>();
                 e.Bind<IPaymentReversed>();
 
                 e.ConfigureConsumer<PaymentReversedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<CardDeductionSagaConsumer>(ctx);
                 e.ConfigureConsumer<BillPaidConsumer>(ctx);
-                e.ConfigureConsumer<BillOverdueConsumer>(ctx);
             });
         });
     });

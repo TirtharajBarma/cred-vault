@@ -111,10 +111,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/logs/system-logs.component').then(m => m.SystemLogsComponent)
       },
       {
-        path: 'violations',
-        loadComponent: () => import('./features/admin/violations/violations.component').then(m => m.ViolationsComponent)
-      },
-      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full'

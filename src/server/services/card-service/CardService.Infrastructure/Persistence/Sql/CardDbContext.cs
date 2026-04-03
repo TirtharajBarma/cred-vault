@@ -1,5 +1,4 @@
 using CardService.Domain.Entities;
-using Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CardService.Infrastructure.Persistence.Sql;
@@ -9,7 +8,6 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
     public DbSet<CardIssuer> CardIssuers => Set<CardIssuer>();
     public DbSet<CardTransaction> CardTransactions => Set<CardTransaction>();
-    public DbSet<CardViolation> CardViolations => Set<CardViolation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,29 +73,6 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.HasIndex(x => x.UserId);
             entity.HasIndex(x => x.DateUtc);
             entity.HasQueryFilter(x => !x.Card!.IsDeleted);
-        });
-
-        modelBuilder.Entity<CardViolation>(entity =>
-        {
-            entity.ToTable("CardViolations");
-            entity.HasKey(x => x.Id);
-            entity.HasOne(x => x.Card)
-                .WithMany()
-                .HasForeignKey(x => x.CardId)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.Property(x => x.CardId).IsRequired();
-            entity.Property(x => x.UserId).IsRequired();
-            entity.Property(x => x.BillId);
-            entity.Property(x => x.Type).IsRequired().HasConversion<int>();
-            entity.Property(x => x.StrikeCount).IsRequired();
-            entity.Property(x => x.Reason).IsRequired().HasMaxLength(500);
-            entity.Property(x => x.PenaltyAmount).IsRequired().HasColumnType("decimal(18,2)");
-            entity.Property(x => x.IsActive).IsRequired();
-            entity.Property(x => x.AppliedAtUtc).IsRequired();
-            entity.Property(x => x.ClearedAtUtc);
-            entity.HasIndex(x => x.CardId);
-            entity.HasIndex(x => x.UserId);
-            entity.HasIndex(x => new { x.CardId, x.IsActive });
         });
     }
 }

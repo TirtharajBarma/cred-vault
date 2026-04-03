@@ -33,9 +33,7 @@ import { AdminService } from '../../../core/services/admin.service';
               </div>
             </div>
             <div class="text-right">
-              @if (card()?.isBlocked) {
-                <span class="px-4 py-2 bg-red-500 text-white rounded-lg text-lg font-bold">BLOCKED</span>
-              } @else if ((card()?.creditLimit ?? 0) <= 0) {
+              @if ((card()?.creditLimit ?? 0) <= 0) {
                 <span class="px-4 py-2 bg-amber-500 text-white rounded-lg text-lg font-bold">NEEDS SETUP</span>
               } @else {
                 <span class="px-4 py-2 bg-emerald-500 text-white rounded-lg text-lg font-bold">ACTIVE</span>
@@ -76,44 +74,6 @@ import { AdminService } from '../../../core/services/admin.service';
                     <div class="h-full bg-gradient-to-r from-emerald-500 to-red-500" 
                          [style.width.%]="utilizationPercent()"></div>
                   </div>
-                </div>
-              }
-            </div>
-
-            <!-- Violations -->
-            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                <h2 class="font-bold text-gray-900">Violations ({{ violations().length }})</h2>
-                @if (violations().length > 0) {
-                  <button (click)="clearViolations()" class="px-4 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200">
-                    Clear All
-                  </button>
-                }
-              </div>
-              @if (isLoadingViolations()) {
-                <div class="p-8 text-center">
-                  <div class="animate-spin w-8 h-8 border-4 border-gray-300 border-t-gray-800 rounded-full mx-auto"></div>
-                </div>
-              } @else if (violations().length > 0) {
-                <div class="divide-y divide-gray-100">
-                  @for (v of violations(); track v.id) {
-                    <div class="px-6 py-4">
-                      <div class="flex justify-between items-start">
-                        <div>
-                          <p class="font-semibold text-gray-900 flex items-center gap-2">
-                            <span class="text-red-500">⚠️</span> {{ v.reason }}
-                          </p>
-                          <p class="text-sm text-gray-500 mt-1">Strike #{{ v.strikeCount }} • Penalty: {{ v.penaltyAmount | currency }}</p>
-                        </div>
-                        <span class="text-xs text-gray-400">{{ formatDate(v.createdAtUtc) }}</span>
-                      </div>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <div class="p-8 text-center text-emerald-600">
-                  <p class="text-2xl mb-2">✓</p>
-                  <p class="font-semibold">No violations on this card</p>
                 </div>
               }
             </div>
@@ -219,13 +179,6 @@ import { AdminService } from '../../../core/services/admin.service';
                         class="w-full px-4 py-2.5 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 disabled:opacity-50">
                   {{ isSaving() ? 'Saving...' : 'Save Changes' }}
                 </button>
-
-                @if (card()?.isBlocked) {
-                  <button (click)="unblockCard()"
-                          class="w-full px-4 py-2.5 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600">
-                    Unblock Card
-                  </button>
-                }
               </div>
             </div>
           </div>
@@ -245,11 +198,9 @@ export class AdminCardDetailComponent implements OnInit {
   private adminService = inject(AdminService);
 
   card = signal<any>(null);
-  violations = signal<any[]>([]);
   statements = signal<any[]>([]);
 
   isLoading = signal(true);
-  isLoadingViolations = signal(false);
   isLoadingStatements = signal(false);
   isSaving = signal(false);
   updateMessage = signal<string | null>(null);
@@ -267,7 +218,6 @@ export class AdminCardDetailComponent implements OnInit {
     this.cardId = this.route.snapshot.paramMap.get('cardId');
     if (this.cardId) {
       this.loadCard(this.cardId);
-      this.loadViolations(this.cardId);
       this.loadStatements(this.cardId);
     }
   }
@@ -286,18 +236,6 @@ export class AdminCardDetailComponent implements OnInit {
         this.isLoading.set(false);
       },
       error: () => this.isLoading.set(false)
-    });
-  }
-
-  loadViolations(cardId: string) {
-    this.isLoadingViolations.set(true);
-    this.adminService.getCardViolations(cardId).subscribe({
-      next: (res) => {
-        const rows = res.data?.data || res.data || [];
-        this.violations.set((Array.isArray(rows) ? rows : []).filter((v: any) => v?.isActive));
-        this.isLoadingViolations.set(false);
-      },
-      error: () => this.isLoadingViolations.set(false)
     });
   }
 
@@ -377,30 +315,6 @@ export class AdminCardDetailComponent implements OnInit {
         this.isSaving.set(false);
         this.updateMessage.set('Failed to update card');
         this.updateSuccess.set(false);
-      }
-    });
-  }
-
-  unblockCard() {
-    const card = this.card();
-    if (!card) return;
-    this.adminService.unblockCard(card.id).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.card.set({ ...card, isBlocked: false });
-        }
-      }
-    });
-  }
-
-  clearViolations() {
-    const card = this.card();
-    if (!card || !confirm('Clear all violations?')) return;
-    this.adminService.clearCardViolations(card.id).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.violations.set([]);
-        }
       }
     });
   }

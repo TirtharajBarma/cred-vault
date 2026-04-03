@@ -414,33 +414,9 @@
             </div>
           </div>
 
-          <!-- Violations -->
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div class="flex justify-between items-center mb-2">
-              <label class="text-sm font-semibold text-red-700">Violations ({{ cardViolations().length }})</label>
-              @if (cardViolations().length > 0) {
-                <button (click)="clearCardViolations(selectedCard().id)" class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">Clear All</button>
-              }
-            </div>
-            @if (isLoadingViolations()) {
-              <p class="text-sm text-gray-500">Loading...</p>
-            } @else if (cardViolations().length > 0) {
-              <div class="space-y-1">
-                @for (v of cardViolations(); track v.id) {
-                  <p class="text-xs text-red-600">⚠️ {{ v.reason }} - {{ v.penaltyAmount | currency }}</p>
-                }
-              </div>
-            } @else {
-              <p class="text-sm text-green-600">✓ No violations</p>
-            }
-          </div>
-
           @if (selectedCard().isBlocked) {
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
               <p class="text-amber-700 font-semibold">This card is blocked</p>
-              <button (click)="unblockCard(selectedCard().id)" class="mt-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">
-                Unblock Card
-              </button>
             </div>
           }
 

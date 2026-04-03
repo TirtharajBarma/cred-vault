@@ -35,7 +35,6 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   userStatements = signal<any[]>([]);
   userLogs = signal<any[]>([]);
   userAudit = signal<any[]>([]);
-  cardViolations = signal<any[]>([]);
 
   // Loading states
   isLoadingCards = signal(false);
@@ -43,7 +42,6 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   isLoadingStatements = signal(false);
   isLoadingLogs = signal(false);
   isLoadingAudit = signal(false);
-  isLoadingViolations = signal(false);
 
   // Card Modal
   selectedCard = signal<any>(null);
@@ -264,27 +262,10 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     this.editCreditLimit = Number(card.creditLimit ?? 0);
     this.editOutstandingBalance = Number(card.outstandingBalance ?? 0);
     this.editBillingCycleStartDay = Number(card.billingCycleStartDay ?? 1);
-    this.loadCardViolations(card.id);
-  }
-
-  loadCardViolations(cardId: string) {
-    this.isLoadingViolations.set(true);
-    this.adminService.getCardViolations(cardId).subscribe({
-      next: (res) => {
-        const violations = res.data?.data || res.data || [];
-        this.cardViolations.set((Array.isArray(violations) ? violations : []).filter((v: any) => v?.isActive));
-        this.isLoadingViolations.set(false);
-      },
-      error: () => {
-        this.cardViolations.set([]);
-        this.isLoadingViolations.set(false);
-      }
-    });
   }
 
   closeCardDetails() {
     this.selectedCard.set(null);
-    this.cardViolations.set([]);
   }
 
   updateSelectedCard() {
@@ -318,29 +299,6 @@ export class UserManagementComponent implements OnInit, OnDestroy {
       error: () => {
         this.isUpdatingCard.set(false);
         this.cardUpdateMessage.set('Failed to update card');
-      }
-    });
-  }
-
-  clearCardViolations(cardId: string) {
-    if (!confirm('Clear all violations for this card?')) return;
-    this.adminService.clearCardViolations(cardId).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.cardViolations.set([]);
-          this.showToast('Violations cleared');
-        }
-      }
-    });
-  }
-
-  unblockCard(cardId: string) {
-    this.adminService.unblockCard(cardId).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.loadCards();
-          this.showToast('Card unblocked');
-        }
       }
     });
   }
