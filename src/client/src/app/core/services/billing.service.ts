@@ -2,8 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiResponse } from '../models/auth.models';
+import { environment } from '../../../environments/environment';
 
-const API_GATEWAY = 'http://localhost:5006';
+const API_GATEWAY = environment.apiGatewayUrl;
 
 export interface Bill {
   id: string;

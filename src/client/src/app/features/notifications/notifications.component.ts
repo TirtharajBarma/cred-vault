@@ -2,6 +2,7 @@ import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 export interface Notification {
   id: string;
@@ -40,7 +41,7 @@ export class NotificationsComponent implements OnInit {
       return;
     }
 
-    this.http.get<any>(`http://localhost:5006/api/v1/notifications/logs?pageSize=100&email=${email}`).subscribe({
+    this.http.get<any>(`${environment.apiGatewayUrl}/api/v1/notifications/logs?pageSize=100&email=${email}`).subscribe({
       next: (res) => {
         const data = res?.data?.data || res?.data || [];
         this.notifications.set(Array.isArray(data) ? data : []);

@@ -3,8 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiResponse } from '../models/auth.models';
 import { CreditCard, CardTransaction, CreateCardRequest, CardIssuer } from '../models/card.models';
+import { environment } from '../../../environments/environment';
 
-const API_GATEWAY = 'http://localhost:5006';
+const API_GATEWAY = environment.apiGatewayUrl;
 
 @Injectable({
   providedIn: 'root'

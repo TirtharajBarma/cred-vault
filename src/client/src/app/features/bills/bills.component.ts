@@ -128,18 +128,13 @@ export class BillsComponent implements OnInit {
     return [...source].sort((a, b) => {
       const aPriority = this.getBillPriority(a);
       const bPriority = this.getBillPriority(b);
+      
       if (aPriority !== bPriority) return aPriority - bPriority;
 
-      const aDue = new Date(a.dueDateUtc).getTime();
-      const bDue = new Date(b.dueDateUtc).getTime();
+      const aDate = new Date(a.billingDateUtc).getTime();
+      const bDate = new Date(b.billingDateUtc).getTime();
 
-      if (aPriority <= 2) {
-        // For active dues, nearest date first.
-        return aDue - bDue;
-      }
-
-      // For paid/cancelled rows, show latest first.
-      return bDue - aDue;
+      return bDate - aDate;
     });
   }
 

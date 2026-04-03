@@ -7,6 +7,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   
+  <!-- Environment Variables -->
+  <script>
+    window.__env = {
+      apiGatewayUrl: (function() {
+        var host = window.location.hostname;
+        var port = window.location.port;
+        var protocol = window.location.protocol;
+        // For production, use relative URL (same origin)
+        if (host !== 'localhost' && host !== '127.0.0.1') {
+          return protocol + '//' + host + (port ? ':' + port : '');
+        }
+        // For development, use configured gateway
+        return 'http://localhost:5006';
+      })()
+    };
+  </script>
+  
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
