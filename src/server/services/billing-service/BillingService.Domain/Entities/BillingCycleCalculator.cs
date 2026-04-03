@@ -2,12 +2,9 @@ namespace BillingService.Domain.Entities;
 
 public static class BillingCycleCalculator
 {
-    public const int GracePeriodDays = 12;
-    public const decimal MonthlyInterestRate = 0.035m;
-
     public static DateTime CalculateDueDate(DateTime billingDate)
     {
-        return billingDate.AddDays(GracePeriodDays);
+        return billingDate.AddDays(12);
     }
 
     public static DateTime GetCurrentBillingPeriodStart(int billingCycleStartDay)
@@ -31,13 +28,5 @@ public static class BillingCycleCalculator
         var billingDate = GetCurrentBillingPeriodStart(billingCycleStartDay);
         var dueDate = CalculateDueDate(billingDate);
         return (billingDate, dueDate);
-    }
-
-    public static decimal CalculateMonthlyInterest(decimal overdueAmount, int overdueMonths)
-    {
-        if (overdueAmount <= 0 || overdueMonths <= 0)
-            return 0;
-        
-        return Math.Round(overdueAmount * MonthlyInterestRate * overdueMonths, 2);
     }
 }

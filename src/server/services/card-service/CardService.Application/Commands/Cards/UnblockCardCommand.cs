@@ -24,9 +24,7 @@ public class UnblockCardCommandHandler(ICardRepository cards, ILogger<UnblockCar
             return new() { Success = false, Message = "Card is not blocked" };
         }
 
-        card.StrikeCount = 0;
-        card.IsBlocked = false;
-        card.UnblockedAtUtc = DateTime.UtcNow;
+        card.ClearStrikes();
         card.UpdatedAtUtc = DateTime.UtcNow;
 
         await cards.UpdateAsync(card, ct);

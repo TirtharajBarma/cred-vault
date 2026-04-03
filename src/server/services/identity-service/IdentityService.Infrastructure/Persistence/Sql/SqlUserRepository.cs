@@ -61,15 +61,4 @@ public sealed class SqlUserRepository(IdentityDbContext dbContext) : IUserReposi
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Status, x => x.Count, ct);
     }
-
-    public async Task SoftDeleteAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
-        if (user != null)
-        {
-            user.Status = UserStatus.Deleted;
-            user.UpdatedAtUtc = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-    }
 }

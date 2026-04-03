@@ -27,17 +27,3 @@ public class NotificationLog
     public string? TraceId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }
-
-public class NotificationLogDto
-{
-    public Guid Id { get; set; }
-    public string? UserId { get; set; }
-    public string Recipient { get; set; } = string.Empty;
-    public string Subject { get; set; } = string.Empty;
-    public string Body { get; set; } = string.Empty;
-    public string Type { get; set; } = string.Empty;
-    public string IsSuccess { get; set; } = "No";
-    public string? ErrorMessage { get; set; }
-    public string? TraceId { get; set; }
-    public DateTime CreatedAtUtc { get; set; }
-}

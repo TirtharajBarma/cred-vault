@@ -9,7 +9,11 @@ public class BillingDbContextFactory : IDesignTimeDbContextFactory<BillingDbCont
     public BillingDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<BillingDbContext>();
-        optionsBuilder.UseSqlServer("Server=localhost,1434;Database=credvault_billing;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;");
+        
+        var connectionString = Environment.GetEnvironmentVariable("BILLING_DB_CONNECTION") 
+            ?? "Server=localhost,1434;Database=credvault_billing;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;";
+        
+        optionsBuilder.UseSqlServer(connectionString);
         return new BillingDbContext(optionsBuilder.Options);
     }
 }

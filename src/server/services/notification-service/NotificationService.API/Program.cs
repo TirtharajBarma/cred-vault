@@ -32,7 +32,15 @@ try
 
     builder.Services.AddControllers();
     builder.Services.AddStandardApi();
-    builder.Services.AddStandardCors();
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowWebClients", policy =>
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+    });
     builder.Services.AddStandardAuth(builder.Configuration);
 
     builder.Services.AddDbContext<NotificationDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("NotificationDb")));

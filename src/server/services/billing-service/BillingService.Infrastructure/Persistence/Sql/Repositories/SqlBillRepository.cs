@@ -6,11 +6,6 @@ namespace BillingService.Infrastructure.Persistence.Sql.Repositories;
 
 public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillRepository
 {
-    public async Task<Bill?> GetByIdAsync(Guid billId, CancellationToken cancellationToken = default)
-    {
-        return await dbContext.Bills.FirstOrDefaultAsync(x => x.Id == billId, cancellationToken);
-    }
-
     public async Task<Bill?> GetByIdAndUserIdAsync(Guid billId, Guid userId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Bills.FirstOrDefaultAsync(x => x.Id == billId && x.UserId == userId, cancellationToken);
@@ -33,13 +28,6 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
                  && x.Status != BillStatus.Cancelled
                  && (x.AmountPaid ?? 0) < x.Amount,
             cancellationToken);
-    }
-
-    public async Task<List<Bill>> GetAllPendingAsync(CancellationToken cancellationToken = default)
-    {
-        return await dbContext.Bills
-            .Where(x => x.Status == BillStatus.Pending)
-            .ToListAsync(cancellationToken);
     }
 
     public async Task<List<Bill>> GetOverdueBillsAsync(CancellationToken cancellationToken = default)

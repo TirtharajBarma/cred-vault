@@ -187,7 +187,7 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
     {
         return await dbContext.CreditCards
             .AsNoTracking()
-            .Where(x => x.IsBlocked && !x.IsDeleted)
+            .Where(x => x.IsBlocked)
             .OrderByDescending(x => x.BlockedAtUtc)
             .ToListAsync(cancellationToken);
     }

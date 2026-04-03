@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text.Json;
 using MassTransit;
 using MediatR;
@@ -154,7 +155,7 @@ public class InitiatePaymentCommandHandler(
 
     private static string GenerateOtp()
     {
-        return Random.Shared.Next(100000, 999999).ToString();
+        return RandomNumberGenerator.GetInt32(100000, 999999).ToString();
     }
 
     private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)

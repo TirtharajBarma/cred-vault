@@ -82,10 +82,7 @@ public class CheckOverdueBillsCommandHandler(
             }
         }
 
-        if (overdueCount > 0)
-        {
-            await unitOfWork.SaveChangesAsync(ct);
-        }
+        await unitOfWork.SaveChangesAsync(ct);
 
         logger.LogInformation("Overdue check completed: Checked={Checked}, Overdue={Overdue}", pendingBills.Count, overdueCount);
 

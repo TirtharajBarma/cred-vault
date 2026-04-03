@@ -5,6 +5,7 @@ using Shared.Contracts.Events.Identity;
 using Shared.Contracts.Events.Billing;
 using Shared.Contracts.Events.Payment;
 using Shared.Contracts.Events.Saga;
+using Shared.Contracts.Events.Card;
 using NotificationService.Application.Commands;
 
 namespace NotificationService.Application.Consumers;
@@ -12,7 +13,7 @@ namespace NotificationService.Application.Consumers;
 public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer> logger) 
     : IConsumer<IUserRegistered>, IConsumer<IUserOtpGenerated>, IConsumer<IBillGenerated>, 
       IConsumer<IPaymentOtpGenerated>, IConsumer<IPaymentCompleted>, IConsumer<IPaymentFailed>,
-      IConsumer<IUserDeleted>, IConsumer<IOtpFailed>
+      IConsumer<IOtpFailed>, IConsumer<ICardAdded>
 {
     public async Task Consume(ConsumeContext<IUserRegistered> context)
     {
@@ -60,10 +61,15 @@ public class DomainEventConsumer(IMediator mediator, ILogger<DomainEventConsumer
     {
         logger.LogWarning("OtpFailed: CorrelationId={CorrelationId}, PaymentId={PaymentId}, Reason={Reason}", 
             context.Message.CorrelationId, context.Message.PaymentId, context.Message.Reason);
+        await mediator.Send(new ProcessNotificationCommand("OtpFailed", string.Empty, string.Empty,
+            new { context.Message.CorrelationId, context.Message.PaymentId, context.Message.Reason }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 
-    public async Task Consume(ConsumeContext<IUserDeleted> context)
+    public async Task Consume(ConsumeContext<ICardAdded> context)
     {
-        logger.LogInformation("UserDeleted: {UserId}", context.Message.UserId);
+        logger.LogInformation("CardAdded: CardId={CardId}, UserId={UserId}, Email={Email}", 
+            context.Message.CardId, context.Message.UserId, context.Message.Email);
+        await mediator.Send(new ProcessNotificationCommand("CardAdded", context.Message.Email, context.Message.FullName,
+            new { context.Message.CardId, context.Message.CardNumberLast4, context.Message.CardHolderName, context.Message.AddedAt }, context.CorrelationId?.ToString(), context.MessageId?.ToString()));
     }
 }

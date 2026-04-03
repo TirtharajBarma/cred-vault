@@ -11,5 +11,4 @@ public interface IUserRepository
     Task UpdateAsync(IdentityUser user, CancellationToken cancellationToken = default);
     Task<(List<IdentityUser> Users, int TotalCount)> ListAllAsync(int page, int pageSize, string? search, UserStatus? status, CancellationToken ct = default);
     Task<Dictionary<UserStatus, int>> GetCountByStatusAsync(CancellationToken ct = default);
-    Task SoftDeleteAsync(Guid userId, CancellationToken cancellationToken = default);
 }

@@ -56,7 +56,7 @@ public class RefundCardBalanceCommandHandler(
             }
 
             var oldBalance = card.OutstandingBalance;
-            card.OutstandingBalance += request.Amount;
+            card.OutstandingBalance -= request.Amount;
 
             if (card.OutstandingBalance > card.CreditLimit)
             {

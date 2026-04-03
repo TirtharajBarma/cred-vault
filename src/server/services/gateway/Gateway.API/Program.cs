@@ -4,7 +4,15 @@ using Shared.Contracts.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddStandardCors();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowWebClients", policy =>
+    {
+        policy.AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 builder.Configuration
     .AddJsonFile("ocelot.json", optional: false, reloadOnChange: true)

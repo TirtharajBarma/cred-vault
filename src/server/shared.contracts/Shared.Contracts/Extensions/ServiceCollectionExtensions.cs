@@ -42,20 +42,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddStandardCors(this IServiceCollection services)
-    {
-        services.AddCors(options =>
-        {
-            options.AddPolicy("AllowWebClients", policy =>
-            {
-                policy.AllowAnyOrigin()
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-            });
-        });
-        return services;
-    }
-
     public static IServiceCollection AddStandardApi(this IServiceCollection services)
     {
         services.AddOpenApi();

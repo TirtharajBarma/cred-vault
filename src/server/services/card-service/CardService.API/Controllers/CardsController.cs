@@ -176,6 +176,7 @@ public class CardsController(IMediator mediator) : BaseApiController
 
     public sealed class UpdateCardByAdminRequest
     {
+        public string? CardholderName { get; set; }
         public decimal CreditLimit { get; set; }
         public decimal? OutstandingBalance { get; set; }
         public int? BillingCycleStartDay { get; set; }
@@ -191,6 +192,9 @@ public class CardsController(IMediator mediator) : BaseApiController
     {
         var card = await cardRepository.GetByIdAsync(cardId, cancellationToken);
         if (card is null) return CreateResponse(false, (object?)null, "Card not found.", "CardNotFound");
+
+        if (!string.IsNullOrWhiteSpace(request.CardholderName))
+            card.CardholderName = request.CardholderName;
 
         if (request.CreditLimit > 0)
             card.CreditLimit = request.CreditLimit;

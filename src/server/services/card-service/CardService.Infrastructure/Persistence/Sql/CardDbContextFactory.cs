@@ -9,7 +9,11 @@ public class CardDbContextFactory : IDesignTimeDbContextFactory<CardDbContext>
     public CardDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<CardDbContext>();
-        optionsBuilder.UseSqlServer("Server=localhost,1434;Database=credvault_cards;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;");
+        
+        var connectionString = Environment.GetEnvironmentVariable("CARD_DB_CONNECTION") 
+            ?? "Server=localhost,1434;Database=credvault_cards;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;";
+        
+        optionsBuilder.UseSqlServer(connectionString);
         return new CardDbContext(optionsBuilder.Options);
     }
 }

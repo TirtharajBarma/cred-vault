@@ -18,8 +18,8 @@ public class RewardsController(IMediator mediator) : BaseApiController
     {
         public string CardNetwork { get; set; } = string.Empty;
         public Guid? IssuerId { get; set; }
-        public decimal MinSpend { get; set; }
-        public decimal RewardRate { get; set; }
+        public decimal MinimumSpend { get; set; }
+        public decimal PointsPerDollar { get; set; }
         public DateTime EffectiveFromUtc { get; set; }
         public DateTime? EffectiveToUtc { get; set; }
     }
@@ -40,8 +40,8 @@ public class RewardsController(IMediator mediator) : BaseApiController
         var command = new CreateRewardTierCommand(
             request.CardNetwork,
             request.IssuerId,
-            request.MinSpend,
-            request.RewardRate,
+            request.MinimumSpend,
+            request.PointsPerDollar,
             request.EffectiveFromUtc,
             request.EffectiveToUtc);
 
