@@ -1,3 +1,4 @@
+using BillingService.Application.Common;
 using BillingService.Application.Abstractions.Persistence;
 using BillingService.Domain.Entities;
 using MediatR;
@@ -18,6 +19,8 @@ public class GetMyBillByIdQueryHandler(IBillRepository billRepository)
         {
             return new ApiResponse<Bill> { Success = false, Message = "Bill not found." };
         }
+
+        bill.Status = BillingStatusReconciliation.ResolveBillStatus(bill, DateTime.UtcNow);
 
         return new ApiResponse<Bill>
         {

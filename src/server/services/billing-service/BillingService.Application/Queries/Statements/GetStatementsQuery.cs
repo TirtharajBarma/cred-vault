@@ -1,3 +1,4 @@
+using BillingService.Application.Common;
 using BillingService.Application.Abstractions.Persistence;
 using BillingService.Domain.Entities;
 using MediatR;
@@ -72,9 +73,10 @@ public class GetMyStatementsQueryHandler(IStatementRepository statementRepositor
     public async Task<StatementsResult> Handle(GetMyStatementsQuery request, CancellationToken ct)
     {
         var statements = await statementRepository.GetByUserIdAsync(request.UserId, ct);
+        var now = DateTime.UtcNow;
         var dtos = statements.Select(s => new StatementDto(
             s.Id, s.BillId, s.CardId, s.StatementPeriod, s.CardLast4, s.CardNetwork, s.IssuerName,
-            s.ClosingBalance, s.MinimumDue, s.AmountPaid, s.Status, s.PeriodEndUtc, s.DueDateUtc
+            s.ClosingBalance, s.MinimumDue, s.AmountPaid, BillingStatusReconciliation.ResolveStatementStatus(s, now), s.PeriodEndUtc, s.DueDateUtc
         )).ToList();
 
         return new StatementsResult(true, dtos, "Statements fetched successfully");
@@ -103,7 +105,7 @@ public class GetStatementByIdQueryHandler(IStatementRepository statementReposito
             statement.OpeningBalance, statement.TotalPurchases, statement.TotalPayments,
             statement.TotalRefunds, statement.PenaltyCharges, statement.InterestCharges,
             statement.ClosingBalance, statement.MinimumDue, statement.AmountPaid,
-            statement.Status, statement.PeriodStartUtc, statement.PeriodEndUtc,
+            BillingStatusReconciliation.ResolveStatementStatus(statement, DateTime.UtcNow), statement.PeriodStartUtc, statement.PeriodEndUtc,
             statement.GeneratedAtUtc, statement.DueDateUtc, statement.PaidAtUtc,
             statement.CreditLimit, statement.AvailableCredit, txnDtos
         );
@@ -127,7 +129,7 @@ public class GetStatementByBillIdQueryHandler(IStatementRepository statementRepo
             statement.Id, statement.BillId, statement.CardId, statement.StatementPeriod,
             statement.CardLast4, statement.CardNetwork, statement.IssuerName,
             statement.ClosingBalance, statement.MinimumDue, statement.AmountPaid,
-            statement.Status, statement.PeriodEndUtc, statement.DueDateUtc
+            BillingStatusReconciliation.ResolveStatementStatus(statement, DateTime.UtcNow), statement.PeriodEndUtc, statement.DueDateUtc
         );
 
         return new StatementsResult(true, new List<StatementDto> { dto }, "Statement fetched successfully");
@@ -140,9 +142,10 @@ public class GetAllStatementsQueryHandler(IStatementRepository statementReposito
     public async Task<StatementsResult> Handle(GetAllStatementsQuery request, CancellationToken ct)
     {
         var statements = await statementRepository.GetAllAsync(ct);
+        var now = DateTime.UtcNow;
         var dtos = statements.Select(s => new StatementDto(
             s.Id, s.BillId, s.CardId, s.StatementPeriod, s.CardLast4, s.CardNetwork, s.IssuerName,
-            s.ClosingBalance, s.MinimumDue, s.AmountPaid, s.Status, s.PeriodEndUtc, s.DueDateUtc
+            s.ClosingBalance, s.MinimumDue, s.AmountPaid, BillingStatusReconciliation.ResolveStatementStatus(s, now), s.PeriodEndUtc, s.DueDateUtc
         )).ToList();
 
         return new StatementsResult(true, dtos, "All statements fetched successfully");

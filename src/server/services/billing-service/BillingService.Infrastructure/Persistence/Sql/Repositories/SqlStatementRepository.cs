@@ -22,7 +22,9 @@ public sealed class SqlStatementRepository(BillingDbContext dbContext) : IStatem
         return await dbContext.Statements
             .AsNoTracking()
             .Where(x => x.UserId == userId)
-            .OrderByDescending(x => x.PeriodEndUtc)
+            .OrderByDescending(x => x.GeneratedAtUtc)
+            .ThenByDescending(x => x.PeriodEndUtc)
+            .ThenByDescending(x => x.DueDateUtc)
             .ToListAsync(ct);
     }
 
@@ -31,7 +33,9 @@ public sealed class SqlStatementRepository(BillingDbContext dbContext) : IStatem
         return await dbContext.Statements
             .AsNoTracking()
             .Where(x => x.CardId == cardId)
-            .OrderByDescending(x => x.PeriodEndUtc)
+            .OrderByDescending(x => x.GeneratedAtUtc)
+            .ThenByDescending(x => x.PeriodEndUtc)
+            .ThenByDescending(x => x.DueDateUtc)
             .ToListAsync(ct);
     }
 
@@ -39,7 +43,9 @@ public sealed class SqlStatementRepository(BillingDbContext dbContext) : IStatem
     {
         return await dbContext.Statements
             .AsNoTracking()
-            .OrderByDescending(x => x.PeriodEndUtc)
+            .OrderByDescending(x => x.GeneratedAtUtc)
+            .ThenByDescending(x => x.PeriodEndUtc)
+            .ThenByDescending(x => x.DueDateUtc)
             .ToListAsync(ct);
     }
 

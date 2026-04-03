@@ -18,6 +18,7 @@ export interface Statement {
   amountPaid: number;
   status: number;
   periodEndUtc: string;
+  generatedAtUtc: string;
   dueDateUtc: string | null;
 }
 

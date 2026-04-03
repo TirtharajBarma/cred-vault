@@ -42,15 +42,37 @@ public class MarkBillPaidCommandHandler(
             return new ApiResponse<Bill> { Success = true, Message = "Bill is already paid.", Data = bill };
         }
 
-        if (request.Amount < bill.MinDue)
+        if (request.Amount <= 0)
+        {
+            return new ApiResponse<Bill> { Success = false, Message = "Payment amount must be greater than zero." };
+        }
+
+        var existingPaid = bill.AmountPaid ?? 0;
+        var proposedTotalPaid = existingPaid + request.Amount;
+        var remainingBeforePayment = Math.Max(0, bill.Amount - existingPaid);
+
+        if (remainingBeforePayment <= 0)
+        {
+            bill.Status = BillStatus.Paid;
+            bill.PaidAtUtc = bill.PaidAtUtc ?? DateTime.UtcNow;
+            await billRepository.UpdateAsync(bill, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return new ApiResponse<Bill> { Success = true, Message = "Bill is already settled.", Data = bill };
+        }
+
+        // First payment on a bill must honor min due unless full amount is paid.
+        if (existingPaid == 0 && request.Amount < bill.MinDue && request.Amount < remainingBeforePayment)
         {
             return new ApiResponse<Bill> { Success = false, Message = $"Payment amount {request.Amount} is less than the minimum due {bill.MinDue}." };
         }
 
         var now = DateTime.UtcNow;
-        bill.Status = BillStatus.Paid;
-        bill.AmountPaid = request.Amount;
-        bill.PaidAtUtc = now;
+        var finalPaidAmount = Math.Min(bill.Amount, proposedTotalPaid);
+        var remainingAfterPayment = Math.Max(0, bill.Amount - finalPaidAmount);
+
+        bill.AmountPaid = finalPaidAmount;
+        bill.Status = remainingAfterPayment <= 0 ? BillStatus.Paid : BillStatus.PartiallyPaid;
+        bill.PaidAtUtc = bill.Status == BillStatus.Paid ? now : null;
         bill.UpdatedAtUtc = now;
 
         await EnsureRewardsRecordedAsync(bill, request.Amount, now, cancellationToken);
@@ -59,7 +81,11 @@ public class MarkBillPaidCommandHandler(
         await billRepository.UpdateAsync(bill, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new ApiResponse<Bill> { Success = true, Message = "Bill marked as paid.", Data = bill };
+        var message = bill.Status == BillStatus.Paid
+            ? "Bill marked as paid."
+            : $"Partial payment recorded. Remaining due: {remainingAfterPayment:0.00}";
+
+        return new ApiResponse<Bill> { Success = true, Message = message, Data = bill };
     }
 
     private async Task EnsureRewardsRecordedAsync(Bill bill, decimal paymentAmount, DateTime now, CancellationToken cancellationToken)
@@ -128,7 +154,13 @@ public class MarkBillPaidCommandHandler(
             existing.TotalPayments = bill.AmountPaid ?? 0;
             existing.PaidAtUtc = bill.PaidAtUtc;
             existing.ClosingBalance = Math.Max(0, bill.Amount - (bill.AmountPaid ?? 0));
-            existing.Status = bill.Status == BillStatus.Paid ? StatementStatus.Paid : existing.Status;
+            existing.Status = bill.Status switch
+            {
+                BillStatus.Paid => StatementStatus.Paid,
+                BillStatus.Overdue => StatementStatus.Overdue,
+                BillStatus.PartiallyPaid => StatementStatus.PartiallyPaid,
+                _ => existing.Status
+            };
             existing.UpdatedAtUtc = now;
             await statementRepository.UpdateAsync(existing, cancellationToken);
             return;
@@ -155,7 +187,13 @@ public class MarkBillPaidCommandHandler(
             MinimumDue = bill.MinDue,
             AmountPaid = bill.AmountPaid ?? 0,
             PaidAtUtc = bill.PaidAtUtc,
-            Status = bill.Status == BillStatus.Paid ? StatementStatus.Paid : StatementStatus.Generated,
+            Status = bill.Status switch
+            {
+                BillStatus.Paid => StatementStatus.Paid,
+                BillStatus.Overdue => StatementStatus.Overdue,
+                BillStatus.PartiallyPaid => StatementStatus.PartiallyPaid,
+                _ => StatementStatus.Generated
+            },
             CardLast4 = string.Empty,
             CardNetwork = bill.CardNetwork.ToString(),
             IssuerName = bill.IssuerId.ToString(),

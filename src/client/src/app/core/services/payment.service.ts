@@ -46,6 +46,10 @@ export class PaymentService {
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/${paymentId}/verify-otp`, { otpCode });
   }
 
+  resendOtp(paymentId: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${this.baseUrl}/${paymentId}/resend-otp`, {});
+  }
+
   getMyPayments(): Observable<ApiResponse<Payment[]>> {
     return this.http.get<ApiResponse<Payment[]>>(this.baseUrl);
   }

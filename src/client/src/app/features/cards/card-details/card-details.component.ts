@@ -64,26 +64,44 @@ export class CardDetailsComponent implements OnInit {
 
   // Real-time Spending Analysis based on Category breakdown
   spendingAnalysis = computed(() => {
-    const txs = this.transactions().filter(t => t.type === 1); // Only Purchases
+    const card = this.card();
+    if (!card || card.outstandingBalance <= 0) return [];
+
+    const txs = this.currentCardTransactions();
     if (txs.length === 0) return [];
 
     const categories: Record<string, number> = {};
+    let remainingOutstanding = card.outstandingBalance;
     let total = 0;
 
-    txs.forEach(t => {
-      const desc = t.description.toLowerCase();
-      let category = 'Services'; // Default fallback
-      
-      if (desc.includes('food') || desc.includes('rest') || desc.includes('dine') || desc.includes('cafe')) category = 'Dining';
-      else if (desc.includes('shop') || desc.includes('amazon') || desc.includes('store') || desc.includes('market') || desc.includes('mall')) category = 'Shopping';
-      else if (desc.includes('travel') || desc.includes('uber') || desc.includes('flight') || desc.includes('hotel') || desc.includes('lyft')) category = 'Travel';
-      else if (desc.includes('rent') || desc.includes('mortgage') || desc.includes('lease') || desc.includes('housing')) category = 'Housing';
-      else if (desc.includes('electricity') || desc.includes('water') || desc.includes('internet') || desc.includes('bill') || desc.includes('utility')) category = 'Utilities';
-      else if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('game') || desc.includes('movie') || desc.includes('hulu')) category = 'Entertainment';
+    // Reconstruct outstanding composition from newest to oldest transactions.
+    for (const tx of txs) {
+      const normalizedType = this.getNormalizedTransactionType(tx.type);
 
-      categories[category] = (categories[category] || 0) + t.amount;
-      total += t.amount;
-    });
+      if (normalizedType === 1) {
+        if (remainingOutstanding <= 0) continue;
+
+        const allocated = Math.min(tx.amount, remainingOutstanding);
+        const desc = (tx.description || '').toLowerCase();
+        let category = 'Services';
+
+        if (desc.includes('food') || desc.includes('rest') || desc.includes('dine') || desc.includes('cafe')) category = 'Dining';
+        else if (desc.includes('shop') || desc.includes('amazon') || desc.includes('store') || desc.includes('market') || desc.includes('mall')) category = 'Shopping';
+        else if (desc.includes('travel') || desc.includes('uber') || desc.includes('flight') || desc.includes('hotel') || desc.includes('lyft')) category = 'Travel';
+        else if (desc.includes('rent') || desc.includes('mortgage') || desc.includes('lease') || desc.includes('housing')) category = 'Housing';
+        else if (desc.includes('electricity') || desc.includes('water') || desc.includes('internet') || desc.includes('bill') || desc.includes('utility')) category = 'Utilities';
+        else if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('game') || desc.includes('movie') || desc.includes('hulu')) category = 'Entertainment';
+
+        categories[category] = (categories[category] || 0) + allocated;
+        total += allocated;
+        remainingOutstanding -= allocated;
+      } else {
+        // Going backwards in time, payments/refunds increase pre-payment outstanding.
+        remainingOutstanding += tx.amount;
+      }
+    }
+
+    if (total <= 0) return [];
 
     return Object.entries(categories)
       .map(([name, amount]) => ({
@@ -94,15 +112,29 @@ export class CardDetailsComponent implements OnInit {
       .sort((a, b) => b.amount - a.amount);
   });
 
+  currentCardTransactions = computed(() => {
+    const cardId = this.card()?.id;
+    if (!cardId) return [];
+    return this.sortedTransactions().filter(t => t.cardId === cardId);
+  });
+
+  sortedTransactions = computed(() => {
+    return [...this.transactions()].sort(
+      (a, b) => new Date(b.dateUtc).getTime() - new Date(a.dateUtc).getTime()
+    );
+  });
+
   ngOnInit(): void {
-    const cardId = this.route.snapshot.paramMap.get('id');
-    if (cardId) {
-      this.loadCardDetails(cardId);
-      this.loadRewards();
-    } else {
-      this.error.set('Card ID not found');
-      this.isLoading.set(false);
-    }
+    this.route.paramMap.subscribe(params => {
+      const cardId = params.get('id');
+      if (cardId) {
+        this.loadCardDetails(cardId);
+        this.loadRewards();
+      } else {
+        this.error.set('Card ID not found');
+        this.isLoading.set(false);
+      }
+    });
   }
 
   loadCardDetails(cardId: string): void {
@@ -193,7 +225,7 @@ export class CardDetailsComponent implements OnInit {
   }
 
   getTransactionIcon(type: number): string {
-    switch (type) {
+    switch (this.getNormalizedTransactionType(type)) {
       case 1: return 'shopping_cart';
       case 2: return 'account_balance_wallet';
       case 3: return 'keyboard_return';
@@ -201,15 +233,59 @@ export class CardDetailsComponent implements OnInit {
     }
   }
 
+  getNormalizedTransactionType(type: number | string): 1 | 2 | 3 {
+    if (type === 1 || type === '1' || type === 'Purchase') return 1;
+    if (type === 2 || type === '2' || type === 'Payment') return 2;
+    if (type === 3 || type === '3' || type === 'Refund') return 3;
+    return 1;
+  }
+
+  getTransactionTitle(tx: CardTransaction): string {
+    const description = (tx.description || '').trim();
+    const lowered = description.toLowerCase();
+
+    if (lowered.startsWith('bill payment:')) {
+      return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
+    }
+
+    if (lowered.startsWith('saga:') && this.getNormalizedTransactionType(tx.type) === 2) {
+      return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
+    }
+
+    return description || 'Card Transaction';
+  }
+
+  getTransactionFlowLabel(type: number | string): string {
+    return this.getNormalizedTransactionType(type) === 1 ? 'Debit' : 'Credit';
+  }
+
+  getTransactionTypeLabel(type: number | string): string {
+    const normalized = this.getNormalizedTransactionType(type);
+    if (normalized === 1) return 'Purchase';
+    if (normalized === 2) return 'Payment';
+    return 'Refund';
+  }
+
+  getSignedAmountPrefix(type: number | string): string {
+    return this.getNormalizedTransactionType(type) === 1 ? '-' : '+';
+  }
+
+  private getMonthYear(dateUtc: string): string {
+    return new Intl.DateTimeFormat('en-IN', {
+      month: 'short',
+      year: 'numeric'
+    }).format(new Date(dateUtc));
+  }
+
   page() { return this.currentPage(); }
   
   paginatedTransactions() {
     const start = (this.currentPage() - 1) * this.itemsPerPage;
-    return this.transactions().slice(start, start + this.itemsPerPage);
+    return this.currentCardTransactions().slice(start, start + this.itemsPerPage);
   }
 
   totalPages(): number {
-    return Math.ceil(this.transactions().length / this.itemsPerPage);
+    return Math.ceil(this.currentCardTransactions().length / this.itemsPerPage);
   }
 
   nextPage(): void {

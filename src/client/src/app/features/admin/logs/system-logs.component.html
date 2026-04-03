@@ -100,7 +100,7 @@
             <tr class="border-b border-charcoal/5 bg-mist-cream/50">
               <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Event</th>
               <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Time</th>
-              <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Action</th>
+              <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Actor/Action</th>
               <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Entity ID</th>
               <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Trace ID</th>
             </tr>
@@ -123,16 +123,16 @@
                         <span class="material-symbols-outlined text-lg">{{ log.action === 'Consumed' ? 'download' : 'settings' }}</span>
                       </div>
                       <div>
-                        <p class="font-black text-charcoal text-sm">{{ log.entityName || 'Unknown Event' }}</p>
-                        <p class="text-[10px] text-misty-gray font-mono">ID: {{ log.entityId?.slice(0, 12) }}...</p>
+                        <p class="font-black text-charcoal text-sm">{{ getAuditEventTitle(log) }}</p>
+                        <p class="text-[10px] text-misty-gray truncate">{{ getAuditContext(log) }}</p>
                       </div>
                     </div>
                   </td>
                   <td class="px-6 lg:px-8 py-5">
-                    <p class="font-bold text-charcoal/70 text-sm">{{ log.createdAtUtc | date:'MMM dd, yyyy' }}</p>
-                    <p class="text-[10px] text-misty-gray">{{ log.createdAtUtc | date:'HH:mm:ss' }}</p>
+                    <p class="font-bold text-charcoal/70 text-sm">{{ formatDateTime(log.createdAtUtc) }}</p>
                   </td>
                   <td class="px-6 lg:px-8 py-5">
+                    <p class="text-[10px] text-misty-gray mb-1 truncate">{{ getAuditActor(log) }}</p>
                     <span class="px-3 py-1 rounded-lg text-[10px] font-black tracking-widest border bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
                       {{ log.action || 'N/A' | uppercase }}
                     </span>
@@ -183,7 +183,7 @@
               <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Time</th>
               <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Status</th>
               <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Recipient</th>
-              <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Trace ID</th>
+              <th class="px-6 lg:px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] text-misty-gray">Context</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-charcoal/5">
@@ -205,14 +205,13 @@
                         <span class="material-symbols-outlined text-lg">{{ log.isSuccess ? 'check_circle' : 'error' }}</span>
                       </div>
                       <div>
-                        <p class="font-black text-charcoal text-sm">{{ log.subject || 'Notification' }}</p>
+                        <p class="font-black text-charcoal text-sm">{{ getNotificationTitle(log) }}</p>
                         <p class="text-[10px] text-misty-gray uppercase tracking-wider">{{ log.type || 'email' }}</p>
                       </div>
                     </div>
                   </td>
                   <td class="px-6 lg:px-8 py-5">
-                    <p class="font-bold text-charcoal/70 text-sm">{{ log.createdAtUtc | date:'MMM dd, yyyy' }}</p>
-                    <p class="text-[10px] text-misty-gray">{{ log.createdAtUtc | date:'HH:mm:ss' }}</p>
+                    <p class="font-bold text-charcoal/70 text-sm">{{ formatDateTime(log.createdAtUtc) }}</p>
                   </td>
                   <td class="px-6 lg:px-8 py-5">
                     <span [class]="log.isSuccess ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'" 
@@ -224,6 +223,7 @@
                     <span class="font-mono text-xs text-charcoal/60 bg-charcoal/5 px-2 py-1 rounded">{{ log.recipient || 'N/A' }}</span>
                   </td>
                   <td class="px-6 lg:px-8 py-5">
+                    <p class="text-xs text-charcoal/70 truncate">{{ getNotificationContext(log) }}</p>
                     <span class="font-mono text-[10px] text-misty-gray bg-mist-cream px-2 py-1 rounded">{{ log.traceId?.slice(0, 12) }}...</span>
                   </td>
                 </tr>

@@ -92,7 +92,7 @@
                 @for (tx of transactions(); track tx.id) {
                   <tr class="hover:bg-surface-container-low/30 transition-colors">
                     <td class="px-8 py-6 text-sm font-medium text-secondary">{{ tx.createdAtUtc | date:'MMM dd, yyyy' }}</td>
-                    <td class="px-8 py-6 text-sm font-bold text-on-surface">Bill Payment Reward</td>
+                    <td class="px-8 py-6 text-sm font-bold text-on-surface">{{ getRewardActivityLabel(tx) }}</td>
                     <td class="px-8 py-6">
                       @if (tx.points > 0) {
                         <span class="px-3 py-1 bg-emerald-500/10 text-emerald-600 rounded-full text-[0.6rem] font-bold uppercase tracking-wider">Earned</span>

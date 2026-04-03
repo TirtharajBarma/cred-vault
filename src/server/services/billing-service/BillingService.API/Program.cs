@@ -6,6 +6,7 @@ using BillingService.Application.Commands.Statements;
 using BillingService.Application.Queries.Bills;
 using BillingService.Application.Queries.Statements;
 using BillingService.Infrastructure.Persistence.Sql.Repositories;
+using BillingService.API.Services;
 using Microsoft.EntityFrameworkCore;
 using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
@@ -51,6 +52,7 @@ try
     builder.Services.AddScoped<IStatementRepository, SqlStatementRepository>();
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddHttpClient();
+    builder.Services.AddHostedService<OverdueBillScheduler>();
 
     builder.Services.AddMassTransit(x =>
     {

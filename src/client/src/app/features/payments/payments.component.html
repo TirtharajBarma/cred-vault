@@ -136,7 +136,7 @@
                 </div>
                 <div>
                   <p class="font-semibold text-slate-900">${{ payment.amount | number:'1.2-2' }}</p>
-                  <p class="text-xs text-slate-500">{{ payment.createdAtUtc | date:'MMM d, y h:mm a' }}</p>
+                  <p class="text-xs text-slate-500">{{ payment.createdAtUtc | date:'MMM d, y h:mm a':'Asia/Kolkata' }} IST</p>
                 </div>
               </div>
               <div class="flex items-center gap-3">
@@ -258,9 +258,16 @@
           @if (otpError()) {
             <p class="text-red-500 text-sm text-center mt-2">{{ otpError() }}</p>
           }
+          @if (otpInfo()) {
+            <p class="text-emerald-600 text-sm text-center mt-2">{{ otpInfo() }}</p>
+          }
           <button (click)="verifyOtp()" [disabled]="otpCode.length !== 6 || isVerifying()"
                   class="w-full mt-4 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-colors">
             @if (isVerifying()) { Verifying... } @else { Verify & Pay }
+          </button>
+          <button (click)="resendOtp()" [disabled]="!canResendOtp() || isResendingOtp()"
+                  class="w-full mt-3 text-amber-700 font-semibold py-2 rounded-xl border border-amber-200 hover:bg-amber-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
+            {{ isResendingOtp() ? 'Resending...' : (canResendOtp() ? 'Resend OTP' : 'Resend in 30s') }}
           </button>
         </div>
       </div>
@@ -344,7 +351,7 @@
           @if (selectedBillDetail()!.paidAtUtc) {
             <div class="flex items-center justify-between">
               <span class="text-sm text-slate-500">Paid On</span>
-              <span class="text-sm text-slate-700">{{ selectedBillDetail()!.paidAtUtc | date:'MMM d, y h:mm a' }}</span>
+              <span class="text-sm text-slate-700">{{ selectedBillDetail()!.paidAtUtc | date:'MMM d, y h:mm a':'Asia/Kolkata' }} IST</span>
             </div>
           }
           @if (selectedBillDetail()!.status === 1 || selectedBillDetail()!.status === 3) {
@@ -390,7 +397,7 @@
           </div>
           <div class="flex items-center justify-between">
             <span class="text-sm text-slate-500">Initiated</span>
-            <span class="text-sm text-slate-700">{{ selectedPaymentDetail()!.createdAtUtc | date:'MMM d, y h:mm a' }}</span>
+            <span class="text-sm text-slate-700">{{ selectedPaymentDetail()!.createdAtUtc | date:'MMM d, y h:mm a':'Asia/Kolkata' }} IST</span>
           </div>
           @if (selectedPaymentDetail()!.failureReason) {
             <div class="bg-red-50 border border-red-200 rounded-lg p-3">

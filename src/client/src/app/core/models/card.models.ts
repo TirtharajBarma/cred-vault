@@ -19,6 +19,7 @@ export interface CreditCard {
   creditLimit: number;
   outstandingBalance: number;
   availableCredit: number;
+  billingCycleStartDay?: number;
   isVerified: boolean;
   isDeleted: boolean;
 }

@@ -407,6 +407,14 @@ export class AdminCardDetailComponent implements OnInit {
 
   formatDate(dateStr: string): string {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${new Intl.DateTimeFormat('en-IN', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    }).format(new Date(dateStr))} IST`;
   }
 }

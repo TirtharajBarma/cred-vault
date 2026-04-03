@@ -101,15 +101,28 @@ export class StatementDetailComponent implements OnInit {
     }
   }
 
-  formatDate(date: string | null): string {
+  formatDate(date: string | null, includeTime = false): string {
     if (!date) return 'N/A';
-    const d = new Date(date);
-    d.setHours(d.getHours() + 5, d.getMinutes() + 30);
-    return d.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+
+    const options: Intl.DateTimeFormatOptions = includeTime
+      ? {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Kolkata'
+        }
+      : {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'Asia/Kolkata'
+        };
+
+    const formatted = new Intl.DateTimeFormat('en-IN', options).format(new Date(date));
+    return includeTime ? `${formatted} IST` : formatted;
   }
 
   billedAmount(stmt: StatementDetail): number {

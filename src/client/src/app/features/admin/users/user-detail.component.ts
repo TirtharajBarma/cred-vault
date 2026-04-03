@@ -165,7 +165,8 @@ import { AdminService } from '../../../core/services/admin.service';
                         }
                         <div class="flex-1 min-w-0">
                           <p class="text-sm font-medium text-gray-900 truncate">{{ log.subject }}</p>
-                          <p class="text-xs text-gray-500 truncate">{{ log.type }} • {{ formatDate(log.createdAtUtc) }}</p>
+                          <p class="text-xs text-gray-500 truncate">{{ getNotificationPurpose(log) }} • {{ formatDate(log.createdAtUtc) }}</p>
+                          <p class="text-xs text-gray-400 truncate">{{ getNotificationContext(log) }}</p>
                         </div>
                       </div>
                     </div>
@@ -193,7 +194,8 @@ import { AdminService } from '../../../core/services/admin.service';
                   @for (audit of auditLogs(); track audit.id) {
                     <div class="px-4 py-2.5 hover:bg-gray-50 transition-all">
                       <p class="text-sm font-medium text-gray-900 truncate">{{ audit.action }}</p>
-                      <p class="text-xs text-gray-500 truncate">{{ audit.entityName }} • {{ formatDate(audit.createdAtUtc) }}</p>
+                      <p class="text-xs text-gray-500 truncate">{{ getAuditActor(audit) }} • {{ formatDate(audit.createdAtUtc) }}</p>
+                      <p class="text-xs text-gray-400 truncate">{{ getAuditContext(audit) }}</p>
                     </div>
                   }
                 </div>
@@ -268,7 +270,8 @@ export class UserDetailComponent implements OnInit {
       this.adminService.getUserNotificationLogs(user.email, 1, 200).subscribe({
         next: (res) => {
           const data = res.data?.data || res.data || res;
-          this.logs.set(data.logs || data || []);
+          const rows = Array.isArray(data?.logs) ? data.logs : (Array.isArray(data) ? data : []);
+          this.logs.set(rows);
           this.isLoadingLogs.set(false);
         },
         error: () => this.isLoadingLogs.set(false)
@@ -283,7 +286,8 @@ export class UserDetailComponent implements OnInit {
     this.adminService.getUserAuditLogs(userId, 1, 200).subscribe({
       next: (res) => {
         const data = res.data?.data || res.data || res;
-        this.auditLogs.set(data.logs || data || []);
+        const rows = Array.isArray(data?.logs) ? data.logs : (Array.isArray(data) ? data : []);
+        this.auditLogs.set(rows);
         this.isLoadingAudit.set(false);
       },
       error: () => this.isLoadingAudit.set(false)
@@ -333,6 +337,65 @@ export class UserDetailComponent implements OnInit {
 
   formatDate(dateStr: string): string {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${new Intl.DateTimeFormat('en-IN', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    }).format(new Date(dateStr))} IST`;
+  }
+
+  getNotificationPurpose(log: any): string {
+    const payload = this.parseJson(log?.body);
+    const subject = String(log?.subject || 'Notification').toLowerCase();
+    if (subject.includes('verification')) return 'OTP Verification';
+    if (subject.includes('successful')) return 'Payment Completed';
+    if (subject.includes('failed')) return 'Payment Failure';
+    return String(payload?.Purpose || payload?.purpose || log?.type || 'Event');
+  }
+
+  getNotificationContext(log: any): string {
+    const payload = this.parseJson(log?.body);
+    const paymentId = payload?.PaymentId || payload?.paymentId;
+    const billId = payload?.BillId || payload?.billId;
+    const amount = Number(payload?.Amount ?? payload?.amount ?? 0);
+    const parts: string[] = [];
+
+    if (paymentId) parts.push(`Payment ${String(paymentId).slice(0, 8)}`);
+    if (billId) parts.push(`Bill ${String(billId).slice(0, 8)}`);
+    if (Number.isFinite(amount) && amount > 0) parts.push(`Amount INR ${amount.toFixed(2)}`);
+    if (log?.recipient) parts.push(`To ${log.recipient}`);
+
+    return parts.join(' | ') || 'No additional context';
+  }
+
+  getAuditActor(audit: any): string {
+    return audit?.userId || audit?.UserId || audit?.entityName || 'System';
+  }
+
+  getAuditContext(audit: any): string {
+    const changes = this.parseJson(audit?.changes);
+    const reason = changes?.Reason || changes?.reason;
+    const amount = Number(changes?.Amount ?? changes?.amount ?? 0);
+    const summary: string[] = [];
+
+    if (audit?.entityName) summary.push(String(audit.entityName));
+    if (Number.isFinite(amount) && amount > 0) summary.push(`Amount INR ${amount.toFixed(2)}`);
+    if (reason) summary.push(`Reason: ${reason}`);
+
+    return summary.join(' | ') || 'No contextual details';
+  }
+
+  private parseJson(value: any): any {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
   }
 }

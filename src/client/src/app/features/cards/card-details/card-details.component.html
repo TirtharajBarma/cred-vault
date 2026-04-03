@@ -147,17 +147,17 @@
                         </span>
                       </div>
                       <div class="flex-1 min-w-0">
-                        <h4 class="font-bold text-[#1b1c1c] truncate text-lg">{{ tx.description }}</h4>
+                        <h4 class="font-bold text-[#1b1c1c] truncate text-lg">{{ getTransactionTitle(tx) }}</h4>
                         <p class="text-xs font-semibold text-[#615e5c] mt-1">
                           {{ tx.dateUtc | date:'EEEE, hh:mm a' }}
                         </p>
                       </div>
                       <div class="text-right shrink-0">
-                        <p [class]="'font-black text-xl ' + (tx.type === 1 ? 'text-red-500' : 'text-emerald-500')">
-                          {{ tx.type === 1 ? '-' : '+' }}{{ tx.amount | currency:'INR' }}
+                        <p [class]="'font-black text-xl ' + (getNormalizedTransactionType(tx.type) === 1 ? 'text-red-500' : 'text-emerald-500')">
+                          {{ getSignedAmountPrefix(tx.type) }}{{ tx.amount | currency:'INR' }}
                         </p>
                         <p class="text-[10px] font-bold text-[#615e5c] uppercase tracking-widest mt-1">
-                          {{ tx.type === 1 ? 'Purchase' : (tx.type === 2 ? 'Payment' : 'Refund') }}
+                          {{ getTransactionFlowLabel(tx.type) }} • {{ getTransactionTypeLabel(tx.type) }}
                         </p>
                       </div>
                     </div>

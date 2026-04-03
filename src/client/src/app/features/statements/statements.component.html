@@ -39,22 +39,24 @@
                   <span class="text-xs text-[#615e5c]">View all statements</span>
                 </div>
               </button>
-              @for (card of cardOptions(); track card.id) {
-                <button 
-                  (click)="selectCardFilter(card.id)"
-                  class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
-                  [class.bg-[#8a5100]/10]="selectedCardFilter() === card.id"
-                >
-                  <div [class]="card.network === 'Mastercard' ? 'bg-[#eb001b]/10 text-[#eb001b]' : 'bg-[#1a1f71]/10 text-[#1a1f71]'"
-                       class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold">
-                    {{ card.network === 'Mastercard' ? 'M' : card.network === 'Visa' ? 'V' : 'C' }}
-                  </div>
-                  <div class="flex flex-col">
-                    <span class="font-bold text-[#1b1c1c]">{{ card.issuerName }}</span>
-                    <span class="text-xs text-[#615e5c]">•••• {{ card.last4 }} • {{ card.network }}</span>
-                  </div>
-                </button>
-              }
+              <div class="max-h-[304px] overflow-y-auto">
+                @for (card of cardOptions(); track card.id) {
+                  <button 
+                    (click)="selectCardFilter(card.id)"
+                    class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
+                    [class.bg-[#8a5100]/10]="selectedCardFilter() === card.id"
+                  >
+                    <div [class]="card.network === 'Mastercard' ? 'bg-[#eb001b]/10 text-[#eb001b]' : 'bg-[#1a1f71]/10 text-[#1a1f71]'"
+                         class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold">
+                      {{ card.network === 'Mastercard' ? 'M' : card.network === 'Visa' ? 'V' : 'C' }}
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="font-bold text-[#1b1c1c]">{{ card.issuerName }} {{ card.network }}</span>
+                      <span class="text-xs text-[#615e5c]">•••• {{ card.last4 }}</span>
+                    </div>
+                  </button>
+                }
+              </div>
             </div>
           }
         </div>
@@ -83,7 +85,7 @@
         @for (stmt of paginatedStatements(); track stmt.id; let i = $index) {
           <article
             (click)="viewStatement(stmt.id)"
-            class="statement-row mist-blur flex cursor-pointer flex-col justify-between gap-7 rounded-3xl border border-white/40 p-8 transition-all duration-300 md:flex-row md:items-center"
+            class="statement-row mist-blur flex cursor-pointer flex-col gap-7 rounded-3xl border border-white/40 p-8 transition-all duration-300 md:grid md:grid-cols-[minmax(0,1fr)_220px_90px_170px] md:items-center md:gap-6"
             [ngClass]="i === 0 ? 'bg-white/70 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)]' : 'bg-white/55 hover:bg-white/70'"
           >
             <div class="flex items-center gap-6">
@@ -101,23 +103,26 @@
                     <span class="text-sm font-bold text-[#1b1c1c]">{{ getCardDisplay(stmt.cardId) }}</span>
                   </span>
                   <span class="text-[#d8c3b2]">|</span>
-                  <span class="text-sm text-[#615e5c]">Due {{ stmt.periodEndUtc | date:'MMM dd' }}</span>
+                  <span class="text-sm text-[#615e5c]">Due {{ (stmt.dueDateUtc || stmt.periodEndUtc) | date:'MMM dd' }}</span>
                 </div>
               </div>
             </div>
 
-            <div class="flex flex-col md:text-right">
+            <div class="flex w-full flex-col items-start md:w-full md:items-end md:text-right">
               <span class="text-sm font-medium text-[#534437]">Total Amount</span>
-              <span [ngClass]="i === 0 ? 'text-3xl font-bold' : 'text-2xl font-semibold'">{{ getDisplayAmount(stmt) | currency:'INR' }}</span>
+              <span class="tabular-nums w-full text-left md:text-right" [ngClass]="i === 0 ? 'text-3xl font-bold' : 'text-2xl font-semibold'">{{ getDisplayAmount(stmt) | currency:'INR' }}</span>
             </div>
 
-            <div class="flex flex-wrap items-center gap-4 md:gap-6">
+            <div class="flex items-center md:justify-center">
               <span
                 class="rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest"
-                [ngClass]="getStatementBadgeClass(stmt.status)"
+                [ngClass]="getStatementBadgeClass(stmt)"
               >
-                {{ getStatementBadgeLabel(stmt.status) }}
+                {{ getStatementBadgeLabel(stmt) }}
               </span>
+            </div>
+
+            <div class="flex items-center md:justify-end">
               <button
                 (click)="viewStatement(stmt.id); $event.stopPropagation()"
                 class="group flex items-center gap-3 rounded-full px-6 py-3 font-medium transition-all duration-300"

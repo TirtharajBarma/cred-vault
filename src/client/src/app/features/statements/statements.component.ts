@@ -37,29 +37,50 @@ export class StatementsComponent implements OnInit {
   });
 
   cardOptions = computed(() => {
-    const cardMap = new Map<string, { last4: string; issuerName: string; network: string }>();
-    this.statements().forEach(s => {
-      if (!cardMap.has(s.cardId)) {
-        cardMap.set(s.cardId, {
-          last4: s.cardLast4,
-          issuerName: s.issuerName,
-          network: s.cardNetwork
-        });
-      }
-    });
-    return Array.from(cardMap.entries()).map(([id, info]) => ({ id, ...info }));
+    const statementCardIds = new Set(this.statements().map(s => s.cardId));
+
+    const cardsFromProfile = this.cards()
+      .filter(c => statementCardIds.has(c.id))
+      .map(c => ({
+        id: c.id,
+        last4: c.last4,
+        issuerName: c.issuerName,
+        network: c.network
+      }));
+
+    const cardsFromStatements = this.statements()
+      .filter(s => !cardsFromProfile.some(c => c.id === s.cardId))
+      .reduce((acc, s) => {
+        if (!acc.some(c => c.id === s.cardId)) {
+          acc.push({
+            id: s.cardId,
+            last4: s.cardLast4,
+            issuerName: s.issuerName,
+            network: s.cardNetwork
+          });
+        }
+        return acc;
+      }, [] as Array<{ id: string; last4: string; issuerName: string; network: string }>);
+
+    return [...cardsFromProfile, ...cardsFromStatements];
   });
 
   getCardDisplay(cardId: string): string {
     const card = this.cards().find(c => c.id === cardId);
     if (card) {
-      return `${card.issuerName} *${card.last4}`;
+      return `${card.issuerName} •••• ${card.last4}`;
     }
     const stmt = this.statements().find(s => s.cardId === cardId);
     if (stmt) {
-      return `${stmt.issuerName} *${stmt.cardLast4}`;
+      return `${stmt.issuerName} •••• ${stmt.cardLast4}`;
     }
     return 'Unknown Card';
+  }
+
+  getCardFilterLabel(cardId: string): string {
+    const card = this.cardOptions().find(c => c.id === cardId);
+    if (!card) return 'All Cards';
+    return `${card.issuerName} ${card.network} •••• ${card.last4}`;
   }
 
   getCardNetworkIcon(network: string): string {
@@ -101,9 +122,7 @@ export class StatementsComponent implements OnInit {
   getSelectedCardLabel(): string {
     const cardId = this.selectedCardFilter();
     if (cardId === 'all') return 'All Cards';
-    const card = this.cards().find(c => c.id === cardId);
-    if (card) return `${card.issuerName} *${card.last4}`;
-    return 'All Cards';
+    return this.getCardFilterLabel(cardId);
   }
 
   paginatedStatements() {
@@ -127,14 +146,43 @@ export class StatementsComponent implements OnInit {
     }
   }
 
-  getStatementBadgeLabel(status: number): string {
-    return status === 2 ? 'Paid' : 'Archived';
+  getStatementBadgeLabel(statement: Statement): string {
+    const status = this.getEffectiveStatementStatus(statement);
+    if (status === 2) return 'Paid';
+    if (status === 3) return 'Overdue';
+    if (status === 4) return 'Partially Paid';
+    if (status === 1) return 'Generated';
+    return 'Archived';
   }
 
-  getStatementBadgeClass(status: number): string {
-    return status === 2
-      ? 'bg-[#ffdcbd]/30 text-[#693c00]'
-      : 'bg-[#e4e2e1] text-[#615e5c]';
+  getStatementBadgeClass(statement: Statement): string {
+    const status = this.getEffectiveStatementStatus(statement);
+    if (status === 2) return 'bg-[#ffdcbd]/30 text-[#693c00]';
+    if (status === 3) return 'bg-red-500/10 text-red-600';
+    if (status === 4) return 'bg-amber-500/10 text-amber-700';
+    if (status === 1) return 'bg-slate-500/10 text-slate-700';
+    return 'bg-[#e4e2e1] text-[#615e5c]';
+  }
+
+  private getEffectiveStatementStatus(statement: Statement): number {
+    const closingBalance = Number(statement.closingBalance || 0);
+    const amountPaid = Number(statement.amountPaid || 0);
+    const rawStatus = Number(statement.status || 1);
+
+    if (closingBalance <= 0) return 2;
+
+    if (statement.dueDateUtc) {
+      const dueDate = new Date(statement.dueDateUtc);
+      if (dueDate.getTime() < Date.now()) {
+        return 3;
+      }
+    }
+
+    if (amountPaid > 0 || rawStatus === 4) {
+      return 4;
+    }
+
+    return 1;
   }
 
   getDisplayAmount(statement: Statement): number {

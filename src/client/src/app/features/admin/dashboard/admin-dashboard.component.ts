@@ -107,7 +107,11 @@ export class AdminDashboardComponent implements OnInit {
 
   formatTime(date: Date | null): string {
     if (!date) return '';
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
+    });
   }
 
   getStatusColor(status: string): string {

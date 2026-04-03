@@ -29,19 +29,26 @@
         <div class="mb-2 text-4xl font-extrabold tracking-tight">{{ totalOutstanding() | currency:'INR' }}</div>
         <div class="flex items-center gap-2 text-sm font-semibold text-[#8a5100]">
           <span class="material-symbols-outlined text-sm">trending_up</span>
-          <span>All pending bills</span>
+          <span>All unpaid bills</span>
         </div>
       </article>
 
       <article class="mist-blur relative overflow-hidden rounded-[2rem] border-l-4 border-[#8a5100]/20 bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] transition-all hover:-translate-y-1 md:p-8">
         <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Upcoming Milestone</label>
-        <div class="mb-2 text-4xl font-extrabold tracking-tight">
-          {{ upcomingMilestone() ? (upcomingMilestone()!.dueDateUtc | date:'MMM dd, yyyy') : '--' }}
+        <div class="mb-3 text-4xl font-extrabold tracking-tight tabular-nums">
+          {{ getMilestoneDate() ? (getMilestoneDate()! | date:'MMM dd, yyyy') : 'No Date' }}
         </div>
-        @if (upcomingMilestone()) {
-          <div class="flex items-center gap-2 text-sm font-medium text-[#534437]">
-            <span class="material-symbols-outlined text-sm">schedule</span>
-            {{ getPayeeInfo(upcomingMilestone()!).name }} {{ getCountdownLabel(upcomingMilestone()!.dueDateUtc) }}
+        @if (getMilestoneDate()) {
+          <div class="space-y-2">
+            <div class="inline-flex items-center rounded-full bg-[#8a5100]/10 px-3 py-1">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-[#8a5100]">{{ getMilestoneBadgeLabel() }}</span>
+            </div>
+            <p class="text-sm font-semibold text-[#1b1c1c] truncate">{{ getUpcomingMilestoneCardLabel() }}</p>
+            <div class="flex items-center gap-2 text-xs font-semibold text-[#615e5c]">
+              <span class="material-symbols-outlined text-sm">schedule</span>
+              {{ getUpcomingMilestoneSubtitle() }}
+            </div>
+            <p class="text-[11px] font-medium text-[#8b8681]">{{ getUpcomingMilestoneSupportText() }}</p>
           </div>
         } @else {
           <div class="text-sm font-medium text-[#534437]">No pending bills</div>
@@ -69,7 +76,7 @@
         <div class="flex flex-wrap gap-3 md:gap-4">
           <div class="flex items-center gap-2 rounded-full bg-[#f6f3f2] px-4 py-2 text-sm font-medium text-[#534437]">
             <button (click)="setFilter(null)" [class.bg-primary-container]="filterStatus() === null" class="px-3 py-1 rounded-full hover:bg-[#eae8e7]">All</button>
-            <button (click)="setFilter(1)" [class.bg-primary-container]="filterStatus() === 1" class="px-3 py-1 rounded-full hover:bg-[#eae8e7]">Pending</button>
+            <button (click)="setFilter('due')" [class.bg-primary-container]="filterStatus() === 'due'" class="px-3 py-1 rounded-full hover:bg-[#eae8e7]">Due</button>
             <button (click)="setFilter(2)" [class.bg-primary-container]="filterStatus() === 2" class="px-3 py-1 rounded-full hover:bg-[#eae8e7]">Paid</button>
           </div>
         </div>
@@ -128,14 +135,14 @@
                       <div class="text-sm font-medium">{{ bill.dueDateUtc | date:'MMM dd, yyyy' }}</div>
                       <div
                         class="text-[0.65rem] font-bold uppercase"
-                        [ngClass]="{ 'text-[#ba1a1a]': bill.status === 1, 'text-[#615e5c]': bill.status !== 1 }"
+                        [ngClass]="{ 'text-[#ba1a1a]': isBillPayable(bill), 'text-[#615e5c]': !isBillPayable(bill) }"
                       >
-                        {{ bill.status === 1 ? getDaysRemaining(bill.dueDateUtc) : 'PAID' }}
+                        {{ getBillSecondaryStatusText(bill) }}
                       </div>
                     </td>
 
                     <td class="px-8 py-6">
-                      <div class="text-lg font-bold">{{ bill.amount | currency:'INR' }}</div>
+                      <div class="text-lg font-bold">{{ getBillOutstandingAmount(bill) | currency:'INR' }}</div>
                       <div class="text-xs text-[#534437]">Min: {{ bill.minDue | currency:'INR' }}</div>
                     </td>
 
@@ -143,26 +150,30 @@
                       <div class="flex items-center gap-2">
                         <div
                           class="h-1.5 w-1.5 rounded-full"
-                          [ngClass]="{ 'bg-[#f0a046] animate-pulse': bill.status === 1, 'bg-[#4caf50]': bill.status === 2 }"
+                          [ngClass]="{ 'bg-[#f0a046] animate-pulse': isBillPayable(bill) && getBillStatusLabel(bill) !== 'Overdue', 'bg-[#ba1a1a] animate-pulse': getBillStatusLabel(bill) === 'Overdue', 'bg-[#4caf50]': isBillPaid(bill) }"
                         ></div>
                         <span class="text-xs font-semibold text-[#534437]">
-                          {{ getStatusLabel(bill.status) }}
+                          {{ getBillStatusLabel(bill) }}
                         </span>
                       </div>
                     </td>
 
                     <td class="px-8 py-6 text-right" (click)="$event.stopPropagation()">
-                      @if (bill.status === 1) {
+                      @if (isBillPayable(bill)) {
                         <button
                           (click)="openPayment(bill)"
                           class="rounded-full bg-[#8a5100] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-[#8a5100]/20 transition-all hover:scale-105 active:scale-95"
                         >
                           Pay Bill
                         </button>
-                      } @else {
+                      } @else if (isBillPaid(bill)) {
                         <span class="text-xs font-semibold text-[#4caf50]">
                           <span class="material-symbols-outlined text-sm align-middle">check_circle</span>
                           Paid
+                        </span>
+                      } @else {
+                        <span class="text-xs font-semibold text-[#615e5c]">
+                          {{ getBillStatusLabel(bill) }}
                         </span>
                       }
                     </td>
@@ -240,7 +251,7 @@
           <div class="flex justify-between items-start mb-4">
             <div>
               <p class="text-xs font-bold uppercase tracking-widest text-[#615e5c] mb-1">Amount Due</p>
-              <p class="text-4xl font-black text-[#1b1c1c]">{{ selectedBill()!.amount | currency:'INR' }}</p>
+              <p class="text-4xl font-black text-[#1b1c1c]">{{ getSelectedBillOutstanding() | currency:'INR' }}</p>
             </div>
             <span class="px-3 py-1 bg-[#8a5100]/10 text-[#8a5100] text-xs font-bold rounded-full">Due {{ selectedBill()!.dueDateUtc | date:'MMM dd' }}</span>
           </div>
@@ -261,7 +272,7 @@
               [ngClass]="paymentType() === 'full' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50'"
             >
               <p class="font-bold text-[#1b1c1c] text-lg">Full Payment</p>
-              <p class="text-sm text-[#534437] mt-1">{{ selectedBill()!.amount | currency:'INR' }}</p>
+              <p class="text-sm text-[#534437] mt-1">{{ getPaymentAmount(selectedBill(), 'full') | currency:'INR' }}</p>
             </button>
             <button 
               (click)="paymentType.set('min')"
@@ -269,7 +280,7 @@
               [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50'"
             >
               <p class="font-bold text-[#1b1c1c] text-lg">Minimum Due</p>
-              <p class="text-sm text-[#534437] mt-1">{{ selectedBill()!.minDue | currency:'INR' }}</p>
+              <p class="text-sm text-[#534437] mt-1">{{ getPaymentAmount(selectedBill(), 'min') | currency:'INR' }}</p>
             </button>
           </div>
         </div>
@@ -290,7 +301,7 @@
             Processing...
           } @else {
             <span class="material-symbols-outlined">payments</span>
-            Pay {{ paymentType() === 'full' ? (selectedBill()!.amount | currency:'INR') : (selectedBill()!.minDue | currency:'INR') }}
+            Pay {{ getPaymentAmount(selectedBill(), paymentType()) | currency:'INR' }}
           }
         </button>
       </div>

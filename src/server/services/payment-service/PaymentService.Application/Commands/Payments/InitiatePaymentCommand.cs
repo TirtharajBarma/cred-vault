@@ -31,7 +31,7 @@ public class InitiatePaymentCommandHandler(
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<InitiatePaymentCommandHandler> logger) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
 {
-    private record BillDto(Guid UserId, Guid CardId, decimal MinDue);
+    private record BillDto(Guid UserId, Guid CardId, decimal Amount, decimal MinDue, decimal? AmountPaid);
 
     public async Task<InitiatePaymentResult> Handle(InitiatePaymentCommand request, CancellationToken cancellationToken)
     {
@@ -64,6 +64,29 @@ public class InitiatePaymentCommandHandler(
             logger.LogWarning("Payment rejected: Card mismatch - Bill {BillId} is for Card {BillCardId}, but payment uses Card {RequestCardId}",
                 request.BillId, bill.CardId, request.CardId);
             return new InitiatePaymentResult(false, null, "Selected card does not match the bill's card");
+        }
+
+        var existingPaid = bill.AmountPaid ?? 0m;
+        var outstandingAmount = Math.Max(0m, bill.Amount - existingPaid);
+
+        if (outstandingAmount <= 0)
+        {
+            logger.LogWarning("Payment rejected: Bill {BillId} already settled", request.BillId);
+            return new InitiatePaymentResult(false, null, "Bill is already settled");
+        }
+
+        if (request.Amount > outstandingAmount)
+        {
+            logger.LogWarning("Payment rejected: Amount {Amount} exceeds outstanding {Outstanding} for Bill {BillId}",
+                request.Amount, outstandingAmount, request.BillId);
+            return new InitiatePaymentResult(false, null, $"Payment exceeds outstanding balance. Outstanding: {outstandingAmount:0.00}");
+        }
+
+        if (request.PaymentType == PaymentType.Full && Math.Abs(request.Amount - outstandingAmount) > 0.01m)
+        {
+            logger.LogWarning("Payment rejected: Full payment amount {Amount} does not match outstanding {Outstanding} for Bill {BillId}",
+                request.Amount, outstandingAmount, request.BillId);
+            return new InitiatePaymentResult(false, null, $"Full payment must equal outstanding balance ({outstandingAmount:0.00})");
         }
 
         var otpCode = GenerateOtp();

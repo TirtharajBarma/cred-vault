@@ -22,7 +22,7 @@ public class BillOverdueConsumer(
         try
         {
             var result = await mediator.Send(
-                new ApplyStrikeCommand(message.CardId, message.BillId, $"Bill overdue by {message.DaysOverdue} days"),
+                new ApplyStrikeCommand(message.CardId, message.BillId, $"Bill overdue by {message.DaysOverdue} days", message.DaysOverdue),
                 context.CancellationToken);
 
             if (result.Success && result.Data != null)

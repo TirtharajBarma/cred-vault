@@ -48,6 +48,9 @@ export class PaymentsComponent implements OnInit {
   otpCode = '';
   isVerifying = signal(false);
   otpError = signal<string | null>(null);
+  otpInfo = signal<string | null>(null);
+  canResendOtp = signal(true);
+  isResendingOtp = signal(false);
   paidAmount = signal(0);
 
   ngOnInit(): void {
@@ -222,6 +225,7 @@ export class PaymentsComponent implements OnInit {
 
     this.isVerifying.set(true);
     this.otpError.set(null);
+    this.otpInfo.set(null);
 
     this.paymentService.verifyOtp(this.paymentId()!, this.otpCode).subscribe({
       next: (res) => {
@@ -242,6 +246,33 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
+  resendOtp(): void {
+    const currentPaymentId = this.paymentId();
+    if (!this.canResendOtp() || !currentPaymentId || this.isResendingOtp()) return;
+
+    this.isResendingOtp.set(true);
+    this.otpError.set(null);
+    this.otpInfo.set(null);
+
+    this.paymentService.resendOtp(currentPaymentId).subscribe({
+      next: (res) => {
+        this.isResendingOtp.set(false);
+        if (res.success) {
+          this.otpInfo.set(res.message || 'A fresh OTP has been sent to your registered email.');
+          this.canResendOtp.set(false);
+          setTimeout(() => this.canResendOtp.set(true), 30000);
+          return;
+        }
+
+        this.otpError.set(res.message || 'Failed to resend OTP.');
+      },
+      error: (err) => {
+        this.isResendingOtp.set(false);
+        this.otpError.set(err?.error?.message || 'Failed to resend OTP.');
+      }
+    });
+  }
+
   closeSuccessModal(): void {
     this.showSuccessModal.set(false);
     this.activeTab.set('history');
@@ -253,6 +284,10 @@ export class PaymentsComponent implements OnInit {
     this.paymentType.set('full');
     this.otpCode = '';
     this.paymentId.set(null);
+    this.otpError.set(null);
+    this.otpInfo.set(null);
+    this.canResendOtp.set(true);
+    this.isResendingOtp.set(false);
     this.paymentType.set('full');
   }
 

@@ -7,6 +7,12 @@ import { DashboardService } from '../../core/services/dashboard.service';
 import { PaymentService } from '../../core/services/payment.service';
 import { CreditCard } from '../../core/models/card.models';
 
+type MilestoneDisplay = {
+  date: Date;
+  cardLabel: string;
+  mode: 'due_date_queue' | 'next_bill_generation' | 'latest_statement_date';
+};
+
 @Component({
   selector: 'app-bills',
   standalone: true,
@@ -23,7 +29,7 @@ export class BillsComponent implements OnInit {
   bills = signal<Bill[]>([]);
   cards = signal<CreditCard[]>([]);
   isLoading = signal(true);
-  filterStatus = signal<number | null>(null);
+  filterStatus = signal<number | 'due' | null>(null);
   currentPage = signal(1);
   itemsPerPage = 7;
 
@@ -52,21 +58,89 @@ export class BillsComponent implements OnInit {
 
   totalOutstanding = computed(() => {
     return this.bills()
-      .filter(b => b.status === BillStatus.Pending)
-      .reduce((acc, b) => acc + b.amount, 0);
+      .filter(b => this.isBillPayable(b))
+      .reduce((acc, b) => acc + this.getBillOutstandingAmount(b), 0);
   });
 
-  upcomingMilestone = computed(() => {
-    const pending = this.bills()
-      .filter(b => b.status === BillStatus.Pending)
+  milestoneDisplay = computed<MilestoneDisplay | null>(() => {
+    const allBills = this.bills();
+    const unpaidBills = allBills
+      .filter(b => [BillStatus.Pending, BillStatus.Overdue, BillStatus.PartiallyPaid].includes(b.status))
+      .filter(b => !!b.dueDateUtc)
       .sort((a, b) => new Date(a.dueDateUtc).getTime() - new Date(b.dueDateUtc).getTime());
-    return pending.length > 0 ? pending[0] : null;
+
+    // Priority 1: Always show nearest unpaid due date first.
+    if (unpaidBills.length > 0) {
+      const nextDueBill = unpaidBills[0];
+
+      return {
+        date: new Date(nextDueBill.dueDateUtc),
+        cardLabel: this.getPayeeInfo(nextDueBill).name,
+        mode: 'due_date_queue'
+      };
+    }
+
+    // Priority 2: If all bills are paid, forecast nearest next bill generation date from cards.
+    const cards = this.cards();
+    if (cards.length > 0) {
+      const candidates = cards.map(card => {
+        const day = this.getBillingCycleDay(card);
+        const nextDate = this.getNextBillingGenerationDate(day);
+        return {
+          date: nextDate,
+          cardLabel: `${card.issuerName || 'Card'} *${card.last4}`
+        };
+      });
+
+      candidates.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      return {
+        date: candidates[0].date,
+        cardLabel: candidates[0].cardLabel,
+        mode: 'next_bill_generation'
+      };
+    }
+
+    // Safety fallback: if cards unavailable but bills exist, show latest statement generation date.
+    const latestStatement = allBills
+      .filter(b => !!b.billingDateUtc)
+      .sort((a, b) => new Date(b.billingDateUtc).getTime() - new Date(a.billingDateUtc).getTime())[0];
+
+    if (latestStatement) {
+      return {
+        date: new Date(latestStatement.billingDateUtc),
+        cardLabel: this.getPayeeInfo(latestStatement).name,
+        mode: 'latest_statement_date'
+      };
+    }
+
+    return null;
   });
 
   filteredBills() {
     const status = this.filterStatus();
-    if (status === null) return this.bills();
-    return this.bills().filter(b => b.status === status);
+    const source = status === null
+      ? this.bills()
+      : status === 'due'
+        ? this.bills().filter(b => this.isBillPayable(b))
+        : this.bills().filter(b => this.getEffectiveBillStatus(b) === status);
+
+    return [...source].sort((a, b) => {
+      const aPriority = this.getBillPriority(a);
+      const bPriority = this.getBillPriority(b);
+      if (aPriority !== bPriority) return aPriority - bPriority;
+
+      const aDue = new Date(a.dueDateUtc).getTime();
+      const bDue = new Date(b.dueDateUtc).getTime();
+
+      if (aPriority <= 2) {
+        // For active dues, nearest date first.
+        return aDue - bDue;
+      }
+
+      // For paid/cancelled rows, show latest first.
+      return bDue - aDue;
+    });
   }
 
   paginatedBills() {
@@ -121,29 +195,173 @@ export class BillsComponent implements OnInit {
   }
 
   getDaysRemaining(date: string): string {
-    const diff = new Date(date).getTime() - new Date().getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days <= 0) return 'DUE TODAY';
+    const days = this.getDayDiff(date);
+    if (days < 0) return `OVERDUE BY ${Math.abs(days)} DAY${Math.abs(days) === 1 ? '' : 'S'}`;
+    if (days === 0) return 'DUE TODAY';
     if (days === 1) return 'DUE IN 1 DAY';
     return `DUE IN ${days} DAYS`;
   }
 
   getCountdownLabel(date: string): string {
-    const diff = new Date(date).getTime() - new Date().getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days <= 0) return 'today';
+    const days = this.getDayDiff(date);
+    if (days < 0) return `overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`;
+    if (days === 0) return 'today';
     if (days === 1) return 'in 1 day';
     return `in ${days} days`;
   }
 
-  getStatusLabel(status: number): string {
-    switch (status) {
+  getUpcomingMilestoneSubtitle(): string {
+    const milestone = this.milestoneDisplay();
+    if (!milestone) return 'No billing milestones yet';
+
+    if (milestone.mode === 'due_date_queue') {
+      return this.getCountdownLabel(milestone.date.toISOString());
+    }
+
+    if (milestone.mode === 'latest_statement_date') {
+      return 'latest generated statement date';
+    }
+
+    return this.getCountdownLabel(milestone.date.toISOString());
+  }
+
+  getUpcomingMilestoneSupportText(): string {
+    const milestone = this.milestoneDisplay();
+    if (!milestone) return '';
+
+    if (milestone.mode === 'due_date_queue') {
+      return 'Priority queue: unpaid due dates';
+    }
+
+    if (milestone.mode === 'next_bill_generation') {
+      return 'All dues are clear. Tracking next bill generation.';
+    }
+
+    return 'Showing latest statement timeline.';
+  }
+
+  getUpcomingMilestoneCardLabel(): string {
+    const milestone = this.milestoneDisplay();
+    if (!milestone) return 'No active card milestone';
+    return milestone.cardLabel;
+  }
+
+  getMilestoneBadgeLabel(): string {
+    const milestone = this.milestoneDisplay();
+    if (!milestone) return 'No Milestone';
+    if (milestone.mode === 'due_date_queue') return 'Upcoming Due Date';
+    if (milestone.mode === 'next_bill_generation') return 'Next Bill Generation';
+    return 'Latest Statement Date';
+  }
+
+  getMilestoneDate(): Date | null {
+    return this.milestoneDisplay()?.date ?? null;
+  }
+
+  isBillPayable(bill: Bill): boolean {
+    return this.getBillOutstandingAmount(bill) > 0;
+  }
+
+  isBillPaid(bill: Bill): boolean {
+    return this.getEffectiveBillStatus(bill) === BillStatus.Paid;
+  }
+
+  getBillOutstandingAmount(bill: Bill): number {
+    return Math.max(0, Number(bill.amount) - this.getBillAmountPaid(bill));
+  }
+
+  getBillSecondaryStatusText(bill: Bill): string {
+    return this.getEffectiveBillStatus(bill) === BillStatus.Paid ? 'PAID' : this.getDaysRemaining(bill.dueDateUtc);
+  }
+
+  private getDayDiff(dateIso: string): number {
+    const target = new Date(dateIso);
+    const today = new Date();
+    const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diffMs = targetDate.getTime() - todayDate.getTime();
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+  }
+
+  private getBillingCycleDay(card: CreditCard): number {
+    const day = Number(card.billingCycleStartDay ?? 1);
+    if (!Number.isFinite(day)) return 1;
+    return Math.min(31, Math.max(1, day));
+  }
+
+  private getNextBillingGenerationDate(day: number): Date {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    const safeDayThisMonth = Math.min(day, new Date(year, month + 1, 0).getDate());
+    const candidateThisMonth = new Date(year, month, safeDayThisMonth, 0, 0, 0, 0);
+
+    if (candidateThisMonth.getTime() >= now.getTime()) {
+      return candidateThisMonth;
+    }
+
+    const safeDayNextMonth = Math.min(day, new Date(year, month + 2, 0).getDate());
+    return new Date(year, month + 1, safeDayNextMonth, 0, 0, 0, 0);
+  }
+
+  private getBillPriority(bill: Bill): number {
+    const status = this.getEffectiveBillStatus(bill);
+    if (status === BillStatus.Overdue) return 0;
+    if (status === BillStatus.Pending || status === BillStatus.PartiallyPaid) return 1;
+    if (status === BillStatus.Paid) return 2;
+    return 3;
+  }
+
+  getBillStatusLabel(bill: Bill): string {
+    switch (this.getEffectiveBillStatus(bill)) {
       case BillStatus.Pending: return 'Pending';
       case BillStatus.Paid: return 'Paid';
       case BillStatus.Overdue: return 'Overdue';
       case BillStatus.PartiallyPaid: return 'Partial';
       default: return 'Unknown';
     }
+  }
+
+  getPaymentAmount(bill: Bill | null, type: 'full' | 'min'): number {
+    if (!bill) return 0;
+
+    const outstanding = this.getBillOutstandingAmount(bill);
+    if (type === 'full') {
+      return outstanding;
+    }
+
+    return Math.min(outstanding, Number(bill.minDue));
+  }
+
+  getSelectedBillOutstanding(): number {
+    return this.getPaymentAmount(this.selectedBill(), 'full');
+  }
+
+  private getBillAmountPaid(bill: Bill): number {
+    return Number(bill.amountPaid || 0);
+  }
+
+  private getEffectiveBillStatus(bill: Bill): BillStatus {
+    const outstanding = this.getBillOutstandingAmount(bill);
+    if (outstanding <= 0) return BillStatus.Paid;
+
+    const paidAmount = this.getBillAmountPaid(bill);
+    const dueDate = new Date(bill.dueDateUtc);
+    const now = new Date();
+
+    if (dueDate.getTime() < now.getTime()) return BillStatus.Overdue;
+    if (paidAmount > 0) return BillStatus.PartiallyPaid;
+
+    return BillStatus.Pending;
+  }
+
+  private normalizeBillStatus(status: number | string): BillStatus {
+    if (status === BillStatus.Pending || status === 1 || status === '1' || status === 'Pending') return BillStatus.Pending;
+    if (status === BillStatus.Paid || status === 2 || status === '2' || status === 'Paid') return BillStatus.Paid;
+    if (status === BillStatus.Overdue || status === 3 || status === '3' || status === 'Overdue') return BillStatus.Overdue;
+    if (status === BillStatus.PartiallyPaid || status === 5 || status === '5' || status === 'PartiallyPaid') return BillStatus.PartiallyPaid;
+    return BillStatus.Cancelled;
   }
 
   viewStatement(bill: Bill): void {
@@ -174,7 +392,12 @@ export class BillsComponent implements OnInit {
       return;
     }
     
-    const amount = this.paymentType() === 'full' ? bill.amount : bill.minDue;
+    const amount = this.getPaymentAmount(bill, this.paymentType());
+
+    if (amount <= 0) {
+      this.errorMessage.set('This bill is already settled.');
+      return;
+    }
     
     this.isProcessing.set(true);
     this.errorMessage.set(null);
@@ -218,7 +441,7 @@ export class BillsComponent implements OnInit {
         if (res.success) {
           this.showOtpModal.set(false);
           this.showSuccessModal.set(true);
-          this.paidAmount.set(this.paymentType() === 'full' ? this.selectedBill()!.amount : this.selectedBill()!.minDue);
+          this.paidAmount.set(this.getPaymentAmount(this.selectedBill(), this.paymentType()));
           this.loadData();
         } else {
           this.otpError.set(res.message || 'Invalid OTP');
@@ -265,7 +488,7 @@ export class BillsComponent implements OnInit {
     });
   }
 
-  setFilter(status: number | null): void {
+  setFilter(status: number | 'due' | null): void {
     this.filterStatus.set(status);
     this.currentPage.set(1);
   }

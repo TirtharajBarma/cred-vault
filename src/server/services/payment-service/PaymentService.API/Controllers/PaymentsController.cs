@@ -73,6 +73,32 @@ public class PaymentsController(IMediator mediator) : BaseApiController
         });
     }
 
+    [HttpPost("{paymentId:guid}/resend-otp")]
+    public async Task<IActionResult> ResendOtp(Guid paymentId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId is null)
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
+
+        var authHeader = HttpContext.Request.Headers.Authorization.ToString();
+        var result = await mediator.Send(new ResendOtpCommand(paymentId, userId.Value, authHeader), cancellationToken);
+
+        if (!result.Success)
+            return BadRequestResponse(result.Error ?? "Failed to resend OTP.");
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "OTP resent successfully.",
+            Data = new
+            {
+                PaymentId = paymentId,
+                OtpExpiresAtUtc = result.ExpiresAtUtc
+            },
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetMyPayments(CancellationToken cancellationToken)
     {

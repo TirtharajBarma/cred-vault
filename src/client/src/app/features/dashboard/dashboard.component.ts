@@ -122,12 +122,65 @@ export class DashboardComponent implements OnInit {
   }
 
   getTransactionIcon(type: TransactionType): string {
-    switch (type) {
+    switch (this.getNormalizedTransactionType(type)) {
       case TransactionType.Purchase: return 'shopping_cart';
       case TransactionType.Payment: return 'payments';
       case TransactionType.Refund: return 'settings_backup_restore';
       default: return 'receipt';
     }
+  }
+
+  getNormalizedTransactionType(type: TransactionType | string | number): TransactionType {
+    if (type === TransactionType.Purchase || type === 1 || type === '1' || type === 'Purchase') return TransactionType.Purchase;
+    if (type === TransactionType.Payment || type === 2 || type === '2' || type === 'Payment') return TransactionType.Payment;
+    if (type === TransactionType.Refund || type === 3 || type === '3' || type === 'Refund') return TransactionType.Refund;
+    return TransactionType.Purchase;
+  }
+
+  getTransactionTitle(tx: CardTransaction): string {
+    const description = (tx.description || '').trim();
+    const lowered = description.toLowerCase();
+
+    if (lowered.startsWith('bill payment:')) {
+      return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
+    }
+
+    if (lowered.startsWith('saga:') && this.getNormalizedTransactionType(tx.type) === TransactionType.Payment) {
+      return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
+    }
+
+    return description || 'Card Transaction';
+  }
+
+  getTransactionCardMeta(tx: CardTransaction): string {
+    const card = this.cards().find(c => c.id === tx.cardId);
+    if (!card) return 'Card details unavailable';
+
+    const network = card.network || 'Card';
+    const issuer = card.issuerName || 'CredVault';
+    return `${issuer} • ${network} •••• ${card.last4}`;
+  }
+
+  getTransactionFlowLabel(type: TransactionType | string | number): string {
+    return this.getNormalizedTransactionType(type) === TransactionType.Purchase ? 'Debit' : 'Credit';
+  }
+
+  getTransactionTypeLabel(type: TransactionType | string | number): string {
+    const normalized = this.getNormalizedTransactionType(type);
+    if (normalized === TransactionType.Purchase) return 'Purchase';
+    if (normalized === TransactionType.Payment) return 'Payment';
+    return 'Refund';
+  }
+
+  getSignedAmountPrefix(type: TransactionType | string | number): string {
+    return this.getNormalizedTransactionType(type) === TransactionType.Purchase ? '-' : '+';
+  }
+
+  private getMonthYear(dateUtc: string): string {
+    return new Intl.DateTimeFormat('en-IN', {
+      month: 'short',
+      year: 'numeric'
+    }).format(new Date(dateUtc));
   }
 
   getCardGradient(index: number): string {
@@ -158,8 +211,11 @@ export class DashboardComponent implements OnInit {
   }
 
   paginatedTransactions() {
+    const sorted = [...this.transactions()].sort(
+      (a, b) => new Date(b.dateUtc).getTime() - new Date(a.dateUtc).getTime()
+    );
     const start = (this.transactionPage() - 1) * this.itemsPerPage;
-    return this.transactions().slice(start, start + this.itemsPerPage);
+    return sorted.slice(start, start + this.itemsPerPage);
   }
 
   totalTransactionPages(): number {

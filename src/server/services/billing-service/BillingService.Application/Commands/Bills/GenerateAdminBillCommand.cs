@@ -223,9 +223,18 @@ public class GenerateAdminBillCommandHandler(
 
         await statements.AddAsync(statement, ct);
 
+        var userBills = await bills.GetByUserIdAsync(bill.UserId, ct);
+        var previousBill = userBills
+            .Where(b => b.CardId == bill.CardId && b.Id != bill.Id)
+            .OrderByDescending(b => b.CreatedAtUtc)
+            .FirstOrDefault();
+
+        // Prefer transactions after the previous settled cycle to avoid leaking old items.
+        var lowerBoundUtc = previousBill?.PaidAtUtc ?? previousBill?.CreatedAtUtc ?? bill.BillingDateUtc;
+
         var txns = await GetCardTransactionsAsync(bill.CardId, auth, ct);
         var lines = txns
-            .Where(t => t.DateUtc >= bill.BillingDateUtc && t.DateUtc <= now)
+            .Where(t => t.Type == 1 && t.DateUtc > lowerBoundUtc && t.DateUtc <= now)
             .OrderBy(t => t.DateUtc)
             .Select(t => new StatementTransaction
             {

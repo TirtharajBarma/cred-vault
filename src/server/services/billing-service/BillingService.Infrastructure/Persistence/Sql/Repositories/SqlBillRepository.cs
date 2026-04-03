@@ -27,7 +27,12 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
 
     public async Task<bool> HasPendingBillAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
     {
-        return await dbContext.Bills.AnyAsync(x => x.UserId == userId && x.CardId == cardId && x.Status == BillStatus.Pending, cancellationToken);
+        return await dbContext.Bills.AnyAsync(
+            x => x.UserId == userId
+                 && x.CardId == cardId
+                 && x.Status != BillStatus.Cancelled
+                 && (x.AmountPaid ?? 0) < x.Amount,
+            cancellationToken);
     }
 
     public async Task<List<Bill>> GetAllPendingAsync(CancellationToken cancellationToken = default)
@@ -40,7 +45,9 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
     public async Task<List<Bill>> GetOverdueBillsAsync(CancellationToken cancellationToken = default)
     {
         return await dbContext.Bills
-            .Where(x => x.Status == BillStatus.Pending && x.DueDateUtc < DateTime.UtcNow)
+            .Where(x => x.Status != BillStatus.Cancelled
+                     && x.DueDateUtc < DateTime.UtcNow
+                     && (x.AmountPaid ?? 0) < x.Amount)
             .ToListAsync(cancellationToken);
     }
 

@@ -24,7 +24,7 @@ import { AdminService } from '../../../core/services/admin.service';
           <div class="flex justify-between items-start">
             <div>
               <h1 class="text-2xl font-bold">Statement Details</h1>
-              <p class="text-blue-200 mt-1">{{ statement()?.statementPeriod }}</p>
+              <p class="text-blue-200 mt-1">{{ statement()?.statementPeriod || statement()?.StatementPeriod || '-' }}</p>
               <p class="text-blue-300 text-sm mt-1">ID: {{ statement()?.id }}</p>
             </div>
             <div class="text-right">
@@ -80,6 +80,7 @@ import { AdminService } from '../../../core/services/admin.service';
                       <tr>
                         <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Description</th>
                         <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Flow</th>
                         <th class="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th>
                       </tr>
                     </thead>
@@ -87,16 +88,22 @@ import { AdminService } from '../../../core/services/admin.service';
                       @for (txn of pagedTransactions(); track txn.id) {
                         <tr class="hover:bg-gray-50">
                           <td class="px-6 py-4">
-                            <p class="font-medium text-gray-900">{{ txn.description || txn.Description || 'Transaction' }}</p>
+                            <p class="font-medium text-gray-900">{{ getTransactionDescription(txn) }}</p>
                             <p class="text-xs text-gray-500">{{ txn.merchantName || '-' }}</p>
                           </td>
                           <td class="px-6 py-4 text-sm text-gray-500">
-                            {{ formatDate(txn.transactionDate || txn.dateUtc || txn.DateUtc) }}
+                            {{ formatDateTime(txn.transactionDate || txn.dateUtc || txn.DateUtc) }}
+                          </td>
+                          <td class="px-6 py-4">
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide"
+                                  [class]="getTransactionFlowClass(txn)">
+                              {{ getTransactionFlowLabel(txn) }}
+                            </span>
                           </td>
                           <td class="px-6 py-4 text-right">
-                            <span [class]="(txn.amount ?? txn.Amount ?? 0) < 0 ? 'text-emerald-600' : 'text-gray-900'"
+                            <span [class]="getTransactionAmountClass(txn)"
                                   class="font-semibold">
-                              {{ (txn.amount ?? txn.Amount ?? 0) | currency }}
+                              {{ getTransactionSignedAmount(txn) | currency:'INR' }}
                             </span>
                           </td>
                         </tr>
@@ -145,7 +152,7 @@ import { AdminService } from '../../../core/services/admin.service';
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-500">Due Date</span>
-                    <span>{{ formatDate(bill()?.dueDate || bill()?.dueDateUtc) }}</span>
+                    <span>{{ formatDateTime(bill()?.dueDate || bill()?.dueDateUtc, false) }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-500">Status</span>
@@ -157,7 +164,7 @@ import { AdminService } from '../../../core/services/admin.service';
                   @if (bill()?.paidAt || bill()?.paidAtUtc) {
                     <div class="flex justify-between">
                       <span class="text-gray-500">Paid At</span>
-                      <span>{{ formatDate(bill()?.paidAt || bill()?.paidAtUtc) }}</span>
+                      <span>{{ formatDateTime(bill()?.paidAt || bill()?.paidAtUtc) }}</span>
                     </div>
                   }
                 </div>
@@ -396,27 +403,92 @@ export class AdminStatementDetailComponent implements OnInit {
     this.router.navigate(['/admin/users', this.userId, 'cards', this.cardId]);
   }
 
-  formatDate(dateStr: string): string {
+  formatDateTime(dateStr: string, includeTime = true): string {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const date = new Date(dateStr);
+    const options: Intl.DateTimeFormatOptions = includeTime
+      ? {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Kolkata'
+        }
+      : {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          timeZone: 'Asia/Kolkata'
+        };
+
+    const formatted = new Intl.DateTimeFormat('en-IN', options).format(date);
+    return includeTime ? `${formatted} IST` : formatted;
   }
 
   getBillStatusLabel(status: number): string {
     const labels: Record<number, string> = {
-      0: 'Pending', 1: 'Paid', 2: 'Overdue', 3: 'Partial', 4: 'Cancelled', 5: 'Partial'
+      1: 'Pending', 2: 'Paid', 3: 'Overdue', 4: 'Cancelled', 5: 'Partially Paid'
     };
     return labels[status] || 'Unknown';
   }
 
   getBillStatusClass(status: number): string {
     const classes: Record<number, string> = {
-      0: 'bg-amber-100 text-amber-700',
-      1: 'bg-emerald-100 text-emerald-700',
-      2: 'bg-red-100 text-red-700',
-      3: 'bg-blue-100 text-blue-700',
+      1: 'bg-amber-100 text-amber-700',
+      2: 'bg-emerald-100 text-emerald-700',
+      3: 'bg-red-100 text-red-700',
       4: 'bg-gray-100 text-gray-700',
-      5: 'bg-teal-100 text-teal-700'
+      5: 'bg-blue-100 text-blue-700'
     };
     return classes[status] || 'bg-gray-100 text-gray-700';
+  }
+
+  getTransactionDescription(txn: any): string {
+    const raw = String(txn?.description || txn?.Description || 'Transaction').trim();
+    if (!raw) return 'Transaction';
+
+    if (raw.startsWith('Saga:')) {
+      return 'Payment Credit (Saga)';
+    }
+
+    if (raw.toLowerCase().startsWith('bill payment:')) {
+      return 'Bill Payment Credit';
+    }
+
+    return raw;
+  }
+
+  getTransactionFlowLabel(txn: any): string {
+    return this.isCreditTransaction(txn) ? 'Credit' : 'Debit';
+  }
+
+  getTransactionFlowClass(txn: any): string {
+    return this.isCreditTransaction(txn)
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-red-100 text-red-700';
+  }
+
+  getTransactionAmountClass(txn: any): string {
+    return this.isCreditTransaction(txn) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600';
+  }
+
+  getTransactionSignedAmount(txn: any): number {
+    const amount = Math.abs(Number(txn?.amount ?? txn?.Amount ?? 0));
+    return this.isCreditTransaction(txn) ? amount : -amount;
+  }
+
+  private isCreditTransaction(txn: any): boolean {
+    const amount = Number(txn?.amount ?? txn?.Amount ?? 0);
+    if (amount < 0) return true;
+
+    const rawType = String(txn?.type ?? txn?.Type ?? '').toLowerCase();
+    if (rawType === '2' || rawType === '3' || rawType.includes('payment') || rawType.includes('refund') || rawType.includes('credit')) {
+      return true;
+    }
+
+    const description = String(txn?.description || txn?.Description || '').toLowerCase();
+    return description.startsWith('saga:') || description.startsWith('bill payment:');
   }
 }

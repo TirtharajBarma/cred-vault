@@ -61,7 +61,7 @@
                 }
               </div>
               <p class="font-medium text-slate-900 text-sm truncate">{{ notif.subject }}</p>
-              <p class="text-xs text-slate-500 mt-1">{{ notif.createdAtUtc | date:'MMM d, y h:mm a' }}</p>
+              <p class="text-xs text-slate-500 mt-1">{{ notif.createdAtUtc | date:'MMM d, y h:mm a':'Asia/Kolkata' }} IST</p>
               @if (notif.errorMessage) {
                 <p class="text-xs text-red-600 mt-1">{{ notif.errorMessage }}</p>
               }
