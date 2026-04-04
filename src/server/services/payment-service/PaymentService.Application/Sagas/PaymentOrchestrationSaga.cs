@@ -13,6 +13,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
     public State AwaitingOtpVerification { get; private set; } = null!;
     public State AwaitingPaymentConfirmation { get; private set; } = null!;
     public State AwaitingBillUpdate { get; private set; } = null!;
+    public State AwaitingRewardRedemption { get; private set; } = null!;
     public State AwaitingCardDeduction { get; private set; } = null!;
     public State Completed { get; private set; } = null!;
     public State Compensating { get; private set; } = null!;
@@ -32,6 +33,8 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
     public Event<IRevertBillUpdateFailed> RevertBillFailed { get; private set; } = null!;
     public Event<IRevertPaymentSucceeded> RevertPaymentSucceeded { get; private set; } = null!;
     public Event<IRevertPaymentFailed> RevertPaymentFailed { get; private set; } = null!;
+    public Event<IRewardRedemptionSucceeded> RewardRedemptionSucceeded { get; private set; } = null!;
+    public Event<IRewardRedemptionFailed> RewardRedemptionFailed { get; private set; } = null!;
 
     public PaymentOrchestrationSaga()
     {
@@ -50,6 +53,8 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
         Event(() => RevertBillFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
         Event(() => RevertPaymentSucceeded, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
         Event(() => RevertPaymentFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
+        Event(() => RewardRedemptionSucceeded, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
+        Event(() => RewardRedemptionFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
 
         Initially(
             When(StartOrchestration)
@@ -64,6 +69,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.Amount = ctx.Message.Amount;
                     ctx.Saga.PaymentType = ctx.Message.PaymentType;
                     ctx.Saga.OtpCode = ctx.Message.OtpCode;
+                    ctx.Saga.RewardsAmount = ctx.Message.RewardsAmount;
                     ctx.Saga.OtpExpiresAtUtc = DateTime.UtcNow.AddMinutes(10);
                     ctx.Saga.CreatedAtUtc = DateTime.UtcNow;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
@@ -130,6 +136,57 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.BillUpdated = true;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
+                .If(ctx => ctx.Saga.RewardsAmount > 0,
+                    x => x.TransitionTo(AwaitingRewardRedemption)
+                        .PublishAsync(ctx => ctx.Init<IRewardRedemptionRequested>(new
+                        {
+                            CorrelationId = ctx.Saga.CorrelationId,
+                            ctx.Saga.PaymentId,
+                            ctx.Saga.UserId,
+                            ctx.Saga.BillId,
+                            Amount = ctx.Saga.RewardsAmount,
+                            RequestedAt = DateTime.UtcNow
+                        }))
+                )
+                .If(ctx => ctx.Saga.RewardsAmount <= 0,
+                    x => x.TransitionTo(AwaitingCardDeduction)
+                        .PublishAsync(ctx => ctx.Init<ICardDeductionRequested>(new
+                        {
+                            CorrelationId = ctx.Saga.CorrelationId,
+                            ctx.Saga.PaymentId,
+                            ctx.Saga.UserId,
+                            ctx.Saga.CardId,
+                            ctx.Saga.Amount,
+                            RequestedAt = DateTime.UtcNow
+                        }))
+                ),
+            When(BillUpdateFailed)
+                .Then(ctx =>
+                {
+                    ctx.Saga.BillUpdateError = ctx.Message.Reason;
+                    ctx.Saga.CompensationReason = $"Bill update failed: {ctx.Message.Reason}";
+                    ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
+                })
+                .TransitionTo(Compensating)
+                .PublishAsync(ctx => ctx.Init<IRevertPaymentRequested>(new
+                {
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    PaymentId = ctx.Saga.PaymentId,
+                    ctx.Saga.UserId,
+                    ctx.Saga.BillId,
+                    ctx.Saga.CardId,
+                    ctx.Saga.Amount,
+                    RequestedAt = DateTime.UtcNow
+                }))
+        );
+
+        During(AwaitingRewardRedemption,
+            When(RewardRedemptionSucceeded)
+                .Then(ctx =>
+                {
+                    ctx.Saga.RewardsRedeemed = true;
+                    ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
+                })
                 .TransitionTo(AwaitingCardDeduction)
                 .PublishAsync(ctx => ctx.Init<ICardDeductionRequested>(new
                 {
@@ -137,14 +194,14 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.PaymentId,
                     ctx.Saga.UserId,
                     ctx.Saga.CardId,
-                    ctx.Saga.Amount,
+                    Amount = ctx.Saga.Amount - ctx.Saga.RewardsAmount,  // Deduct only remaining amount after rewards
                     RequestedAt = DateTime.UtcNow
                 })),
-            When(BillUpdateFailed)
+            When(RewardRedemptionFailed)
                 .Then(ctx =>
                 {
-                    ctx.Saga.BillUpdateError = ctx.Message.Reason;
-                    ctx.Saga.CompensationReason = $"Bill update failed: {ctx.Message.Reason}";
+                    ctx.Saga.BillUpdateError = $"Reward redemption failed: {ctx.Message.Reason}";
+                    ctx.Saga.CompensationReason = $"Reward redemption failed: {ctx.Message.Reason}";
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .TransitionTo(Compensating)
@@ -174,7 +231,11 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.UserId,
                     Email = ctx.Saga.Email ?? string.Empty,
                     FullName = ctx.Saga.FullName ?? "User",
+                    ctx.Saga.CardId,
+                    ctx.Saga.BillId,
                     ctx.Saga.Amount,
+                    AmountPaid = ctx.Saga.Amount - ctx.Saga.RewardsAmount,  // Actual amount charged
+                    RewardsRedeemed = ctx.Saga.RewardsAmount,
                     CompletedAt = DateTime.UtcNow
                 })),
             When(CardDeductionFailed)

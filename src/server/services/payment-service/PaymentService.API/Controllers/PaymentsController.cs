@@ -28,7 +28,14 @@ public class PaymentsController(IMediator mediator) : BaseApiController
             return BadRequest(BadRequestResponse($"Invalid PaymentType. Valid values: {string.Join(", ", Enum.GetNames<PaymentType>())}"));
 
         var authHeader = HttpContext.Request.Headers.Authorization.ToString();
-        var command = new InitiatePaymentCommand(userId.Value, request.CardId, request.BillId, request.Amount, paymentType, authHeader);
+        
+        decimal? rewardsAmount = null;
+        if (request.RewardsPoints.HasValue && request.RewardsPoints > 0)
+        {
+            rewardsAmount = request.RewardsPoints.Value * 0.25m; // 1 point = 25 paise (₹0.25)
+        }
+        
+        var command = new InitiatePaymentCommand(userId.Value, request.CardId, request.BillId, request.Amount, paymentType, authHeader, rewardsAmount);
         var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)
@@ -37,12 +44,15 @@ public class PaymentsController(IMediator mediator) : BaseApiController
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
         {
             Success = true,
-            Message = "Payment initiated. OTP required — call /verify-otp to complete.",
+            Message = result.RewardsApplied ? "Payment initiated with rewards applied. OTP required." : "Payment initiated. OTP required — call /verify-otp to complete.",
             Data = new
             {
                 PaymentId = result.PaymentId,
                 OtpRequired = result.OtpRequired,
-                Status = "Pending OTP Verification"
+                Status = "Pending OTP Verification",
+                RewardsApplied = result.RewardsApplied,
+                RewardsAmount = result.RewardsAmount,
+                FinalAmount = result.FinalAmount
             },
             TraceId = HttpContext.TraceIdentifier
         });
@@ -157,5 +167,5 @@ public class PaymentsController(IMediator mediator) : BaseApiController
     }
 }
 
-public record InitiatePaymentRequest(Guid CardId, Guid BillId, decimal Amount, string PaymentType);
+public record InitiatePaymentRequest(Guid CardId, Guid BillId, decimal Amount, string PaymentType, int? RewardsPoints = null);
 public record VerifyOtpRequest(string OtpCode);

@@ -75,7 +75,7 @@ public class MarkBillPaidCommandHandler(
         bill.PaidAtUtc = bill.Status == BillStatus.Paid ? now : null;
         bill.UpdatedAtUtc = now;
 
-        await EnsureRewardsRecordedAsync(bill, request.Amount, now, cancellationToken);
+        await EnsureRewardsRecordedAsync(bill, finalPaidAmount, now, cancellationToken);
         await EnsureStatementRecordedAsync(bill, now, cancellationToken);
 
         await billRepository.UpdateAsync(bill, cancellationToken);

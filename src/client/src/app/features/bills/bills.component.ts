@@ -5,6 +5,7 @@ import { RouterModule, Router } from '@angular/router';
 import { BillingService, Bill, BillStatus } from '../../core/services/billing.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { PaymentService } from '../../core/services/payment.service';
+import { RewardsService } from '../../core/services/rewards.service';
 import { CreditCard } from '../../core/models/card.models';
 
 type MilestoneDisplay = {
@@ -24,6 +25,7 @@ export class BillsComponent implements OnInit {
   private billingService = inject(BillingService);
   private dashboardService = inject(DashboardService);
   private paymentService = inject(PaymentService);
+  private rewardsService = inject(RewardsService);
   private router = inject(Router);
 
   bills = signal<Bill[]>([]);
@@ -49,6 +51,27 @@ export class BillsComponent implements OnInit {
 
   paymentStage = signal<'initiated' | 'otp_sent' | 'processing' | 'completed'>('initiated');
   canResendOtp = signal(true);
+
+  useRewards = signal(false);
+  availablePoints = signal(0);
+  private readonly pointsToRupeeRate = 0.25;
+  
+  rewardValue = computed(() => Math.floor(this.availablePoints()) * this.pointsToRupeeRate);
+  
+  usablePointsValue = computed(() => {
+    const bill = this.selectedBill();
+    if (!bill) return 0;
+    const outstanding = this.getBillOutstandingAmount(bill);
+    return Math.min(this.rewardValue(), outstanding);
+  });
+  
+  maxRedeemablePoints = computed(() => {
+    const bill = this.selectedBill();
+    if (!bill) return 0;
+    const outstanding = this.getBillOutstandingAmount(bill);
+    const maxPointsByAmount = Math.floor(outstanding / this.pointsToRupeeRate);
+    return Math.min(Math.floor(this.availablePoints()), maxPointsByAmount);
+  });
 
   resendOtp(): void {
     if (!this.canResendOtp()) return;
@@ -368,7 +391,24 @@ export class BillsComponent implements OnInit {
     this.paymentType.set('full');
     this.errorMessage.set(null);
     this.paymentStage.set('initiated');
+    this.useRewards.set(false);
+    this.loadRewardAccount();
     this.showPaymentModal.set(true);
+  }
+
+  private loadRewardAccount(): void {
+    this.rewardsService.getRewardAccount().subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.availablePoints.set(res.data.pointsBalance || 0);
+        }
+      },
+      error: () => this.availablePoints.set(0)
+    });
+  }
+
+  toggleRewards(): void {
+    this.useRewards.update(v => !v);
   }
 
   closePayment(): void {
@@ -398,11 +438,14 @@ export class BillsComponent implements OnInit {
     this.errorMessage.set(null);
     this.paymentStage.set('processing');
 
+    const rewardsPoints = this.useRewards() ? this.maxRedeemablePoints() : null;
+
     this.paymentService.initiatePayment({
       cardId: card.id,
       billId: bill.id,
       amount: amount,
-      paymentType: this.paymentType() === 'full' ? 'Full' : 'Partial'
+      paymentType: this.paymentType() === 'full' ? 'Full' : 'Partial',
+      rewardsPoints: rewardsPoints
     }).subscribe({
       next: (res) => {
         this.isProcessing.set(false);

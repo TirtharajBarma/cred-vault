@@ -9,6 +9,8 @@ public interface IPaymentCompleted
     Guid CardId { get; }
     Guid BillId { get; }
     decimal Amount { get; }
+    decimal AmountPaid { get; }  // Actual amount paid (after rewards)
+    decimal RewardsRedeemed { get; }  // Rewards used in payment
     DateTime CompletedAt { get; }
 }
 

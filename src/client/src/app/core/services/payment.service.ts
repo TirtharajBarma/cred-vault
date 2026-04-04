@@ -24,12 +24,16 @@ export interface PaymentInitiateRequest {
   billId: string;
   amount: number;
   paymentType: 'Full' | 'Partial';
+  rewardsPoints?: number | null;
 }
 
 export interface PaymentInitiateResponse {
   paymentId: string;
   otpRequired: boolean;
   status: string;
+  rewardsApplied?: boolean;
+  rewardsAmount?: number;
+  finalAmount?: number;
 }
 
 @Injectable({

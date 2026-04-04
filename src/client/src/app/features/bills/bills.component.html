@@ -285,6 +285,62 @@
           </div>
         </div>
 
+        <!-- Rewards Redemption Toggle -->
+        @if (availablePoints() > 0) {
+          <div class="mb-6 rounded-2xl border-2 transition-all"
+               [ngClass]="useRewards() ? 'border-[#8a5100] bg-[#8a5100]/5' : 'border-[#d8c3b2]/30 bg-white'">
+            <div class="p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div class="w-12 h-12 rounded-full flex items-center justify-center"
+                       [ngClass]="useRewards() ? 'bg-[#8a5100]' : 'bg-[#f0a046]/20'">
+                    <span class="material-symbols-outlined text-xl"
+                          [ngClass]="useRewards() ? 'text-white' : 'text-[#8a5100]'">stars</span>
+                  </div>
+                  <div>
+                    <p class="font-bold text-lg text-[#1b1c1c]">Rewards Points</p>
+                    <p class="text-sm text-[#534437]">
+                      <span class="font-semibold">{{ availablePoints() | number:'1.0-0' }} points</span> 
+                      <span class="text-[#615e5c]">= {{ rewardValue() | currency:'INR' }}</span>
+                    </p>
+                  </div>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input type="checkbox" [checked]="useRewards()" (change)="toggleRewards()" class="peer sr-only">
+                  <div class="h-8 w-14 rounded-full bg-[#d8c3b2] transition-all after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-all after:content-[''] peer-checked:bg-[#8a5100] peer-checked:after:translate-x-6"></div>
+                </label>
+              </div>
+              
+              @if (useRewards()) {
+                <div class="mt-5 pt-5 border-t border-[#d8c3b2]/30">
+                  <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-[#f0edeb] rounded-xl p-4">
+                      <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Using</p>
+                      <p class="text-xl font-bold text-[#8a5100] mt-1">{{ maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
+                      <p class="text-sm text-[#534437]">-{{ maxRedeemablePoints() * 0.25 | currency:'INR' }}</p>
+                    </div>
+                    <div class="bg-[#f0edeb] rounded-xl p-4">
+                      <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Remaining</p>
+                      <p class="text-xl font-bold text-[#1b1c1c] mt-1">{{ availablePoints() - maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
+                      <p class="text-sm text-[#534437]">={{ (availablePoints() - maxRedeemablePoints()) * 0.25 | currency:'INR' }}</p>
+                    </div>
+                  </div>
+                  <div class="flex justify-between items-center p-4 bg-[#8a5100]/10 rounded-xl">
+                    <span class="font-semibold text-[#1b1c1c]">You Pay</span>
+                    <span class="text-2xl font-black text-[#8a5100]">
+                      @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) <= 0) {
+                        ₹0.00
+                      } @else {
+                        {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) | currency:'INR' }}
+                      }
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
         @if (errorMessage()) {
           <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl">
             <p class="text-sm text-red-600 font-medium">{{ errorMessage() }}</p>
@@ -301,7 +357,15 @@
             Processing...
           } @else {
             <span class="material-symbols-outlined">payments</span>
-            Pay {{ getPaymentAmount(selectedBill(), paymentType()) | currency:'INR' }}
+            @if (useRewards() && maxRedeemablePoints() > 0) {
+              @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) <= 0) {
+                Pay ₹0 with Rewards
+              } @else {
+                Pay {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) | currency:'INR' }} (with {{ maxRedeemablePoints() }} pts)
+              }
+            } @else {
+              Pay {{ getPaymentAmount(selectedBill(), paymentType()) | currency:'INR' }}
+            }
           }
         </button>
       </div>

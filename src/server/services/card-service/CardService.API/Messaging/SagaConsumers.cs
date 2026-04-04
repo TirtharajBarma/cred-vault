@@ -51,15 +51,16 @@ public class CardDeductionSagaConsumer(
                 return;
             }
 
-            if (card.OutstandingBalance < message.Amount)
+            var availableCredit = card.CreditLimit - card.OutstandingBalance;
+            if (availableCredit < message.Amount)
             {
-                logger.LogWarning("Insufficient balance: CardId={CardId}, Balance={Balance}, PaymentAmount={Amount}",
-                    message.CardId, card.OutstandingBalance, message.Amount);
+                logger.LogWarning("Insufficient available credit: CardId={CardId}, CreditLimit={CreditLimit}, AvailableCredit={AvailableCredit}, PaymentAmount={Amount}",
+                    message.CardId, card.CreditLimit, availableCredit, message.Amount);
                 await context.Publish<ICardDeductionFailed>(new
                 {
                     CorrelationId = message.CorrelationId,
                     CardId = message.CardId,
-                    Reason = "Insufficient bill balance to pay",
+                    Reason = "Insufficient credit limit to pay",
                     FailedAt = DateTime.UtcNow
                 });
                 return;

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentService.Infrastructure.Persistence.Sql;
 using PaymentService.Application.Sagas;
+using PaymentService.Application.Sagas.Consumers;
 using PaymentService.Domain.Interfaces;
 using PaymentService.Domain.Entities;
 using PaymentService.Infrastructure.Persistence.Sql.Repositories;
@@ -73,6 +74,7 @@ try
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<PaymentProcessConsumer>();
         x.AddConsumer<RevertPaymentConsumer>();
+        x.AddConsumer<RewardRedemptionConsumer>();
         x.AddSagaStateMachine<PaymentOrchestrationSaga, PaymentOrchestrationSagaState>()
             .EntityFrameworkRepository(r => r.ExistingDbContext<PaymentDbContext>());
 
@@ -97,6 +99,7 @@ try
                 e.UseInMemoryOutbox();
                 e.ConfigureConsumer<PaymentProcessConsumer>(ctx);
                 e.ConfigureConsumer<RevertPaymentConsumer>(ctx);
+                e.ConfigureConsumer<RewardRedemptionConsumer>(ctx);
             });
 
             cfg.ReceiveEndpoint("payment-domain-event", e =>

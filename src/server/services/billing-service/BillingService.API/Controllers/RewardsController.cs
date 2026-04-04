@@ -24,6 +24,21 @@ public class RewardsController(IMediator mediator) : BaseApiController
         public DateTime? EffectiveToUtc { get; set; }
     }
 
+    public sealed class RedeemRewardsRequest
+    {
+        public int Points { get; set; }
+        public string Target { get; set; } = "Bill";
+        public Guid? BillId { get; set; }
+    }
+
+    public sealed class InternalRedeemRewardsRequest
+    {
+        public Guid UserId { get; set; }
+        public int Points { get; set; }
+        public string Target { get; set; } = "Bill";
+        public Guid? BillId { get; set; }
+    }
+
     [HttpGet("tiers")]
     public async Task<IActionResult> ListRewardTiers(CancellationToken cancellationToken)
     {
@@ -89,6 +104,63 @@ public class RewardsController(IMediator mediator) : BaseApiController
         var targetUserId = (User.IsInRole("admin") && userId.HasValue) ? userId.Value : currentUserId.Value;
 
         var result = await mediator.Send(new GetRewardTransactionsQuery(targetUserId), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("redeem")]
+    public async Task<IActionResult> RedeemRewards(
+        [FromBody] RedeemRewardsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId is null) return UnauthorizedResponse();
+
+        var target = request.Target?.ToLower() switch
+        {
+            "account" => RedeemRewardsTarget.Account,
+            "bill" => RedeemRewardsTarget.Bill,
+            _ => RedeemRewardsTarget.Bill
+        };
+
+        var command = new RedeemRewardsCommand(
+            userId.Value,
+            request.Points,
+            target,
+            request.BillId);
+
+        var result = await mediator.Send(command, cancellationToken);
+        
+        if (!result.Success) return BadRequest(result);
+
+        return Ok(result);
+    }
+
+    [HttpPost("internal/redeem")]
+    [AllowAnonymous]  // Internal service-to-service call
+    public async Task<IActionResult> InternalRedeemRewards(
+        [FromBody] InternalRedeemRewardsRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.UserId == Guid.Empty)
+            return BadRequestResponse("UserId is required");
+
+        var target = request.Target?.ToLower() switch
+        {
+            "account" => RedeemRewardsTarget.Account,
+            "bill" => RedeemRewardsTarget.Bill,
+            _ => RedeemRewardsTarget.Bill
+        };
+
+        var command = new RedeemRewardsCommand(
+            request.UserId,
+            request.Points,
+            target,
+            request.BillId);
+
+        var result = await mediator.Send(command, cancellationToken);
+        
+        if (!result.Success) return BadRequestResponse(result.Message ?? "Redemption failed");
+
         return Ok(result);
     }
 }

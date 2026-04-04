@@ -2,6 +2,7 @@ import { Component, signal, inject } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { UserRole } from '../../../core/models/auth.models';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -72,7 +73,7 @@ export class LoginComponent {
         this.isLoading.set(false);
         if (response.success) {
           const user = this.authService.currentUser();
-          if (user?.role === 'admin') {
+          if (user?.role === UserRole.Admin) {
             this.router.navigate(['/admin/dashboard']);
           } else {
             this.router.navigate(['/dashboard']);

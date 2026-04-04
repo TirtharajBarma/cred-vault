@@ -12,6 +12,7 @@ public interface IStartPaymentOrchestration
     decimal Amount { get; }
     string PaymentType { get; }
     string OtpCode { get; }
+    decimal RewardsAmount { get; }  // To be redeemed AFTER successful payment
     DateTime StartedAt { get; }
 }
 
@@ -166,6 +167,32 @@ public interface IRevertPaymentFailed
 {
     Guid CorrelationId { get; }
     Guid PaymentId { get; }
+    string Reason { get; }
+    DateTime FailedAt { get; }
+}
+
+public interface IRewardRedemptionRequested
+{
+    Guid CorrelationId { get; }
+    Guid PaymentId { get; }
+    Guid UserId { get; }
+    Guid BillId { get; }
+    decimal Amount { get; }
+    DateTime RequestedAt { get; }
+}
+
+public interface IRewardRedemptionSucceeded
+{
+    Guid CorrelationId { get; }
+    Guid BillId { get; }
+    decimal AmountRedeemed { get; }
+    DateTime SucceededAt { get; }
+}
+
+public interface IRewardRedemptionFailed
+{
+    Guid CorrelationId { get; }
+    Guid BillId { get; }
     string Reason { get; }
     DateTime FailedAt { get; }
 }

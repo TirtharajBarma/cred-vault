@@ -67,6 +67,7 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
             entity.Property(x => x.BillUpdateError).HasMaxLength(500);
             entity.Property(x => x.CardDeductionError).HasMaxLength(500);
             entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.RewardsAmount).HasColumnType("decimal(18,2)");
         });
     }
 }

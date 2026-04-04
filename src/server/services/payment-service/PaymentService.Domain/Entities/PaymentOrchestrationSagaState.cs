@@ -16,6 +16,9 @@ public sealed class PaymentOrchestrationSagaState : SagaStateMachineInstance
     public decimal Amount { get; set; }
     public string? PaymentType { get; set; }
 
+    public decimal RewardsAmount { get; set; }
+    public bool RewardsRedeemed { get; set; }
+
     public string? OtpCode { get; set; }
     public DateTime? OtpExpiresAtUtc { get; set; }
     public bool OtpVerified { get; set; }

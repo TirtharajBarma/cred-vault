@@ -94,14 +94,16 @@
                     <td class="px-8 py-6 text-sm font-medium text-secondary">{{ tx.createdAtUtc | date:'MMM dd, yyyy' }}</td>
                     <td class="px-8 py-6 text-sm font-bold text-on-surface">{{ getRewardActivityLabel(tx) }}</td>
                     <td class="px-8 py-6">
-                      @if (tx.points > 0) {
+                      @if (tx.type === 3) {
+                        <span class="px-3 py-1 bg-red-500/10 text-red-600 rounded-full text-[0.6rem] font-bold uppercase tracking-wider">Redeemed</span>
+                      } @else if (tx.points > 0) {
                         <span class="px-3 py-1 bg-emerald-500/10 text-emerald-600 rounded-full text-[0.6rem] font-bold uppercase tracking-wider">Earned</span>
                       } @else {
-                        <span class="px-3 py-1 bg-red-500/10 text-red-600 rounded-full text-[0.6rem] font-bold uppercase tracking-wider">Debited</span>
+                        <span class="px-3 py-1 bg-red-500/10 text-red-600 rounded-full text-[0.6rem] font-bold uppercase tracking-wider">Reversed</span>
                       }
                     </td>
-                    <td class="px-8 py-6 text-sm font-extrabold text-right" [class]="tx.points > 0 ? 'text-emerald-600' : 'text-red-500'">
-                      {{ tx.points > 0 ? '+' : '' }}{{ tx.points | number }}
+                    <td class="px-8 py-6 text-sm font-extrabold text-right" [class]="tx.type === 3 ? 'text-red-500' : 'text-emerald-600'">
+                      @if (tx.type === 3) { - }{{ tx.points | number }}
                     </td>
                   </tr>
                 }
