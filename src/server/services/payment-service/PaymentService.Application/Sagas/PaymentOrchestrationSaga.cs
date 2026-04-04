@@ -82,6 +82,8 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                 .Then(ctx =>
                 {
                     ctx.Saga.OtpVerified = true;
+                    ctx.Saga.OtpCode = null;
+                    ctx.Saga.OtpExpiresAtUtc = null;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .TransitionTo(AwaitingPaymentConfirmation)

@@ -13,6 +13,7 @@ public record VerifyOtpResult(bool Success, string? Error);
 
 public class VerifyOtpCommandHandler(
     IPaymentRepository paymentRepository,
+    IUnitOfWork unitOfWork,
     ISendEndpointProvider sendEndpointProvider,
     ILogger<VerifyOtpCommandHandler> logger
 ) : IRequestHandler<VerifyOtpCommand, VerifyOtpResult>
@@ -48,7 +49,7 @@ public class VerifyOtpCommandHandler(
             return new VerifyOtpResult(false, "OTP not generated");
         }
 
-        if (payment.OtpCode != request.OtpCode)
+        if (!string.Equals(payment.OtpCode.Trim(), request.OtpCode.Trim(), StringComparison.Ordinal))
         {
             logger.LogWarning("Invalid OTP for Payment {PaymentId}", request.PaymentId);
             var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
@@ -75,6 +76,12 @@ public class VerifyOtpCommandHandler(
             }, cancellationToken);
             return new VerifyOtpResult(false, "OTP has expired");
         }
+
+        payment.OtpCode = null;
+        payment.OtpExpiresAtUtc = null;
+        payment.UpdatedAtUtc = DateTime.UtcNow;
+        await paymentRepository.UpdateAsync(payment);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Publishing IOtpVerified for PaymentId={PaymentId}", request.PaymentId);
 

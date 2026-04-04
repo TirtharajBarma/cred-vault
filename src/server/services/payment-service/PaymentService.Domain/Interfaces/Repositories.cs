@@ -6,6 +6,7 @@ public interface IPaymentRepository
 {
     Task<Payment?> GetByIdAsync(Guid id);
     Task<IEnumerable<Payment>> GetByUserIdAsync(Guid userId);
+    Task<IEnumerable<Payment>> GetStuckPaymentsAsync(Guid userId, Guid billId, CancellationToken ct = default);
     Task AddAsync(Payment payment);
     Task UpdateAsync(Payment payment);
 }

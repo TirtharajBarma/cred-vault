@@ -185,11 +185,7 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
 
     public async Task<List<CreditCard>> GetBlockedCardsAsync(CancellationToken cancellationToken = default)
     {
-        return await dbContext.CreditCards
-            .AsNoTracking()
-            .Where(x => x.IsBlocked)
-            .OrderByDescending(x => x.BlockedAtUtc)
-            .ToListAsync(cancellationToken);
+        return new List<CreditCard>();
     }
 
     public async Task<bool> HasTransactionsAsync(Guid cardId, CancellationToken cancellationToken = default)

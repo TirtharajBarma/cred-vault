@@ -16,8 +16,6 @@ public sealed class Payment
     public string? OtpCode { get; set; }
     public DateTime? OtpExpiresAtUtc { get; set; }
     
-    public bool IsDeleted { get; set; }
-    public DateTime? DeletedAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 

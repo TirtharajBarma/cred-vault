@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentService.Domain.Entities;
+using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
 
 namespace PaymentService.Infrastructure.Persistence.Sql.Repositories;
@@ -16,7 +17,7 @@ public sealed class PaymentRepository(PaymentDbContext dbContext) : IPaymentRepo
     public async Task<IEnumerable<Payment>> GetByUserIdAsync(Guid userId)
     {
         return await dbContext.Payments
-            .Where(x => x.UserId == userId && !x.IsDeleted)
+            .Where(x => x.UserId == userId)
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync();
     }
@@ -30,6 +31,16 @@ public sealed class PaymentRepository(PaymentDbContext dbContext) : IPaymentRepo
     {
         dbContext.Payments.Update(payment);
         return Task.CompletedTask;
+    }
+
+    public async Task<IEnumerable<Payment>> GetStuckPaymentsAsync(Guid userId, Guid billId, CancellationToken ct = default)
+    {
+        return await dbContext.Payments
+            .Where(x => x.UserId == userId 
+                && x.BillId == billId 
+                && x.Status == PaymentStatus.Initiated 
+                && x.OtpExpiresAtUtc < DateTime.UtcNow)
+            .ToListAsync(ct);
     }
 }
 

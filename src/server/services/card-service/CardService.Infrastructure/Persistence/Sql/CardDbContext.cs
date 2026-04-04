@@ -38,10 +38,6 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.Property(x => x.CreditLimit).IsRequired().HasColumnType("decimal(18,2)");
             entity.Property(x => x.OutstandingBalance).IsRequired().HasColumnType("decimal(18,2)");
             entity.Property(x => x.BillingCycleStartDay).IsRequired();
-            entity.Property(x => x.StrikeCount).IsRequired().HasDefaultValue(0);
-            entity.Property(x => x.IsBlocked).IsRequired().HasDefaultValue(false);
-            entity.Property(x => x.BlockedAtUtc);
-            entity.Property(x => x.UnblockedAtUtc);
             entity.Property(x => x.IsDefault).IsRequired();
             entity.Property(x => x.IsVerified).IsRequired();
             entity.Property(x => x.VerifiedAtUtc);

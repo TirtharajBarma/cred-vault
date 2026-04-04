@@ -20,11 +20,6 @@ public sealed class CreditCard
     public decimal OutstandingBalance { get; set; }
     public int BillingCycleStartDay { get; set; }
 
-    public int StrikeCount { get; set; } = 0;
-    public bool IsBlocked { get; set; } = false;
-    public DateTime? BlockedAtUtc { get; set; }
-    public DateTime? UnblockedAtUtc { get; set; }
-
     public bool IsDefault { get; set; }
     public bool IsVerified { get; set; }
     public DateTime? VerifiedAtUtc { get; set; }
@@ -34,21 +29,4 @@ public sealed class CreditCard
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
-
-    public void AddStrike()
-    {
-        StrikeCount++;
-        if (StrikeCount >= 3)
-        {
-            IsBlocked = true;
-            BlockedAtUtc = DateTime.UtcNow;
-        }
-    }
-
-    public void ClearStrikes()
-    {
-        StrikeCount = 0;
-        IsBlocked = false;
-        UnblockedAtUtc = DateTime.UtcNow;
-    }
 }

@@ -30,6 +30,7 @@ public class InitiatePaymentCommandHandler(
     IPaymentRepository paymentRepository,
     IUnitOfWork unitOfWork,
     IPublishEndpoint publishEndpoint,
+    ISendEndpointProvider sendEndpointProvider,
     IHttpClientFactory httpClientFactory,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<InitiatePaymentCommandHandler> logger) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
@@ -40,6 +41,9 @@ public class InitiatePaymentCommandHandler(
     {
         logger.LogInformation("InitiatePayment: UserId={UserId}, BillId={BillId}, Amount={Amount}, RewardsAmount={RewardsAmount}",
             request.UserId, request.BillId, request.Amount, request.RewardsAmount);
+
+        // Cleanup stuck payments for this user/bill before creating new one
+        await MarkStuckPaymentsFailedAsync(request.UserId, request.BillId, cancellationToken);
 
         if (request.Amount <= 0)
         {
@@ -321,6 +325,37 @@ public class InitiatePaymentCommandHandler(
         {
             logger.LogError(ex, "Exception during rewards redemption for Bill {BillId}", billId);
             return (false, "Error processing rewards redemption", 0);
+        }
+    }
+
+    private async Task MarkStuckPaymentsFailedAsync(Guid userId, Guid billId, CancellationToken ct)
+    {
+        try
+        {
+            var stuckPayments = await paymentRepository.GetStuckPaymentsAsync(userId, billId, ct);
+            foreach (var payment in stuckPayments)
+            {
+                payment.Status = PaymentStatus.Failed;
+                payment.FailureReason = "User initiated new payment before completing this one";
+                payment.OtpCode = null;
+                payment.OtpExpiresAtUtc = null;
+                payment.UpdatedAtUtc = DateTime.UtcNow;
+                await paymentRepository.UpdateAsync(payment);
+                logger.LogInformation("Marked stuck payment as Failed: PaymentId={PaymentId}", payment.Id);
+
+                var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
+                await endpoint.Send<IOtpFailed>(new
+                {
+                    CorrelationId = payment.Id,
+                    PaymentId = payment.Id,
+                    Reason = "Payment superseded by new payment request",
+                    FailedAt = DateTime.UtcNow
+                }, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to cleanup stuck payments for UserId={UserId}, BillId={BillId}", userId, billId);
         }
     }
 }
