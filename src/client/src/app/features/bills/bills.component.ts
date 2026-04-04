@@ -154,10 +154,20 @@ export class BillsComponent implements OnInit {
       
       if (aPriority !== bPriority) return aPriority - bPriority;
 
+      // For paid bills, always show the most recently settled/updated records first.
+      if (aPriority === 2) {
+        const aPaidTime = this.getBillLatestSortTime(a);
+        const bPaidTime = this.getBillLatestSortTime(b);
+        if (aPaidTime !== bPaidTime) return bPaidTime - aPaidTime;
+      }
+
       const aDate = new Date(a.billingDateUtc).getTime();
       const bDate = new Date(b.billingDateUtc).getTime();
 
-      return bDate - aDate;
+      if (aDate !== bDate) return bDate - aDate;
+
+      // Deterministic fallback when billing cycle date is identical.
+      return this.getBillLatestSortTime(b) - this.getBillLatestSortTime(a);
     });
   }
 
@@ -329,6 +339,16 @@ export class BillsComponent implements OnInit {
     if (status === BillStatus.Pending || status === BillStatus.PartiallyPaid) return 1;
     if (status === BillStatus.Paid) return 2;
     return 3;
+  }
+
+  private getBillLatestSortTime(bill: Bill): number {
+    const candidates = [bill.paidAtUtc, bill.updatedAtUtc, bill.createdAtUtc, bill.billingDateUtc];
+    for (const value of candidates) {
+      if (!value) continue;
+      const timestamp = new Date(value).getTime();
+      if (!Number.isNaN(timestamp)) return timestamp;
+    }
+    return 0;
   }
 
   getBillStatusLabel(bill: Bill): string {

@@ -31,9 +31,9 @@ export class StatementsComponent implements OnInit {
     if (cardFilter !== 'all') {
       filtered = filtered.filter(s => s.cardId === cardFilter);
     }
-    return [...filtered].sort(
-      (a, b) => new Date(b.periodEndUtc).getTime() - new Date(a.periodEndUtc).getTime()
-    );
+
+    // Keep API order so the latest generated statement stays at the top.
+    return filtered;
   });
 
   cardOptions = computed(() => {
