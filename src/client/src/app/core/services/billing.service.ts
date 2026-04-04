@@ -43,14 +43,6 @@ export class BillingService {
     return this.http.get<ApiResponse<Bill[]>>(this.baseUrl);
   }
 
-  getBillById(billId: string): Observable<ApiResponse<Bill>> {
-    return this.http.get<ApiResponse<Bill>>(`${this.baseUrl}/${billId}`);
-  }
-
-  getBillStatusLabel(status: number): string {
-    return BillStatus[status] || 'Unknown';
-  }
-
   getBillStatusClass(status: number): string {
     switch (status) {
       case BillStatus.Pending: return 'badge-warning';
@@ -60,9 +52,5 @@ export class BillingService {
       case BillStatus.Cancelled: return 'badge-neutral';
       default: return 'badge-neutral';
     }
-  }
-
-  getStatementTransactions(statementId: string): Observable<ApiResponse<any>> {
-    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/statements/${statementId}/transactions`);
   }
 }

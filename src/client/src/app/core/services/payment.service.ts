@@ -58,8 +58,4 @@ export class PaymentService {
   getMyPayments(): Observable<ApiResponse<Payment[]>> {
     return this.http.get<ApiResponse<Payment[]>>(this.baseUrl);
   }
-
-  getPaymentById(paymentId: string): Observable<ApiResponse<Payment>> {
-    return this.http.get<ApiResponse<Payment>>(`${this.baseUrl}/${paymentId}`);
-  }
 }

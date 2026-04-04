@@ -2,9 +2,7 @@ using MassTransit;
 using Microsoft.Extensions.Logging;
 using MediatR;
 using BillingService.Application.Commands.Bills;
-using BillingService.Application.Commands.Rewards;
 using Shared.Contracts.Events.Saga;
-using Shared.Contracts.Events.Payment;
 
 namespace BillingService.API.Messaging;
 
@@ -130,21 +128,5 @@ public class RevertBillSagaConsumer(
                 FailedAt = DateTime.UtcNow
             });
         }
-    }
-}
-
-public class PaymentCompletedSagaConsumer(
-    ILogger<PaymentCompletedSagaConsumer> logger
-) : IConsumer<IPaymentCompleted>
-{
-    public async Task Consume(ConsumeContext<IPaymentCompleted> context)
-    {
-        var message = context.Message;
-
-        logger.LogInformation("PaymentCompleted: PaymentId={PaymentId}, UserId={UserId}, AmountPaid={AmountPaid}, RewardsRedeemed={RewardsRedeemed}",
-            message.PaymentId, message.UserId, message.AmountPaid, message.RewardsRedeemed);
-
-        // Note: Rewards are already earned in MarkBillPaidCommand via EnsureRewardsRecordedAsync
-        // No additional rewards to earn here - prevents duplicate earning
     }
 }

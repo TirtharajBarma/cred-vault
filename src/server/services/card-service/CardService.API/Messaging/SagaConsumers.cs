@@ -67,7 +67,7 @@ public class CardDeductionSagaConsumer(
             }
 
             var oldBalance = card.OutstandingBalance;
-            card.OutstandingBalance = card.OutstandingBalance + message.Amount;
+            card.OutstandingBalance = card.OutstandingBalance - message.Amount;
             card.UpdatedAtUtc = DateTime.UtcNow;
 
             dbContext.CardTransactions.Add(new CardTransaction

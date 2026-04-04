@@ -69,7 +69,6 @@ try
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<BillUpdateSagaConsumer>();
         x.AddConsumer<RevertBillSagaConsumer>();
-        x.AddConsumer<PaymentCompletedSagaConsumer>();
 
         x.UsingRabbitMq((ctx, cfg) =>
         {
@@ -88,12 +87,10 @@ try
                 e.Bind<IUserDeleted>();
                 e.Bind<IBillUpdateRequested>();
                 e.Bind<IRevertBillUpdateRequested>();
-                e.Bind<IPaymentCompleted>();
 
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<BillUpdateSagaConsumer>(ctx);
                 e.ConfigureConsumer<RevertBillSagaConsumer>(ctx);
-                e.ConfigureConsumer<PaymentCompletedSagaConsumer>(ctx);
             });
         });
     });

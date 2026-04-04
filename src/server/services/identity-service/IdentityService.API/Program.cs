@@ -4,50 +4,81 @@ using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
 using IdentityService.Application.Abstractions.Persistence;
 using IdentityService.Application.Commands.Auth;
+using Serilog;
+using Serilog.Events;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File(
+        "logs/identity-service-.log",
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
 
-// Standard Services
-builder.Services.AddControllers();
-builder.Services.AddStandardApi();
-builder.Services.AddCors(options =>
+try
 {
-    options.AddPolicy("AllowWebClients", policy =>
+    Log.Information("Starting Identity Service");
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Host.UseSerilog();
+
+    // Standard Services
+    builder.Services.AddControllers();
+    builder.Services.AddStandardApi();
+    builder.Services.AddCors(options =>
     {
-        policy.AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        options.AddPolicy("AllowWebClients", policy =>
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
     });
-});
-builder.Services.AddStandardAuth(builder.Configuration);
+    builder.Services.AddStandardAuth(builder.Configuration);
 
-// Service Specifics
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<RegisterCommand>());
-builder.Services.AddDbContext<IdentityDbContext>(options =>
-{
-    options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityDb"));
-});
-builder.Services.AddScoped<IUserRepository, SqlUserRepository>();
+    // Service Specifics
+    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<RegisterCommand>());
+    builder.Services.AddDbContext<IdentityDbContext>(options =>
+    {
+        options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityDb"));
+    });
+    builder.Services.AddScoped<IUserRepository, SqlUserRepository>();
 
-// Messaging - SIMPLE with dedicated queue
-builder.Services.AddStandardMessaging(builder.Configuration, configure: null, serviceName: "identity");
+    // Messaging - SIMPLE with dedicated queue
+    builder.Services.AddStandardMessaging(builder.Configuration, configure: null, serviceName: "identity");
 
-var app = builder.Build();
+    var app = builder.Build();
 
-// Database Migration
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-    await dbContext.Database.MigrateAsync();
+    // Database Migration
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        await dbContext.Database.MigrateAsync();
+    }
+
+    // Standard Pipeline
+    app.UseStandardApi("Identity Service API");
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseSerilogRequestLogging();
+    app.UseHttpsRedirection();
+    app.UseCors("AllowWebClients");
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+
+    app.Run();
 }
-
-// Standard Pipeline
-app.UseStandardApi("Identity Service API");
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseHttpsRedirection();
-app.UseCors("AllowWebClients");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Identity Service terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

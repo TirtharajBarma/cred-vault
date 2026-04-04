@@ -99,10 +99,6 @@ export class RewardsService {
     return this.http.get<ApiResponse<RewardAccount>>(`${this.baseUrl}/rewards/account`);
   }
 
-  getRewardTiers(): Observable<ApiResponse<RewardTier[]>> {
-    return this.http.get<ApiResponse<RewardTier[]>>(`${this.baseUrl}/rewards/tiers`);
-  }
-
   getRewardHistory(): Observable<ApiResponse<RewardTransaction[]>> {
     return this.http.get<ApiResponse<RewardTransaction[]>>(`${this.baseUrl}/rewards/transactions`);
   }
