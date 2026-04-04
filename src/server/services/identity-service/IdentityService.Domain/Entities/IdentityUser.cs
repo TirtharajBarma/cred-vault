@@ -7,7 +7,7 @@ public sealed class IdentityUser
 	public Guid Id { get; set; }
 	public string Email { get; set; } = string.Empty;
 	public string FullName { get; set; } = string.Empty;
-	public string PasswordHash { get; set; } = string.Empty;
+	public string? PasswordHash { get; set; }
 	public bool IsEmailVerified { get; set; }
 	public string? EmailVerificationOtp { get; set; }
 	public DateTime? EmailVerificationOtpExpiresAtUtc { get; set; }

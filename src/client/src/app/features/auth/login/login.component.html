@@ -105,10 +105,26 @@
             <div class="flex-grow border-t border-charcoal/10"></div>
           </div>
           <div class="grid grid-cols-2 gap-4">
-            <button class="flex items-center justify-center gap-3 h-12 bg-white/60 border border-white rounded-xl hover:bg-white transition-all duration-300 shadow-sm">
-              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtJETqJiaZRch0HWuS6B4PFpsxTrGcMrRg8ZflpHkVQY1DXPEkJfuUOs9QvQSmzzhzQw0AdXAaCkrgTwFVp51gv-7ZrrNhte3blIoVFqIFlOPKe0TLLaHJO39PP5tlkOH-CV8UGKvhOOrgxrZXDW2EzYWl7h6wYGr9i9Hg9gtflbHjDOccPplZMf1ABPYE7x7-VP4niEl87o6mIPqcMN2bP8DQ0TSWFVZbrJKNxqa0_IUrrv30BYOOUGgc00hEfa3NCFZZIybr_4eD" alt="Google" class="size-5">
-              <span class="text-charcoal text-sm font-bold">Google</span>
-            </button>
+            <!-- Google Sign-In: our styled button with Google's real button overlaid invisibly -->
+            <div class="relative h-12">
+              <!-- Our styled button (visible) -->
+              <div class="flex items-center justify-center gap-3 h-12 bg-white/60 border border-white rounded-xl shadow-sm w-full pointer-events-none select-none">
+                <ng-container *ngIf="!isGoogleLoading(); else googleSpinner">
+                  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtJETqJiaZRch0HWuS6B4PFpsxTrGcMrRg8ZflpHkVQY1DXPEkJfuUOs9QvQSmzzhzQw0AdXAaCkrgTwFVp51gv-7ZrrNhte3blIoVFqIFlOPKe0TLLaHJO39PP5tlkOH-CV8UGKvhOOrgxrZXDW2EzYWl7h6wYGr9i9Hg9gtflbHjDOccPplZMf1ABPYE7x7-VP4niEl87o6mIPqcMN2bP8DQ0TSWFVZbrJKNxqa0_IUrrv30BYOOUGgc00hEfa3NCFZZIybr_4eD" alt="Google" class="size-5">
+                  <span class="text-charcoal text-sm font-bold">Google</span>
+                </ng-container>
+                <ng-template #googleSpinner>
+                  <span class="size-4 border-2 border-charcoal/20 border-t-charcoal rounded-full animate-spin"></span>
+                  <span class="text-charcoal text-sm font-bold">Signing in...</span>
+                </ng-template>
+              </div>
+              <!-- Google's real button rendered here — invisible overlay that captures clicks -->
+              <div
+                #googleBtnContainer
+                class="absolute inset-0 opacity-0 overflow-hidden rounded-xl cursor-pointer"
+                style="z-index: 1"
+              ></div>
+            </div>
             <button class="flex items-center justify-center gap-3 h-12 bg-white/60 border border-white rounded-xl hover:bg-white transition-all duration-300 shadow-sm">
               <span class="material-symbols-outlined text-charcoal text-xl">fingerprint</span>
               <span class="text-charcoal text-sm font-bold">SSO</span>

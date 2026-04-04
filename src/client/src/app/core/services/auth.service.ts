@@ -80,6 +80,16 @@ export class AuthService {
     );
   }
 
+  loginWithGoogle(idToken: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${this.baseUrl}/google`, { idToken }).pipe(
+      tap(response => {
+        if (response.success && response.data) {
+          this.handleAuthSuccess(response.data);
+        }
+      })
+    );
+  }
+
   logout(): void {
     this.clearAuthData();
     this.router.navigate(['/login'], { replaceUrl: true });

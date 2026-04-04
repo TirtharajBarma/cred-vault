@@ -39,7 +39,7 @@ public sealed class LoginCommandHandler(IUserRepository userRepository, IOptions
             };
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
             return new AuthResult
             {

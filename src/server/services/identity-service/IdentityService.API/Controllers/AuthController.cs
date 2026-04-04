@@ -23,6 +23,13 @@ public class AuthController(IMediator mediator) : BaseApiController
         return CreateResponse(result.Success, result, result.Message, result.ErrorCode);
     }
 
+    [HttpPost("google")]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GoogleLoginCommand(request.IdToken), cancellationToken);
+        return CreateResponse(result.Success, result, result.Message, result.ErrorCode);
+    }
+
     [HttpPost("resend-verification")]
     public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationRequest request, CancellationToken cancellationToken)
     {
