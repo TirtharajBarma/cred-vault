@@ -65,23 +65,29 @@ export class CardDetailsComponent implements OnInit {
   // Real-time Spending Analysis based on Category breakdown
   spendingAnalysis = computed(() => {
     const card = this.card();
-    if (!card || card.outstandingBalance <= 0) return [];
+    if (!card) return [];
 
     const txs = this.currentCardTransactions();
     if (txs.length === 0) return [];
 
+    // Get current month's transactions only (resets when new bill is generated)
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const monthTxs = txs.filter(t => {
+      const d = new Date(t.dateUtc);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    if (monthTxs.length === 0) return [];
+
     const categories: Record<string, number> = {};
-    let remainingOutstanding = card.outstandingBalance;
     let total = 0;
 
-    // Reconstruct outstanding composition from newest to oldest transactions.
-    for (const tx of txs) {
+    for (const tx of monthTxs) {
       const normalizedType = this.getNormalizedTransactionType(tx.type);
 
       if (normalizedType === 1) {
-        if (remainingOutstanding <= 0) continue;
-
-        const allocated = Math.min(tx.amount, remainingOutstanding);
         const desc = (tx.description || '').toLowerCase();
         let category = 'Services';
 
@@ -92,12 +98,8 @@ export class CardDetailsComponent implements OnInit {
         else if (desc.includes('electricity') || desc.includes('water') || desc.includes('internet') || desc.includes('bill') || desc.includes('utility')) category = 'Utilities';
         else if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('game') || desc.includes('movie') || desc.includes('hulu')) category = 'Entertainment';
 
-        categories[category] = (categories[category] || 0) + allocated;
-        total += allocated;
-        remainingOutstanding -= allocated;
-      } else {
-        // Going backwards in time, payments/refunds increase pre-payment outstanding.
-        remainingOutstanding += tx.amount;
+        categories[category] = (categories[category] || 0) + tx.amount;
+        total += tx.amount;
       }
     }
 

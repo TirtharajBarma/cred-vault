@@ -205,5 +205,19 @@ public class MarkBillPaidCommandHandler(
         };
 
         await statementRepository.AddAsync(statement, cancellationToken);
+
+        // Create statement transaction for the bill payment
+        await statementRepository.AddTransactionsAsync(new List<StatementTransaction>
+        {
+            new StatementTransaction
+            {
+                Id = Guid.NewGuid(),
+                StatementId = statement.Id,
+                Type = "Payment",
+                Amount = bill.AmountPaid ?? 0,
+                Description = "Bill payment",
+                DateUtc = bill.PaidAtUtc ?? now
+            }
+        }, cancellationToken);
     }
 }

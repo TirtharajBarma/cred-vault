@@ -142,7 +142,11 @@
                     </td>
 
                     <td class="px-8 py-6">
-                      <div class="text-lg font-bold">{{ getBillOutstandingAmount(bill) | currency:'INR' }}</div>
+                      @if (isBillPaid(bill)) {
+                        <div class="text-lg font-bold">{{ bill.amount | currency:'INR' }}</div>
+                      } @else {
+                        <div class="text-lg font-bold">{{ getBillOutstandingAmount(bill) | currency:'INR' }}</div>
+                      }
                       <div class="text-xs text-[#534437]">Min: {{ bill.minDue | currency:'INR' }}</div>
                     </td>
 
