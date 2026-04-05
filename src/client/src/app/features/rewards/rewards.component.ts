@@ -17,16 +17,22 @@ export class RewardsComponent implements OnInit {
   private dashboardService = inject(DashboardService);
   private billingService = inject(BillingService);
 
+  Math = Math;
+
   rewardAccount = signal<RewardAccount | null>(null);
   transactions = signal<RewardTransaction[]>([]);
   rewardTiers = signal<RewardTier[]>([]);
   rewardCardLabelMap = signal<Record<string, string>>({});
   issuerMap = signal<Record<string, string>>({});
+  brokenNetworkLogos = signal<Record<string, true>>({});
   isLoading = signal(true);
   error = signal<string | null>(null);
 
   tiersPage = signal(1);
   tiersPerPage = 3;
+
+  transactionsPage = signal(1);
+  transactionsPerPage = 7;
 
   paginatedTiers = computed(() => {
     const start = (this.tiersPage() - 1) * this.tiersPerPage;
@@ -125,6 +131,34 @@ export class RewardsComponent implements OnInit {
     this.loadData();
   }
 
+  sortedTransactions() {
+    return [...this.transactions()].sort(
+      (a, b) => new Date(b.createdAtUtc).getTime() - new Date(a.createdAtUtc).getTime()
+    );
+  }
+
+  paginatedTransactions() {
+    const sorted = this.sortedTransactions();
+    const start = (this.transactionsPage() - 1) * this.transactionsPerPage;
+    return sorted.slice(start, start + this.transactionsPerPage);
+  }
+
+  totalTransactionPages(): number {
+    return Math.ceil(this.transactions().length / this.transactionsPerPage);
+  }
+
+  nextTransactionPage(): void {
+    if (this.transactionsPage() < this.totalTransactionPages()) {
+      this.transactionsPage.set(this.transactionsPage() + 1);
+    }
+  }
+
+  prevTransactionPage(): void {
+    if (this.transactionsPage() > 1) {
+      this.transactionsPage.set(this.transactionsPage() - 1);
+    }
+  }
+
   getRewardActivityLabel(tx: RewardTransaction): string {
     const cardLabel = this.rewardCardLabelMap()[tx.billId];
     if (!cardLabel) return 'Bill Payment Reward';
@@ -198,6 +232,25 @@ export class RewardsComponent implements OnInit {
       case 1: return 'text-blue-800';
       default: return 'text-gray-500';
     }
+  }
+
+  getNetworkLogoSrc(tier: RewardTier): string | null {
+    switch (tier.cardNetwork) {
+      case 1: return '/assets/visa.png';
+      case 2: return '/assets/mastercard.png';
+      default: return null;
+    }
+  }
+
+  hasUsableNetworkLogo(tier: RewardTier): boolean {
+    const logoSrc = this.getNetworkLogoSrc(tier);
+    return !!logoSrc && !this.brokenNetworkLogos()[logoSrc];
+  }
+
+  onNetworkLogoError(tier: RewardTier): void {
+    const logoSrc = this.getNetworkLogoSrc(tier);
+    if (!logoSrc) return;
+    this.brokenNetworkLogos.update((current) => ({ ...current, [logoSrc]: true }));
   }
 
   getNetworkName(tier: RewardTier): string {
