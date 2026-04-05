@@ -321,21 +321,21 @@
                     <div class="bg-[#f0edeb] rounded-xl p-4">
                       <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Using</p>
                       <p class="text-xl font-bold text-[#8a5100] mt-1">{{ maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
-                      <p class="text-sm text-[#534437]">-{{ maxRedeemablePoints() * 0.25 | currency:'INR' }}</p>
+                      <p class="text-sm text-[#534437]">-{{ maxRedeemablePoints() * pointsToRupeeRate | currency:'INR' }}</p>
                     </div>
                     <div class="bg-[#f0edeb] rounded-xl p-4">
                       <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Remaining</p>
                       <p class="text-xl font-bold text-[#1b1c1c] mt-1">{{ availablePoints() - maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
-                      <p class="text-sm text-[#534437]">={{ (availablePoints() - maxRedeemablePoints()) * 0.25 | currency:'INR' }}</p>
+                      <p class="text-sm text-[#534437]">={{ (availablePoints() - maxRedeemablePoints()) * pointsToRupeeRate | currency:'INR' }}</p>
                     </div>
                   </div>
                   <div class="flex justify-between items-center p-4 bg-[#8a5100]/10 rounded-xl">
                     <span class="font-semibold text-[#1b1c1c]">You Pay</span>
                     <span class="text-2xl font-black text-[#8a5100]">
-                      @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) <= 0) {
-                        ₹0.00
+                      @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) <= 0) {
+                        Fully Paid
                       } @else {
-                        {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) | currency:'INR' }}
+                        {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) | currency:'INR' }}
                       }
                     </span>
                   </div>
@@ -362,10 +362,10 @@
           } @else {
             <span class="material-symbols-outlined">payments</span>
             @if (useRewards() && maxRedeemablePoints() > 0) {
-              @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) <= 0) {
-                Pay ₹0 with Rewards
+              @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) <= 0) {
+                Fully Paid
               } @else {
-                Pay {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * 0.25) | currency:'INR' }} (with {{ maxRedeemablePoints() }} pts)
+                Pay {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) | currency:'INR' }} (with {{ maxRedeemablePoints() }} pts)
               }
             } @else {
               Pay {{ getPaymentAmount(selectedBill(), paymentType()) | currency:'INR' }}

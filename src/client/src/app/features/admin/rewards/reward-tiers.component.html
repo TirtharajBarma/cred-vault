@@ -127,14 +127,15 @@
             <div class="space-y-2">
               <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Network</label>
               <select formControlName="cardNetwork" class="premium-input px-5 h-12 text-base appearance-none bg-white/60">
-                <option [value]="1">VISA</option>
-                <option [value]="2">MASTERCARD</option>
+                <option [ngValue]="1">Visa</option>
+                <option [ngValue]="2">Mastercard</option>
               </select>
             </div>
             <div class="space-y-2">
-              <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Cashback (%)</label>
-              <input type="number" step="0.01" formControlName="rewardRate" 
-                     class="premium-input px-5 h-12 text-base bg-white/60" placeholder="5.00">
+              <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Reward Rate (decimal)</label>
+              <input type="number" step="0.001" formControlName="rewardRate" 
+                     class="premium-input px-5 h-12 text-base bg-white/60" placeholder="0.025">
+              <p class="text-[9px] text-misty-gray">{{ getCashbackDisplay(tierForm.get('rewardRate')?.value) }} cashback on every eligible payment</p>
             </div>
           </div>
 
@@ -144,8 +145,14 @@
               <input type="number" formControlName="minSpend" class="premium-input px-5 h-12 text-base bg-white/60" placeholder="100">
             </div>
             <div class="space-y-2">
-              <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Issuer ID (Optional)</label>
-              <input type="text" formControlName="issuerId" class="premium-input px-5 h-12 text-base bg-white/60 font-mono" placeholder="UUID">
+              <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Issuer (Optional)</label>
+              <select formControlName="issuerId" class="premium-input px-5 h-12 text-base appearance-none bg-white/60">
+                <option [ngValue]="null">All Issuers (Network-Wide)</option>
+                @for (issuer of issuers(); track issuer.id) {
+                  <option [ngValue]="issuer.id">{{ issuer.name }}</option>
+                }
+              </select>
+              <p class="text-[9px] text-misty-gray">Leave empty to apply across all banks on this network</p>
             </div>
           </div>
 

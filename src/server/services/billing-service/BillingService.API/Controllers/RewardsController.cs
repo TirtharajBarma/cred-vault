@@ -67,6 +67,29 @@ public class RewardsController(IMediator mediator) : BaseApiController
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    [HttpPut("tiers/{id:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> UpdateRewardTier(
+        [FromRoute] Guid id,
+        [FromBody] CreateRewardTierRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new UpdateRewardTierCommand(
+            id,
+            request.CardNetwork,
+            request.IssuerId,
+            request.MinimumSpend,
+            request.PointsPerDollar,
+            request.EffectiveFromUtc,
+            request.EffectiveToUtc);
+
+        var result = await mediator.Send(command, cancellationToken);
+        
+        if (!result.Success) return BadRequest(result);
+
+        return Ok(result);
+    }
+
     [HttpDelete("tiers/{id:guid}")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> DeleteRewardTier(

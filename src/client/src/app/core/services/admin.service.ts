@@ -113,12 +113,23 @@ export class AdminService {
 
   createRewardTier(tier: any): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/rewards/tiers`, {
-      CardNetwork: tier.cardNetwork === 1 ? 'Visa' : 'Mastercard',
-      IssuerId: tier.issuerId || null,
-      MinSpend: tier.minSpend,
-      RewardRate: tier.rewardRate,
-      EffectiveFromUtc: tier.effectiveFromUtc ? new Date(tier.effectiveFromUtc).toISOString() : new Date().toISOString(),
-      EffectiveToUtc: tier.effectiveToUtc ? new Date(tier.effectiveToUtc).toISOString() : null
+      cardNetwork: tier.cardNetwork === 1 ? 'Visa' : 'Mastercard',
+      issuerId: tier.issuerId || null,
+      minimumSpend: tier.minSpend,
+      pointsPerDollar: tier.rewardRate,
+      effectiveFromUtc: tier.effectiveFromUtc ? new Date(tier.effectiveFromUtc).toISOString() : new Date().toISOString(),
+      effectiveToUtc: tier.effectiveToUtc ? new Date(tier.effectiveToUtc).toISOString() : null
+    });
+  }
+
+  updateRewardTier(id: string, tier: any): Observable<ApiResponse<any>> {
+    return this.http.put<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/rewards/tiers/${id}`, {
+      cardNetwork: tier.cardNetwork === 1 ? 'Visa' : 'Mastercard',
+      issuerId: tier.issuerId || null,
+      minimumSpend: tier.minSpend,
+      pointsPerDollar: tier.rewardRate,
+      effectiveFromUtc: tier.effectiveFromUtc ? new Date(tier.effectiveFromUtc).toISOString() : new Date().toISOString(),
+      effectiveToUtc: tier.effectiveToUtc ? new Date(tier.effectiveToUtc).toISOString() : null
     });
   }
 

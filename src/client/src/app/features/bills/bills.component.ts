@@ -14,6 +14,8 @@ type MilestoneDisplay = {
   mode: 'due_date_queue' | 'next_bill_generation' | 'latest_statement_date';
 };
 
+import { environment } from '../../../environments/environment';
+
 @Component({
   selector: 'app-bills',
   standalone: true,
@@ -54,7 +56,7 @@ export class BillsComponent implements OnInit {
 
   useRewards = signal(false);
   availablePoints = signal(0);
-  private readonly pointsToRupeeRate = 0.25;
+  readonly pointsToRupeeRate = environment.pointsToRupeeRate;
   
   rewardValue = computed(() => Math.floor(this.availablePoints()) * this.pointsToRupeeRate);
   

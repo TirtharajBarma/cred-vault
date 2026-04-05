@@ -2,6 +2,8 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AdminService } from '../../../core/services/admin.service';
+import { RewardTier } from '../../../core/services/rewards.service';
+import { CardIssuer } from '../../../core/models/card.models';
 
 @Component({
   selector: 'app-reward-tiers',
@@ -13,12 +15,13 @@ export class RewardTiersComponent implements OnInit {
   private adminService = inject(AdminService);
   private fb = inject(FormBuilder);
   
-  tiers = signal<any[]>([]);
+  tiers = signal<RewardTier[]>([]);
+  issuers = signal<CardIssuer[]>([]);
   isLoading = signal(true);
   isSubmitting = signal(false);
   showModal = signal(false);
   isEditMode = signal(false);
-  editingTier = signal<any>(null);
+  editingTier = signal<RewardTier | null>(null);
   
   showDeleteConfirm = signal(false);
   deleteTargetId = signal<string | null>(null);
@@ -28,33 +31,43 @@ export class RewardTiersComponent implements OnInit {
   errorMessage = signal<string | null>(null);
 
   tierForm = this.fb.group({
-    cardNetwork: [1, [Validators.required]],
-    issuerId: [null],
-    minSpend: [0, [Validators.required, Validators.min(0)]],
-    rewardRate: [0.01, [Validators.required, Validators.min(0), Validators.max(1)]],
-    effectiveFromUtc: [new Date().toISOString().split('T')[0], [Validators.required]],
-    effectiveToUtc: [null]
+    cardNetwork: [1 as number | null, [Validators.required]],
+    issuerId: [null as string | null, []],
+    minSpend: [0 as number | null, [Validators.required, Validators.min(0)]],
+    rewardRate: [0.01 as number | null, [Validators.required, Validators.min(0), Validators.max(1)]],
+    effectiveFromUtc: [new Date().toISOString().split('T')[0] as string | null, [Validators.required]],
+    effectiveToUtc: [null as string | null, []]
   });
 
   ngOnInit() {
     this.fetchTiers();
+    this.fetchIssuers();
   }
 
   fetchTiers() {
     this.isLoading.set(true);
     this.adminService.getRewardTiers().subscribe({
-      next: (res: any) => {
-        this.tiers.set(res.data?.data || res.data || []);
+      next: (res) => {
+        this.tiers.set(res.data || []);
         this.isLoading.set(false);
       },
-      error: (err) => {
+      error: () => {
         this.isLoading.set(false);
         this.errorMessage.set('Failed to load reward tiers');
       }
     });
   }
 
-  openModal(tier?: any) {
+  fetchIssuers() {
+    this.adminService.getIssuers().subscribe({
+      next: (res) => {
+        this.issuers.set(res.data || []);
+      },
+      error: () => {}
+    });
+  }
+
+  openModal(tier?: RewardTier) {
     this.successMessage.set(null);
     this.errorMessage.set(null);
     
@@ -94,7 +107,11 @@ export class RewardTiersComponent implements OnInit {
     const data = { ...this.tierForm.value };
     if (!data.issuerId) delete data.issuerId;
     
-    this.adminService.createRewardTier(data).subscribe({
+    const save$ = this.isEditMode() && this.editingTier()
+      ? this.adminService.updateRewardTier(this.editingTier()!.id, data)
+      : this.adminService.createRewardTier(data);
+
+    save$.subscribe({
       next: (res) => {
         if (res.success) {
           this.successMessage.set(this.isEditMode() ? 'Tier updated successfully' : 'Tier created successfully');
@@ -112,7 +129,7 @@ export class RewardTiersComponent implements OnInit {
     });
   }
 
-  confirmDelete(tier: any) {
+  confirmDelete(tier: RewardTier) {
     this.deleteTargetId.set(tier.id);
     this.deleteTargetName.set(`${tier.cardNetwork === 1 ? 'Visa' : 'Mastercard'} - $${tier.minSpend}+`);
     this.showDeleteConfirm.set(true);
@@ -134,20 +151,20 @@ export class RewardTiersComponent implements OnInit {
         if (res.success) {
           this.fetchTiers();
         } else {
-          alert('Deletion failed: ' + (res.message || 'Unknown error'));
+          this.errorMessage.set('Deletion failed: ' + (res.message || 'Unknown error'));
         }
         this.deleteTargetId.set(null);
         this.deleteTargetName.set('');
       },
       error: () => {
-        alert('Failed to delete tier');
+        this.errorMessage.set('Failed to delete tier');
         this.deleteTargetId.set(null);
         this.deleteTargetName.set('');
       }
     });
   }
 
-  getTierStatus(tier: any): { label: string; color: string } {
+  getTierStatus(tier: RewardTier): { label: string; color: string } {
     const now = new Date();
     const from = new Date(tier.effectiveFromUtc);
     const to = tier.effectiveToUtc ? new Date(tier.effectiveToUtc) : null;
@@ -162,10 +179,16 @@ export class RewardTiersComponent implements OnInit {
   }
 
   getNetworkName(network: number): string {
-    return network === 1 ? 'Visa' : 'Mastercard';
+    return network === 1 ? 'Visa' : network === 2 ? 'Mastercard' : 'Unknown';
   }
 
   formatRewardRate(rate: number): string {
     return (rate * 100).toFixed(1) + '%';
+  }
+
+  getCashbackDisplay(rate: number | null | undefined): string {
+    if (!rate || rate === 0) return '0%';
+    const pct = (rate * 100).toFixed(2).replace(/\.?0+$/, '');
+    return pct;
   }
 }

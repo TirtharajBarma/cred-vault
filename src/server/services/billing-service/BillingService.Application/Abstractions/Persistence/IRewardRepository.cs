@@ -9,6 +9,7 @@ public interface IRewardRepository
     Task<RewardTier?> GetTierByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<RewardTier?> GetBestMatchingTierAsync(CardNetwork network, Guid? issuerId, decimal amount, DateTime dateUtc, CancellationToken cancellationToken = default);
     Task AddTierAsync(RewardTier tier, CancellationToken cancellationToken = default);
+    Task UpdateTierAsync(RewardTier tier, CancellationToken cancellationToken = default);
     Task DeleteTierAsync(RewardTier tier, CancellationToken cancellationToken = default);
 
     Task<RewardAccount?> GetAccountByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
