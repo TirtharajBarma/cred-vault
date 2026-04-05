@@ -3,8 +3,13 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "generate:env": "node scripts/generate-runtime-env.js development",
+    "generate:env:prod": "node scripts/generate-runtime-env.js production",
+    "prestart": "npm run generate:env",
     "start": "ng serve",
+    "prebuild": "npm run generate:env:prod",
     "build": "ng build",
+    "prewatch": "npm run generate:env",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve:ssr:client": "node dist/client/server/server.mjs"

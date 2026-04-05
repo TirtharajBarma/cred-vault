@@ -43,3 +43,8 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 /build.log
+
+# Local environment configuration
+.env
+.env.*
+!.env.example

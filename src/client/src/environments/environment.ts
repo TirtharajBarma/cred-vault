@@ -1,10 +1,4 @@
-declare global {
-  interface Window {
-    __env?: {
-      apiGatewayUrl?: string;
-    };
-  }
-}
+import { runtimeEnv } from './environment.generated';
 
 export interface EnvironmentConfig {
   production: boolean;
@@ -12,8 +6,10 @@ export interface EnvironmentConfig {
   pointsToRupeeRate: number;
 }
 
+const fallbackApiGatewayUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
 export const environment: EnvironmentConfig = {
   production: false,
-  apiGatewayUrl: window.__env?.apiGatewayUrl || 'http://localhost:5006',
+  apiGatewayUrl: runtimeEnv.apiGatewayUrl || fallbackApiGatewayUrl,
   pointsToRupeeRate: 0.25
 };
