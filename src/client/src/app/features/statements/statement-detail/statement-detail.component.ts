@@ -164,4 +164,8 @@ export class StatementDetailComponent implements OnInit {
       this.currentPage.set(this.currentPage() - 1);
     }
   }
+
+  exportToPdf(): void {
+    window.print();
+  }
 }

@@ -21,19 +21,32 @@ export class StatementsComponent implements OnInit {
   cards = signal<CreditCard[]>([]);
   isLoading = signal(true);
   selectedCardFilter = signal<string>('all');
+  selectedMonthFilter = signal<string>('all');
   showFilterDropdown = signal(false);
+  showMonthDropdown = signal(false);
   currentPage = signal(1);
   itemsPerPage = 7;
 
   sortedStatements = computed(() => {
     let filtered = this.statements();
     const cardFilter = this.selectedCardFilter();
+    const monthFilter = this.selectedMonthFilter();
+    
     if (cardFilter !== 'all') {
       filtered = filtered.filter(s => s.cardId === cardFilter);
+    }
+    if (monthFilter !== 'all') {
+      filtered = filtered.filter(s => s.statementPeriod === monthFilter);
     }
 
     // Keep API order so the latest generated statement stays at the top.
     return filtered;
+  });
+
+  monthOptions = computed(() => {
+    const months = new Set(this.statements().map(s => s.statementPeriod));
+    // Simple sort for 'Jan 2024' formats assuming they are roughly consistent, or just rely on API order
+    return Array.from(months);
   });
 
   cardOptions = computed(() => {
@@ -112,12 +125,64 @@ export class StatementsComponent implements OnInit {
 
   toggleFilterDropdown(): void {
     this.showFilterDropdown.set(!this.showFilterDropdown());
+    this.showMonthDropdown.set(false);
+  }
+
+  toggleMonthDropdown(): void {
+    this.showMonthDropdown.set(!this.showMonthDropdown());
+    this.showFilterDropdown.set(false);
   }
 
   selectCardFilter(cardId: string): void {
     this.selectedCardFilter.set(cardId);
     this.showFilterDropdown.set(false);
   }
+
+  selectMonthFilter(month: string): void {
+    this.selectedMonthFilter.set(month);
+    this.showMonthDropdown.set(false);
+  }
+
+  exportAllToCSV(): void {
+    const stmts = this.sortedStatements();
+    if (stmts.length === 0) return;
+    
+    const headers = ['Statement ID', 'Issuer', 'Network', 'Card Last 4', 'Period', 'Status', 'Total Amount', 'Min Due', 'Due Date'];
+    const rows = stmts.map(s => {
+      const card = this.cards().find(c => c.id === s.cardId);
+      const issuer = card?.issuerName || s.issuerName || 'Unknown Issuer';
+      const last4 = card?.last4 || s.cardLast4 || 'N/A';
+      const network = card?.network || s.cardNetwork || 'Unknown';
+
+      return [
+        s.id,
+        `"${issuer}"`,
+        network,
+        last4,
+        `"${s.statementPeriod}"`,
+        this.getStatementBadgeLabel(s),
+        this.getDisplayAmount(s),
+        s.minimumDue,
+        s.dueDateUtc ? new Date(s.dueDateUtc).toLocaleDateString() : 'N/A'
+      ];
+    });
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `statements_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
 
   getSelectedCardLabel(): string {
     const cardId = this.selectedCardFilter();

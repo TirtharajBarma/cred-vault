@@ -102,6 +102,10 @@ export class RewardsService {
   getRewardHistory(): Observable<ApiResponse<RewardTransaction[]>> {
     return this.http.get<ApiResponse<RewardTransaction[]>>(`${this.baseUrl}/rewards/transactions`);
   }
+
+  getRewardTiers(): Observable<ApiResponse<RewardTier[]>> {
+    return this.http.get<ApiResponse<RewardTier[]>>(`${this.baseUrl}/rewards/tiers`);
+  }
 }
 
 @Injectable({
