@@ -21,22 +21,20 @@ import { AdminService } from '../../../core/services/admin.service';
         </div>
       } @else if (card()) {
         <!-- Card Header -->
-        <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-6 text-white mb-6">
-          <div class="flex justify-between items-start">
-            <div>
-              <div class="flex items-center gap-3 mb-2">
-                <span class="text-3xl">{{ card()?.network === 'Visa' ? '💳' : '💠' }}</span>
-                <div>
-                  <h1 class="text-2xl font-bold">{{ card()?.issuerName || 'Credit Card' }}</h1>
-                  <p class="text-gray-300">{{ card()?.network }} •••• {{ card()?.last4 }}</p>
-                </div>
+        <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 text-white mb-6">
+          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+            <div class="flex items-center gap-3">
+              <span class="text-3xl">{{ card()?.network === 'Visa' ? '💳' : '💠' }}</span>
+              <div>
+                <h1 class="text-xl sm:text-2xl font-bold">{{ card()?.issuerName || 'Credit Card' }}</h1>
+                <p class="text-gray-300">{{ card()?.network }} •••• {{ card()?.last4 }}</p>
               </div>
             </div>
-            <div class="text-right">
+            <div class="shrink-0">
               @if ((card()?.creditLimit ?? 0) <= 0) {
-                <span class="px-4 py-2 bg-amber-500 text-white rounded-lg text-lg font-bold">NEEDS SETUP</span>
+                <span class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-sm font-bold">NEEDS SETUP</span>
               } @else {
-                <span class="px-4 py-2 bg-emerald-500 text-white rounded-lg text-lg font-bold">ACTIVE</span>
+                <span class="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-sm font-bold">ACTIVE</span>
               }
             </div>
           </div>
@@ -49,18 +47,18 @@ import { AdminService } from '../../../core/services/admin.service';
             <!-- Balance Overview -->
             <div class="bg-white rounded-xl border border-gray-200 p-6">
               <h2 class="font-bold text-gray-900 mb-4">Balance Overview</h2>
-              <div class="grid grid-cols-3 gap-6">
-                <div class="text-center p-4 bg-gray-50 rounded-xl">
-                  <p class="text-sm text-gray-500 mb-1">Credit Limit</p>
-                  <p class="text-2xl font-bold text-gray-900">{{ card()?.creditLimit | currency }}</p>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="text-center p-3 bg-gray-50 rounded-xl">
+                  <p class="text-xs text-gray-500 mb-1">Credit Limit</p>
+                  <p class="text-lg font-bold text-gray-900">{{ card()?.creditLimit | currency }}</p>
                 </div>
-                <div class="text-center p-4 bg-red-50 rounded-xl">
-                  <p class="text-sm text-gray-500 mb-1">Outstanding</p>
-                  <p class="text-2xl font-bold text-red-600">{{ card()?.outstandingBalance | currency }}</p>
+                <div class="text-center p-3 bg-red-50 rounded-xl">
+                  <p class="text-xs text-gray-500 mb-1">Outstanding</p>
+                  <p class="text-lg font-bold text-red-600">{{ card()?.outstandingBalance | currency }}</p>
                 </div>
-                <div class="text-center p-4 bg-emerald-50 rounded-xl">
-                  <p class="text-sm text-gray-500 mb-1">Available</p>
-                  <p class="text-2xl font-bold text-emerald-600">{{ (card()?.creditLimit - card()?.outstandingBalance) | currency }}</p>
+                <div class="text-center p-3 bg-emerald-50 rounded-xl">
+                  <p class="text-xs text-gray-500 mb-1">Available</p>
+                  <p class="text-lg font-bold text-emerald-600">{{ (card()?.creditLimit - card()?.outstandingBalance) | currency }}</p>
                 </div>
               </div>
 
@@ -91,14 +89,14 @@ import { AdminService } from '../../../core/services/admin.service';
                 <div class="max-h-96 overflow-y-auto divide-y divide-gray-100">
                   @for (stmt of statements(); track stmt.id) {
                     <div (click)="viewStatement(stmt)" 
-                         class="px-6 py-4 hover:bg-blue-50 cursor-pointer transition-all flex justify-between items-center">
-                      <div>
-                        <p class="font-semibold text-gray-900">{{ stmt.statementPeriod || 'Statement' }}</p>
-                        <p class="text-sm text-gray-500">{{ stmt.cardLast4 }} • {{ stmt.cardNetwork }}</p>
+                         class="px-4 py-3 hover:bg-blue-50 cursor-pointer transition-all flex justify-between items-center gap-2">
+                      <div class="min-w-0">
+                        <p class="font-semibold text-gray-900 truncate">{{ stmt.statementPeriod || 'Statement' }}</p>
+                        <p class="text-xs text-gray-500">{{ stmt.cardLast4 }} • {{ stmt.cardNetwork }}</p>
                       </div>
-                      <div class="text-right">
-                        <p class="font-bold text-lg">{{ stmt.closingBalance || stmt.totalAmount | currency }}</p>
-                        <p class="text-sm text-gray-400">→ View Details</p>
+                      <div class="text-right shrink-0">
+                        <p class="font-bold text-sm">{{ stmt.closingBalance || stmt.totalAmount | currency }}</p>
+                        <p class="text-xs text-gray-400">→ View</p>
                       </div>
                     </div>
                   }

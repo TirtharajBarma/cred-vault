@@ -1,9 +1,16 @@
 <!-- Premium Pill Navbar -->
 <nav class="fixed top-5 left-1/2 -translate-x-1/2 w-[95%] max-w-7xl rounded-full bg-[#fbf9f8]/80 backdrop-blur-xl shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] flex justify-between items-center px-8 py-3 z-50 transition-all duration-300">
   
-  <!-- Brand -->
-  <div class="flex items-center gap-3 cursor-pointer group" routerLink="/dashboard">
-    <span class="text-2xl font-bold tracking-tighter text-[#1b1c1c] font-headline">CredVault</span>
+  <!-- Brand & Mobile Toggle -->
+  <div class="flex items-center gap-2 md:gap-3">
+    <!-- Hamburger (Mobile Only) -->
+    <button (click)="toggleMobileMenu()" 
+            class="md:hidden p-1 -ml-1 text-[#1b1c1c] hover:bg-black/5 rounded-lg flex items-center justify-center transition-colors">
+      <span class="material-symbols-outlined">{{ isMobileMenuOpen() ? 'close' : 'menu' }}</span>
+    </button>
+    <div class="flex items-center gap-2 cursor-pointer group" routerLink="/dashboard">
+      <span class="text-xl md:text-2xl font-bold tracking-tighter text-[#1b1c1c] font-headline">CredVault</span>
+    </div>
   </div>
 
   <!-- Center Side: Desktop Tabs (Hidden on mobile) -->
@@ -100,80 +107,65 @@
   </div>
 </nav>
 
-<!-- Mobile Menu Button (visible on small screens) -->
-<button (click)="toggleMobileMenu()" 
-        class="md:hidden fixed top-6 left-6 z-50 w-10 h-10 flex items-center justify-center text-[#1b1c1c] bg-white/80 backdrop-blur-xl rounded-full shadow-lg">
-  <span class="material-symbols-outlined">{{ isMobileMenuOpen() ? 'close' : 'menu' }}</span>
-</button>
-
-<!-- Mobile Menu Drawer Overlay -->
+<!-- Mobile Menu Fullscreen Overlay -->
 @if (isMobileMenuOpen()) {
-  <div class="fixed inset-0 z-[100] md:hidden animate-fade-in">
-    <div (click)="toggleMobileMenu()" class="absolute inset-0 bg-charcoal/40 backdrop-blur-sm"></div>
-    
-    <div class="absolute inset-y-0 left-0 w-[80%] max-w-sm bg-mist-cream shadow-2xl p-6 flex flex-col transform animate-scale-in">
-      <!-- Header -->
-      <div class="flex items-center justify-between mb-8 mt-12">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-[#8a5100] rounded-xl flex items-center justify-center">
-            <span class="material-symbols-outlined text-white font-black">shield_with_heart</span>
-          </div>
-          <span class="text-xl font-black text-charcoal">Menu</span>
-        </div>
-        <button (click)="toggleMobileMenu()" class="p-2 text-charcoal/40 hover:text-charcoal hover:bg-charcoal/5 rounded-xl">
-          <span class="material-symbols-outlined">close</span>
-        </button>
+  <div class="fixed inset-0 z-[100] md:hidden bg-[#fbf9f8] flex flex-col animate-fade-in">
+    <!-- Header -->
+    <div class="px-8 pt-8 pb-4 flex justify-between items-center z-10">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl font-bold tracking-tighter text-[#1b1c1c] font-headline">CredVault</span>
+        <span class="px-2 py-0.5 rounded-full bg-[#8a5100]/10 text-[#8a5100] text-[10px] font-black uppercase tracking-widest">Menu</span>
       </div>
+      <button (click)="toggleMobileMenu()" class="w-10 h-10 bg-black/5 text-[#1b1c1c] rounded-full flex justify-center items-center hover:bg-black/10 transition-colors">
+        <span class="material-symbols-outlined font-black">close</span>
+      </button>
+    </div>
 
-      <!-- Links -->
-      <nav class="flex-1 space-y-2">
+    <!-- Links -->
+    <div class="flex-1 overflow-y-auto px-8 py-10 flex flex-col justify-center">
+      <nav class="flex flex-col gap-8">
         @if (user()?.role !== 'admin') {
-          <a routerLink="/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary" 
-             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">dashboard</span>
+          <a routerLink="/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
             Dashboard
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
           </a>
-          <a routerLink="/cards" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
-             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">credit_card</span>
-            Cards
-          </a>
-          <a routerLink="/bills" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
-             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">receipt_long</span>
+          <a routerLink="/bills" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
             Bills
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
           </a>
-          <a routerLink="/statements" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
-             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">receipt_long</span>
+          <a routerLink="/statements" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
             Statements
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
           </a>
-          <a routerLink="/rewards" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
-             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">stars</span>
+          <a routerLink="/rewards" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
             Rewards
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
           </a>
-          <a routerLink="/notifications" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
-             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-charcoal/60 hover:bg-charcoal/5 transition-all">
-            <span class="material-symbols-outlined">notifications</span>
+          <a routerLink="/notifications" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
             Notifications
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
           </a>
         } @else {
-          <a routerLink="/admin/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!bg-primary/10 !text-primary"
-             class="flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-primary hover:bg-primary/5 transition-all">
-            <span class="material-symbols-outlined">admin_panel_settings</span>
+          <a routerLink="/admin/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#8a5100] hover:text-[#8a5100]/80 transition-colors tracking-tight">
             Admin Console
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
           </a>
         }
       </nav>
+    </div>
 
-      <!-- Footer -->
-      <div class="pt-6 border-t border-charcoal/5">
-        <button (click)="logout(); toggleMobileMenu()" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-red-500 hover:bg-red-50 transition-all">
-          <span class="material-symbols-outlined">logout</span>
-          Sign Out
-        </button>
-      </div>
+    <!-- Footer -->
+    <div class="px-8 pb-12 pt-6">
+      <button (click)="logout(); toggleMobileMenu()" class="flex items-center gap-3 text-xl font-black text-[#ba1a1a] hover:opacity-80 transition-opacity">
+        <span class="material-symbols-outlined text-2xl">logout</span>
+        Sign Out Securely
+      </button>
     </div>
   </div>
 }

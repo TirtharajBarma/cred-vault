@@ -20,23 +20,23 @@ import { AdminService } from '../../../core/services/admin.service';
         </div>
       } @else if (user()) {
         <!-- User Header -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 rounded-2xl p-6 text-white mb-6">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl font-bold">
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 rounded-2xl p-5 text-white mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-12 h-12 sm:w-16 sm:h-16 shrink-0 bg-white/20 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl font-bold">
                 {{ user()?.fullName?.charAt(0) || '?' }}
               </div>
-              <div>
-                <h1 class="text-2xl font-bold">{{ user()?.fullName }}</h1>
-                <p class="text-gray-300">{{ user()?.email }}</p>
-                <p class="text-gray-400 text-sm mt-1">ID: {{ user()?.id }}</p>
+              <div class="min-w-0">
+                <h1 class="text-lg sm:text-2xl font-bold truncate">{{ user()?.fullName }}</h1>
+                <p class="text-gray-300 text-sm truncate">{{ user()?.email }}</p>
+                <p class="text-gray-400 text-xs mt-1 truncate">ID: {{ user()?.id }}</p>
               </div>
             </div>
-            <div class="text-right">
-              <span class="px-4 py-1.5 rounded-full text-sm font-semibold bg-white/20">
+            <div class="flex sm:flex-col sm:items-end gap-2">
+              <span class="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 whitespace-nowrap">
                 {{ getStatusLabel(user()?.status) }}
               </span>
-              <p class="text-gray-300 mt-2">{{ user()?.role }}</p>
+              <span class="text-gray-300 text-sm">{{ user()?.role }}</span>
             </div>
           </div>
         </div>
@@ -57,36 +57,30 @@ import { AdminService } from '../../../core/services/admin.service';
                 <div class="divide-y divide-gray-100">
                   @for (card of cards(); track card.id) {
                     <div (click)="viewCard(card)" 
-                         class="p-6 hover:bg-blue-50 cursor-pointer transition-all">
-                      <div class="flex justify-between items-start">
-                        <div>
-                          <div class="flex items-center gap-3 mb-2">
-                            <span class="text-2xl">{{ card.network === 'Visa' ? '💳' : '💠' }}</span>
-                            <div>
-                              <p class="font-bold text-lg text-gray-900">{{ card.issuerName || 'Credit Card' }}</p>
-                              <p class="text-gray-500">{{ card.network }} •••• {{ card.last4 }}</p>
+                         class="p-4 hover:bg-blue-50 cursor-pointer transition-all">
+                      <div class="flex items-start gap-3">
+                        <span class="text-2xl shrink-0">{{ card.network === 'Visa' ? '💳' : '💠' }}</span>
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                              <p class="font-bold text-gray-900 truncate">{{ card.issuerName || 'Credit Card' }}</p>
+                              <p class="text-gray-500 text-sm">{{ card.network }} •••• {{ card.last4 }}</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                              @if (card.isBlocked) {
+                                <span class="px-2 py-0.5 bg-red-500 text-white rounded text-xs font-bold">BLOCKED</span>
+                              } @else if ((card.creditLimit ?? 0) <= 0) {
+                                <span class="px-2 py-0.5 bg-amber-500 text-white rounded text-xs font-bold">SETUP</span>
+                              } @else {
+                                <span class="px-2 py-0.5 bg-emerald-500 text-white rounded text-xs font-bold">ACTIVE</span>
+                              }
+                              <p class="text-gray-400 text-xs mt-1">→ View</p>
                             </div>
                           </div>
-                          <div class="flex gap-4 text-sm">
-                            <div>
-                              <span class="text-gray-500">Credit Limit:</span>
-                              <span class="ml-1 font-semibold">{{ card.creditLimit | currency }}</span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500">Outstanding:</span>
-                              <span class="ml-1 font-semibold text-red-600">{{ card.outstandingBalance | currency }}</span>
-                            </div>
+                          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs mt-2">
+                            <span class="text-gray-500">Credit: <span class="font-semibold text-gray-800">{{ card.creditLimit | currency }}</span></span>
+                            <span class="text-gray-500">Outstanding: <span class="font-semibold text-red-600">{{ card.outstandingBalance | currency }}</span></span>
                           </div>
-                        </div>
-                        <div class="text-right">
-                          @if (card.isBlocked) {
-                            <span class="px-3 py-1 bg-red-500 text-white rounded-lg text-sm font-bold">BLOCKED</span>
-                          } @else if ((card.creditLimit ?? 0) <= 0) {
-                            <span class="px-3 py-1 bg-amber-500 text-white rounded-lg text-sm font-bold">SETUP</span>
-                          } @else {
-                            <span class="px-3 py-1 bg-emerald-500 text-white rounded-lg text-sm font-bold">ACTIVE</span>
-                          }
-                          <p class="text-gray-400 text-sm mt-2">→ View Details</p>
                         </div>
                       </div>
                     </div>

@@ -47,25 +47,23 @@ import { AdminService } from '../../../core/services/admin.service';
           <div class="divide-y divide-gray-100">
             @for (user of users(); track user.id) {
               <div (click)="viewUser(user)" 
-                   class="flex items-center justify-between px-6 py-4 hover:bg-blue-50 cursor-pointer transition-all">
-                <div class="flex items-center gap-4">
-                  <div class="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center text-white font-bold text-lg">
-                    {{ user.fullName?.charAt(0) || '?' }}
-                  </div>
-                  <div>
-                    <p class="font-semibold text-gray-900">{{ user.fullName }}</p>
-                    <p class="text-sm text-gray-500">{{ user.email }}</p>
+                   class="flex items-center gap-3 px-4 py-4 hover:bg-blue-50 cursor-pointer transition-all">
+                <div class="w-10 h-10 shrink-0 bg-gray-800 rounded-xl flex items-center justify-center text-white font-bold text-base">
+                  {{ user.fullName?.charAt(0) || '?' }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 truncate">{{ user.fullName }}</p>
+                  <p class="text-sm text-gray-500 truncate">{{ user.email }}</p>
+                  <div class="flex items-center gap-2 mt-1 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold border {{ getStatusClass(user.status) }}">
+                      {{ getStatusLabel(user.status) }}
+                    </span>
+                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                      {{ user.role }}
+                    </span>
                   </div>
                 </div>
-                <div class="flex items-center gap-4">
-                  <span class="px-3 py-1 rounded-full text-xs font-semibold border {{ getStatusClass(user.status) }}">
-                    {{ getStatusLabel(user.status) }}
-                  </span>
-                  <span class="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                    {{ user.role }}
-                  </span>
-                  <span class="text-gray-400">→</span>
-                </div>
+                <span class="text-gray-400 shrink-0">→</span>
               </div>
             }
           </div>

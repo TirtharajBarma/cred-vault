@@ -5,7 +5,7 @@
     <div class="absolute inset-0 bg-gradient-to-b from-[#dcd9d9]/20 to-[#fbf9f8]"></div>
   </div>
 
-  <main class="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-24 md:px-8 md:pt-28">
+  <main class="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-32 md:px-8 md:pt-32">
     <header class="mb-14 flex flex-col justify-between gap-8 md:mb-20 md:flex-row md:items-end">
       <div class="max-w-2xl">
         <span class="mb-4 block text-xs font-bold uppercase tracking-[0.05em] text-[#8a5100]">Archive</span>
@@ -27,7 +27,7 @@
             {{ getSelectedCardLabel() }}
           </button>
           @if (showFilterDropdown()) {
-            <div class="absolute top-full mt-2 right-0 w-72 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden z-50">
+            <div class="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-72 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden z-[60]">
               <button 
                 (click)="selectCardFilter('all')"
                 class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
@@ -51,7 +51,7 @@
                       {{ card.network === 'Mastercard' ? 'M' : card.network === 'Visa' ? 'V' : 'C' }}
                     </div>
                     <div class="flex flex-col">
-                      <span class="font-bold text-[#1b1c1c]">{{ card.issuerName }} {{ card.network }}</span>
+                      <span class="font-bold text-[#1b1c1c] truncate max-w-[150px]">{{ card.issuerName }} {{ card.network }}</span>
                       <span class="text-xs text-[#615e5c]">•••• {{ card.last4 }}</span>
                     </div>
                   </button>

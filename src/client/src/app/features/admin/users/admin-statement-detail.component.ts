@@ -20,16 +20,16 @@ import { AdminService } from '../../../core/services/admin.service';
         </div>
       } @else if (statement()) {
         <!-- Statement Header -->
-        <div class="bg-gradient-to-r from-blue-800 to-blue-900 rounded-2xl p-6 text-white mb-6">
-          <div class="flex justify-between items-start">
-            <div>
-              <h1 class="text-2xl font-bold">Statement Details</h1>
-              <p class="text-blue-200 mt-1">{{ statement()?.statementPeriod || statement()?.StatementPeriod || '-' }}</p>
-              <p class="text-blue-300 text-sm mt-1">ID: {{ statement()?.id }}</p>
+        <div class="bg-gradient-to-r from-blue-800 to-blue-900 rounded-2xl p-5 text-white mb-6">
+          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+            <div class="min-w-0">
+              <h1 class="text-xl sm:text-2xl font-bold">Statement Details</h1>
+              <p class="text-blue-200 mt-1 text-sm">{{ statement()?.statementPeriod || statement()?.StatementPeriod || '-' }}</p>
+              <p class="text-blue-300 text-xs mt-1 truncate">ID: {{ statement()?.id }}</p>
             </div>
-            <div class="text-right">
+            <div class="shrink-0">
               <p class="text-sm text-blue-200">Total Amount</p>
-              <p class="text-3xl font-bold">{{ resolvedTotalAmount() | currency }}</p>
+              <p class="text-2xl font-bold">{{ resolvedTotalAmount() | currency }}</p>
             </div>
           </div>
         </div>
@@ -74,35 +74,34 @@ import { AdminService } from '../../../core/services/admin.service';
                   <div class="animate-spin w-8 h-8 border-4 border-gray-300 border-t-gray-800 rounded-full mx-auto"></div>
                 </div>
               } @else if (transactions().length > 0) {
-                <div class="max-h-96 overflow-y-auto">
-                  <table class="w-full">
+                <div class="max-h-96 overflow-y-auto overflow-x-auto">
+                  <table class="w-full min-w-[480px]">
                     <thead class="bg-gray-50">
                       <tr>
-                        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Description</th>
-                        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Flow</th>
-                        <th class="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                        <th class="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Description</th>
+                        <th class="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                        <th class="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Flow</th>
+                        <th class="text-right px-3 sm:px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                       @for (txn of pagedTransactions(); track txn.id) {
                         <tr class="hover:bg-gray-50">
-                          <td class="px-6 py-4">
-                            <p class="font-medium text-gray-900">{{ getTransactionDescription(txn) }}</p>
-                            <p class="text-xs text-gray-500">{{ txn.merchantName || '-' }}</p>
+                          <td class="px-3 sm:px-6 py-3">
+                            <p class="font-medium text-gray-900 text-sm">{{ getTransactionDescription(txn) }}</p>
                           </td>
-                          <td class="px-6 py-4 text-sm text-gray-500">
+                          <td class="px-3 sm:px-6 py-3 text-xs text-gray-500 whitespace-nowrap">
                             {{ formatDateTime(txn.transactionDate || txn.dateUtc || txn.DateUtc) }}
                           </td>
-                          <td class="px-6 py-4">
+                          <td class="px-3 sm:px-6 py-3">
                             <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide"
                                   [class]="getTransactionFlowClass(txn)">
                               {{ getTransactionFlowLabel(txn) }}
                             </span>
                           </td>
-                          <td class="px-6 py-4 text-right">
+                          <td class="px-3 sm:px-6 py-3 text-right">
                             <span [class]="getTransactionAmountClass(txn)"
-                                  class="font-semibold">
+                                  class="font-semibold text-sm whitespace-nowrap">
                               {{ getTransactionSignedAmount(txn) | currency:'INR' }}
                             </span>
                           </td>
