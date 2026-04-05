@@ -51,20 +51,11 @@ public class CardDeductionSagaConsumer(
                 return;
             }
 
-            var availableCredit = card.CreditLimit - card.OutstandingBalance;
-            if (availableCredit < message.Amount)
-            {
-                logger.LogWarning("Insufficient available credit: CardId={CardId}, CreditLimit={CreditLimit}, AvailableCredit={AvailableCredit}, PaymentAmount={Amount}",
-                    message.CardId, card.CreditLimit, availableCredit, message.Amount);
-                await context.Publish<ICardDeductionFailed>(new
-                {
-                    CorrelationId = message.CorrelationId,
-                    CardId = message.CardId,
-                    Reason = "Insufficient credit limit to pay",
-                    FailedAt = DateTime.UtcNow
-                });
-                return;
-            }
+            // NOTE: For bill payments through saga, we DON'T check available credit
+            // Reason: Bill payment reduces outstanding balance (paying off debt)
+            // This check is only needed for NEW purchases/transactions, not bill payments
+            // The bill amount IS based on current outstanding balance, so this check would always fail
+            // when OutstandingBalance > CreditLimit (which happens after multiple charges)
 
             var oldBalance = card.OutstandingBalance;
             card.OutstandingBalance = card.OutstandingBalance - message.Amount;

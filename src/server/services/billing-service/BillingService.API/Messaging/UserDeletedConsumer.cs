@@ -25,11 +25,18 @@ public class UserDeletedConsumer(BillingDbContext db, ILogger<UserDeletedConsume
             var rewardAccount = await db.RewardAccounts.FirstOrDefaultAsync(x => x.UserId == userId, context.CancellationToken);
             if (rewardAccount != null)
             {
+                // Delete all reward transactions for this account first (cascade handles this, but be explicit)
+                var rewardTransactions = await db.RewardTransactions
+                    .Where(x => x.RewardAccountId == rewardAccount.Id)
+                    .ToListAsync(context.CancellationToken);
+                db.RewardTransactions.RemoveRange(rewardTransactions);
+
                 db.RewardAccounts.Remove(rewardAccount);
             }
 
             await db.SaveChangesAsync(context.CancellationToken);
-            logger.LogInformation("Processed IUserDeleted: cancelled {BillCount} bills for user {UserId}", bills.Count, userId);
+            logger.LogInformation("Processed IUserDeleted: cancelled {BillCount} bills, removed reward account and {TxCount} transactions for user {UserId}", 
+                bills.Count, rewardAccount != null ? db.RewardTransactions.Count(x => x.RewardAccountId == rewardAccount.Id) : 0, userId);
         }
         catch (Exception ex)
         {

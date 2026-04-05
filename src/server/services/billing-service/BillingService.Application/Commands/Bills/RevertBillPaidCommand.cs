@@ -29,19 +29,11 @@ public class RevertBillPaidCommandHandler(
             return new ApiResponse<bool> { Success = false, Message = "Bill not found.", Data = false };
         }
 
-        if (bill.Status != BillStatus.Paid)
+        if (bill.Status == BillStatus.Pending || bill.Status == BillStatus.Cancelled)
         {
-            logger.LogInformation("Bill {BillId} is not paid, nothing to revert", request.BillId);
+            logger.LogInformation("Bill {BillId} is {Status}, nothing to revert", request.BillId, bill.Status);
             return new ApiResponse<bool> { Success = true, Message = "Bill is not paid.", Data = true };
         }
-
-        // Revert bill status
-        bill.Status = BillStatus.Pending;
-        bill.AmountPaid = null;
-        bill.PaidAtUtc = null;
-        bill.UpdatedAtUtc = DateTime.UtcNow;
-
-        await billRepository.UpdateAsync(bill, cancellationToken);
 
         // Revert rewards - find the reward transaction for this bill and reverse it
         var rewardTx = await rewardRepository.GetTransactionByBillIdAsync(request.BillId, cancellationToken);
@@ -70,6 +62,29 @@ public class RevertBillPaidCommandHandler(
                 logger.LogInformation("Reversed {Points} points from user {UserId} account", rewardTx.Points, request.UserId);
             }
         }
+
+        // Revert bill status - handle both Paid and PartiallyPaid
+        var currentPaid = bill.AmountPaid ?? 0;
+        var revertAmount = request.Amount;
+
+        if (bill.Status == BillStatus.Paid && revertAmount >= currentPaid)
+        {
+            // Full reversal
+            bill.Status = BillStatus.Pending;
+            bill.AmountPaid = null;
+            bill.PaidAtUtc = null;
+        }
+        else
+        {
+            // Partial reversal
+            var newPaid = Math.Max(0, currentPaid - revertAmount);
+            bill.AmountPaid = newPaid > 0 ? newPaid : null;
+            bill.Status = newPaid > 0 ? BillStatus.PartiallyPaid : BillStatus.Pending;
+            bill.PaidAtUtc = newPaid > 0 ? bill.PaidAtUtc : null;
+        }
+
+        bill.UpdatedAtUtc = DateTime.UtcNow;
+        await billRepository.UpdateAsync(bill, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

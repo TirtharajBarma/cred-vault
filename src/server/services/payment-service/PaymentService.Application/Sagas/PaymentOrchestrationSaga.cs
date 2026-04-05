@@ -196,7 +196,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.PaymentId,
                     ctx.Saga.UserId,
                     ctx.Saga.CardId,
-                    Amount = ctx.Saga.Amount - ctx.Saga.RewardsAmount,  // Deduct only remaining amount after rewards
+                    Amount = ctx.Saga.Amount - ctx.Message.AmountRedeemed,
                     RequestedAt = DateTime.UtcNow
                 })),
             When(RewardRedemptionFailed)

@@ -62,19 +62,18 @@ public class RedeemRewardsCommandHandler(
             var availablePoints = (int)Math.Floor(account.PointsBalance);
             if (availablePoints <= 0)
             {
-                return new ApiResponse<RedeemRewardsResult>
-                {
-                    Success = false,
-                    Message = $"Insufficient points. Available: {account.PointsBalance}"
-                };
+                logger.LogInformation("No points available for redemption. Proceeding with 0 points.");
+                request = request with { Points = 0 };
+                dollarValue = 0;
             }
+            else
+            {
+                logger.LogInformation("Insufficient points for redemption: requested={Requested}, available={Available}. Using available points.",
+                    request.Points, availablePoints);
             
-            logger.LogInformation("Insufficient points for redemption: requested={Requested}, available={Available}. Using available points.",
-                request.Points, availablePoints);
-            
-            // Recalculate with available points
-            request = request with { Points = availablePoints };
-            dollarValue = availablePoints * PointsToDollarRate;
+                request = request with { Points = availablePoints };
+                dollarValue = availablePoints * PointsToDollarRate;
+            }
         }
 
         var now = DateTime.UtcNow;
@@ -112,23 +111,35 @@ public class RedeemRewardsCommandHandler(
         {
             Id = Guid.NewGuid(),
             RewardAccountId = account.Id,
-            BillId = Guid.Empty,
+            BillId = null, // Account redemption - no bill associated
             Points = points,
             Type = RewardTransactionType.Redeemed,
             CreatedAtUtc = now
         }, cancellationToken);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to save account redemption for UserId={UserId}", account.UserId);
+            return new ApiResponse<RedeemRewardsResult>
+            {
+                Success = false,
+                Message = $"Failed to process redemption: {ex.Message}"
+            };
+        }
 
         return new ApiResponse<RedeemRewardsResult>
         {
             Success = true,
-            Message = $"Successfully redeemed {points} points for ₹{dollarValue:F2} account credit.",
+            Message = $"Successfully redeemed {points} points for ${dollarValue:F2} account credit.",
             Data = new RedeemRewardsResult
             {
                 PointsRedeemed = points,
                 DollarValue = dollarValue,
-                Message = $"₹{dollarValue:F2} applied to your account",
+                Message = $"${dollarValue:F2} applied to your account",
                 NewPointsBalance = account.PointsBalance
             }
         };
@@ -170,7 +181,7 @@ public class RedeemRewardsCommandHandler(
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
-            var successMessage = $"Redeemed {points} points (₹{dollarValue:F2}) - bill already processed";
+            var successMessage = $"Redeemed {points} points (${dollarValue:F2}) - bill already processed";
             return new ApiResponse<RedeemRewardsResult>
             {
                 Success = true,
@@ -225,8 +236,8 @@ public class RedeemRewardsCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var message = bill.Status == BillStatus.Paid
-            ? $"Successfully redeemed {points} points (₹{dollarValue:F2}) to pay off this bill."
-            : $"Successfully redeemed {points} points (₹{dollarValue:F2}). Remaining due: ₹{remainingAfterPayment:F2}";
+            ? $"Successfully redeemed {points} points (${dollarValue:F2}) to pay off this bill."
+            : $"Successfully redeemed {points} points (${dollarValue:F2}). Remaining due: ${remainingAfterPayment:F2}";
 
         return new ApiResponse<RedeemRewardsResult>
         {

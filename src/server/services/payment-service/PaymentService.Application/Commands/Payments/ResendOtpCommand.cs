@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
+using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
+using Shared.Contracts.Events.Payment;
 
 namespace PaymentService.Application.Commands.Payments;
 
@@ -12,6 +14,7 @@ public record ResendOtpResult(bool Success, string? Error, DateTime? ExpiresAtUt
 
 public class ResendOtpCommandHandler(
     IPaymentRepository paymentRepository,
+    IPublishEndpoint publishEndpoint,
     ILogger<ResendOtpCommandHandler> logger
 ) : IRequestHandler<ResendOtpCommand, ResendOtpResult>
 {
@@ -48,7 +51,20 @@ public class ResendOtpCommandHandler(
         payment.UpdatedAtUtc = DateTime.UtcNow;
 
         await paymentRepository.UpdateAsync(payment);
-        logger.LogInformation("New OTP generated for PaymentId={PaymentId}, ExpiresAt={ExpiresAt}",
+
+        // Publish OTP event so notification service delivers it to the user
+        await publishEndpoint.Publish<IPaymentOtpGenerated>(new
+        {
+            PaymentId = payment.Id,
+            UserId = payment.UserId,
+            Email = string.Empty,
+            FullName = string.Empty,
+            Amount = payment.Amount,
+            OtpCode = newOtpCode,
+            ExpiresAtUtc = expiresAtUtc
+        }, cancellationToken);
+
+        logger.LogInformation("New OTP generated and published for PaymentId={PaymentId}, ExpiresAt={ExpiresAt}",
             request.PaymentId, expiresAtUtc);
 
         return new ResendOtpResult(true, null, expiresAtUtc);

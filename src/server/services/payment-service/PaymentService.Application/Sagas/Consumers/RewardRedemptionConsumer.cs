@@ -21,7 +21,19 @@ public class RewardRedemptionConsumer(
         try
         {
             var pointsToRedeem = (int)Math.Floor(message.Amount / 0.25m);
-            pointsToRedeem = Math.Max(pointsToRedeem, 1);
+
+            if (pointsToRedeem <= 0)
+            {
+                logger.LogInformation("Reward amount too small for redemption: Amount={Amount}", message.Amount);
+                await context.Publish<IRewardRedemptionSucceeded>(new
+                {
+                    CorrelationId = message.CorrelationId,
+                    BillId = message.BillId,
+                    AmountRedeemed = 0m,
+                    SucceededAt = DateTime.UtcNow
+                });
+                return;
+            }
 
             var client = httpClientFactory.CreateClient();
             var billingUrl = configuration["Services:BillingService"] ?? "http://localhost:5003";
@@ -49,6 +61,7 @@ public class RewardRedemptionConsumer(
                 await context.Publish<IRewardRedemptionFailed>(new
                 {
                     CorrelationId = message.CorrelationId,
+                    PaymentId = message.PaymentId,
                     BillId = message.BillId,
                     Reason = $"Billing service returned {response.StatusCode}",
                     FailedAt = DateTime.UtcNow
@@ -56,14 +69,22 @@ public class RewardRedemptionConsumer(
                 return;
             }
 
-            logger.LogInformation("Reward redemption successful: PaymentId={PaymentId}, BillId={BillId}, Points={Points}",
-                message.PaymentId, message.BillId, pointsToRedeem);
+            var responseBody = await response.Content.ReadAsStringAsync(context.CancellationToken);
+            var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
+            var dataElement = responseJson.RootElement.GetProperty("data");
+            var actualDollarValue = dataElement.TryGetProperty("dollarValue", out var dv) 
+                ? dv.GetDecimal() 
+                : 0m;
+
+            logger.LogInformation("Reward redemption successful: PaymentId={PaymentId}, BillId={BillId}, Points={Points}, ActualAmount=${Amount}",
+                message.PaymentId, message.BillId, pointsToRedeem, actualDollarValue);
 
             await context.Publish<IRewardRedemptionSucceeded>(new
             {
                 CorrelationId = message.CorrelationId,
+                PaymentId = message.PaymentId,
                 BillId = message.BillId,
-                AmountRedeemed = message.Amount,
+                AmountRedeemed = actualDollarValue,
                 SucceededAt = DateTime.UtcNow
             });
         }
@@ -74,6 +95,7 @@ public class RewardRedemptionConsumer(
             await context.Publish<IRewardRedemptionFailed>(new
             {
                 CorrelationId = message.CorrelationId,
+                PaymentId = message.PaymentId,
                 BillId = message.BillId,
                 Reason = ex.Message,
                 FailedAt = DateTime.UtcNow

@@ -87,7 +87,7 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options)
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.RewardAccountId).IsRequired();
-            entity.Property(x => x.BillId).IsRequired();
+            entity.Property(x => x.BillId).IsRequired(false);
             entity.Property(x => x.Points).IsRequired().HasColumnType("decimal(18,2)");
             entity.Property(x => x.Type).IsRequired().HasConversion<int>();
             entity.Property(x => x.CreatedAtUtc).IsRequired();

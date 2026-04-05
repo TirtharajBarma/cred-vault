@@ -24,10 +24,11 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
             .Where(x => x.CardNetwork == network && 
                         (x.IssuerId == issuerId || x.IssuerId == null) &&
                         x.EffectiveFromUtc <= dateUtc && 
-                        (x.EffectiveToUtc == null || x.EffectiveToUtc >= dateUtc) &&
+                        (x.EffectiveToUtc == null || x.EffectiveToUtc > dateUtc) &&
                         amount >= x.MinSpend)
             .OrderByDescending(x => x.IssuerId != null) // Prioritize Issuer-specific tiers over network defaults
-            .ThenByDescending(x => x.MinSpend)
+            .ThenByDescending(x => x.MinSpend)          // Higher spend threshold first
+            .ThenByDescending(x => x.RewardRate)        // Higher reward rate for same MinSpend
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -86,7 +87,7 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
     public async Task<bool> HasTransactionForBillAsync(Guid billId, CancellationToken cancellationToken = default)
     {
         return await dbContext.RewardTransactions
-            .AnyAsync(x => x.BillId == billId, cancellationToken);
+            .AnyAsync(x => x.BillId == billId && x.Type == RewardTransactionType.Earned, cancellationToken);
     }
 
     public async Task<RewardTransaction?> GetTransactionByBillIdAsync(Guid billId, CancellationToken cancellationToken = default)
