@@ -118,9 +118,9 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             "UserRegistered" => ("Welcome to CredVault", $"<h2>Welcome {name ?? "User"}!</h2><p>Your account is ready.</p>"),
             "UserOtpGenerated" => ("Your Verification Code", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Purpose: {data.GetValueOrDefault("Purpose", "N/A")}</p>"),
             "CardAdded" => ("Card Added", $"<h2>New card ending in {data.GetValueOrDefault("CardNumberLast4", "****")}</h2>"),
-            "BillGenerated" => ("Bill Ready", $"<h2>Amount: ${data.GetValueOrDefault("Amount", "0")}</h2><p>Due: {data.GetValueOrDefault("DueDate", "N/A")}</p>"),
-            "PaymentOtpGenerated" => ("Payment Verification", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Amount: ${data.GetValueOrDefault("Amount", "0")}</p>"),
-            "PaymentCompleted" => ("Payment Successful", $"<h2>Payment of ${data.GetValueOrDefault("Amount", "0")} completed!</h2>"),
+            "BillGenerated" => ("Bill Ready", $"<h2>Amount: ₹{data.GetValueOrDefault("Amount", "0")}</h2><p>Due: {data.GetValueOrDefault("DueDate", "N/A")}</p>"),
+            "PaymentOtpGenerated" => ("Payment Verification", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Amount: ₹{data.GetValueOrDefault("Amount", "0")}</p>"),
+            "PaymentCompleted" => ("Payment Successful", $"<h2>Payment of ₹{data.GetValueOrDefault("Amount", "0")} completed!</h2>"),
             "PaymentFailed" => ("Payment Failed", $"<h2>Payment failed: {data.GetValueOrDefault("Reason", "Unknown")}</h2>"),
             _ => (eventType, $"<h2>{eventType}</h2><p>Details: {json}</p>")
         };

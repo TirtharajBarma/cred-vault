@@ -171,9 +171,9 @@ export class RewardsComponent implements OnInit {
     if (minSpend === 0) return 'No minimum';
     if (minSpend >= 1000) {
       const k = minSpend / 1000;
-      return `$${k % 1 === 0 ? k : k.toFixed(1)}+`;
+      return `₹${k % 1 === 0 ? k : k.toFixed(1)}+`;
     }
-    return `$${minSpend}+`;
+    return `₹${minSpend}+`;
   }
 
   getNetworkBadgeClass(tier: RewardTier): string {

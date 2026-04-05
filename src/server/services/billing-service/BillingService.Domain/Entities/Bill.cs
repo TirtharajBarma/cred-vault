@@ -13,7 +13,7 @@ public sealed class Bill
 
     public decimal Amount { get; set; }
     public decimal MinDue { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "INR";
 
     public DateTime BillingDateUtc { get; set; }
     public DateTime DueDateUtc { get; set; }

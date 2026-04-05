@@ -131,7 +131,7 @@ export class RewardTiersComponent implements OnInit {
 
   confirmDelete(tier: RewardTier) {
     this.deleteTargetId.set(tier.id);
-    this.deleteTargetName.set(`${tier.cardNetwork === 1 ? 'Visa' : 'Mastercard'} - $${tier.minSpend}+`);
+    this.deleteTargetName.set(`${tier.cardNetwork === 1 ? 'Visa' : 'Mastercard'} - ₹${tier.minSpend}+`);
     this.showDeleteConfirm.set(true);
   }
 

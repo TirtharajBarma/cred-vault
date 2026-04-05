@@ -119,7 +119,7 @@
           <div class="space-y-2">
             <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Settlement Currency</label>
             <div class="grid grid-cols-3 gap-3">
-              @for (curr of ['USD', 'EUR', 'GBP']; track curr) {
+              @for (curr of ['INR']; track curr) {
                 <button type="button" (click)="billForm.patchValue({currency: curr})"
                         [class]="billForm.get('currency')?.value === curr ? 'bg-charcoal text-white border-transparent shadow-lg' : 'bg-white border-charcoal/10 text-charcoal hover:bg-mist-cream'"
                         class="h-12 rounded-xl font-black text-sm border transition-all flex items-center justify-center gap-2">

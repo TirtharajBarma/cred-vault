@@ -44,7 +44,7 @@ public class BillsController(IMediator mediator) : BaseApiController
     {
         public Guid UserId { get; set; }
         public Guid CardId { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "INR";
     }
 
     [HttpPost("admin/generate-bill")]

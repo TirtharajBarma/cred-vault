@@ -27,7 +27,7 @@ export class BillGenerationComponent implements OnInit {
   billForm = this.fb.group({
     userId: ['', [Validators.required]],
     cardId: ['', [Validators.required]],
-    currency: ['USD', [Validators.required]]
+    currency: ['INR', [Validators.required]]
   });
 
   ngOnInit() {
@@ -105,7 +105,7 @@ export class BillGenerationComponent implements OnInit {
       next: (res) => {
         if (res.success) {
           this.successMessage.set(`Billing cycle executed successfully for ${this.selectedUserName()}. User will be notified.`);
-          this.billForm.reset({ currency: 'USD' });
+          this.billForm.reset({ currency: 'INR' });
           this.cards.set([]);
           this.selectedUserName.set('');
           this.selectedCardDetails.set(null);

@@ -123,12 +123,12 @@ public class RedeemRewardsCommandHandler(
         return new ApiResponse<RedeemRewardsResult>
         {
             Success = true,
-            Message = $"Successfully redeemed {points} points for ${dollarValue:F2} account credit.",
+            Message = $"Successfully redeemed {points} points for ₹{dollarValue:F2} account credit.",
             Data = new RedeemRewardsResult
             {
                 PointsRedeemed = points,
                 DollarValue = dollarValue,
-                Message = $"${dollarValue:F2} applied to your account",
+                Message = $"₹{dollarValue:F2} applied to your account",
                 NewPointsBalance = account.PointsBalance
             }
         };
@@ -170,7 +170,7 @@ public class RedeemRewardsCommandHandler(
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
-            var successMessage = $"Redeemed {points} points (${dollarValue:F2}) - bill already processed";
+            var successMessage = $"Redeemed {points} points (₹{dollarValue:F2}) - bill already processed";
             return new ApiResponse<RedeemRewardsResult>
             {
                 Success = true,
@@ -225,8 +225,8 @@ public class RedeemRewardsCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var message = bill.Status == BillStatus.Paid
-            ? $"Successfully redeemed {points} points (${dollarValue:F2}) to pay off this bill."
-            : $"Successfully redeemed {points} points (${dollarValue:F2}). Remaining due: ${remainingAfterPayment:F2}";
+            ? $"Successfully redeemed {points} points (₹{dollarValue:F2}) to pay off this bill."
+            : $"Successfully redeemed {points} points (₹{dollarValue:F2}). Remaining due: ₹{remainingAfterPayment:F2}";
 
         return new ApiResponse<RedeemRewardsResult>
         {
