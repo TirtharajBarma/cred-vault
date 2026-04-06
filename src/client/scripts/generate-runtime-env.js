@@ -32,7 +32,12 @@ const modeEnv = mode === 'production'
   ? parseEnvFile(path.join(projectRoot, '.env.production'))
   : parseEnvFile(path.join(projectRoot, '.env.development'));
 
-const apiGatewayUrl = process.env.API_GATEWAY_URL || modeEnv.API_GATEWAY_URL || commonEnv.API_GATEWAY_URL || '';
+const fromFiles = modeEnv.API_GATEWAY_URL || commonEnv.API_GATEWAY_URL || '';
+const fromProcess = (process.env.API_GATEWAY_URL || '').trim();
+const isPlaceholder = fromProcess.includes('your-gateway-domain.com');
+
+// For local development, favor checked-in env files unless an explicit non-placeholder override is provided.
+const apiGatewayUrl = fromProcess && !isPlaceholder ? fromProcess : fromFiles || fromProcess || '';
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 

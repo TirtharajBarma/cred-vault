@@ -6,10 +6,15 @@ export interface EnvironmentConfig {
   pointsToRupeeRate: number;
 }
 
-const fallbackApiGatewayUrl = typeof window !== 'undefined' ? window.location.origin : '';
+const fallbackApiGatewayUrl = 'http://localhost:5006';
+const configuredApiGatewayUrl = (runtimeEnv.apiGatewayUrl || '').trim();
+const hasPlaceholderGateway = configuredApiGatewayUrl.includes('your-gateway-domain.com');
+const effectiveApiGatewayUrl = !configuredApiGatewayUrl || hasPlaceholderGateway
+  ? fallbackApiGatewayUrl
+  : configuredApiGatewayUrl;
 
 export const environment: EnvironmentConfig = {
   production: false,
-  apiGatewayUrl: runtimeEnv.apiGatewayUrl || fallbackApiGatewayUrl,
+  apiGatewayUrl: effectiveApiGatewayUrl,
   pointsToRupeeRate: 0.25
 };

@@ -11,6 +11,18 @@
     </button>
   </div>
 
+  @if (successMessage()) {
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+      {{ successMessage() }}
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+      {{ errorMessage() }}
+    </div>
+  }
+
   <!-- Tiers Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
     @if (isLoading()) {
@@ -23,13 +35,16 @@
           <!-- Header -->
           <div class="flex items-start justify-between mb-4">
             <div class="flex items-center gap-3">
-              <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-lg"
-                   [class]="tier.cardNetwork === 1 ? 'bg-gradient-to-br from-blue-600 to-blue-800' : 'bg-gradient-to-br from-red-500 to-red-700'">
-                {{ tier.cardNetwork === 1 ? 'V' : 'M' }}
+              <div class="w-12 h-12 rounded-xl border border-charcoal/10 bg-white flex items-center justify-center shadow-sm">
+                @if (hasUsableNetworkLogo(tier.cardNetwork) && getNetworkLogoSrc(tier.cardNetwork); as logoSrc) {
+                  <img [src]="logoSrc" [alt]="getNetworkName(tier.cardNetwork) + ' logo'" class="max-h-8 max-w-8 object-contain" (error)="onNetworkLogoError(tier.cardNetwork)">
+                } @else {
+                  <span class="font-black text-lg" [class]="tier.cardNetwork === 1 ? 'text-blue-700' : 'text-red-600'">{{ tier.cardNetwork === 1 ? 'V' : 'M' }}</span>
+                }
               </div>
               <div>
-                <h3 class="font-black text-charcoal">{{ getNetworkName(tier.cardNetwork) }} Protocol</h3>
-                <p class="text-[10px] text-misty-gray uppercase tracking-wider">{{ tier.issuerId ? 'Issuer Specific' : 'Network Wide' }}</p>
+                <h3 class="font-black text-charcoal">{{ getTierBankName(tier) }}</h3>
+                <p class="text-[10px] text-misty-gray uppercase tracking-wider">{{ getNetworkName(tier.cardNetwork) }} • {{ getTierScopeLabel(tier) }}</p>
               </div>
             </div>
             <span [class]="getTierStatus(tier).color"
@@ -41,7 +56,7 @@
           <!-- Stats -->
           <div class="grid grid-cols-2 gap-4 mb-4">
             <div class="bg-mist-cream/50 rounded-xl p-3">
-              <p class="text-2xl font-black text-charcoal">{{ tier.minSpend | currency:'INR':'symbol':'1.0-0' }}</p>
+              <p class="text-2xl font-black text-charcoal">{{ formatMinSpendForCard(tier.minSpend) }}</p>
               <p class="text-[9px] text-misty-gray uppercase tracking-wider mt-1">Min Spend</p>
             </div>
             <div class="bg-emerald-50 rounded-xl p-3">
@@ -65,11 +80,13 @@
           <!-- Actions -->
           <div class="flex gap-2 pt-4 border-t border-charcoal/5">
             <button (click)="openModal(tier)" 
+                  type="button"
                     class="flex-1 h-10 rounded-xl font-bold text-xs text-primary hover:bg-primary/10 transition-all border border-charcoal/10 flex items-center justify-center gap-1">
               <span class="material-symbols-outlined text-sm">edit</span>
               Edit
             </button>
             <button (click)="confirmDelete(tier)" 
+                  type="button"
                     class="h-10 px-4 rounded-xl font-bold text-xs text-red-500 hover:bg-red-50 transition-all border border-charcoal/10">
               <span class="material-symbols-outlined text-sm">delete</span>
             </button>
@@ -104,7 +121,7 @@
             <h2 class="text-2xl lg:text-3xl font-black tracking-tight text-charcoal">{{ isEditMode() ? 'Edit' : 'Reward' }} Engineering</h2>
             <p class="text-misty-gray font-medium text-sm mt-1">{{ isEditMode() ? 'Update tier parameters' : 'Define profit distribution parameters.' }}</p>
           </div>
-          <button (click)="closeModal()" class="p-2 hover:bg-mist-ivory rounded-xl transition-all text-charcoal/30">
+          <button (click)="closeModal()" type="button" class="p-2 hover:bg-mist-ivory rounded-xl transition-all text-charcoal/30">
             <span class="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
@@ -126,7 +143,7 @@
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Network</label>
-              <select formControlName="cardNetwork" class="premium-input px-5 h-12 text-base appearance-none bg-white/60">
+              <select formControlName="cardNetwork" (change)="onNetworkSelectionChange()" class="premium-input px-5 h-12 text-base appearance-none bg-white/60">
                 <option [ngValue]="1">Visa</option>
                 <option [ngValue]="2">Mastercard</option>
               </select>
@@ -148,11 +165,11 @@
               <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Issuer (Optional)</label>
               <select formControlName="issuerId" class="premium-input px-5 h-12 text-base appearance-none bg-white/60">
                 <option [ngValue]="null">All Issuers (Network-Wide)</option>
-                @for (issuer of issuers(); track issuer.id) {
+                @for (issuer of getAvailableIssuersForSelectedNetwork(); track issuer.id) {
                   <option [ngValue]="issuer.id">{{ issuer.name }}</option>
                 }
               </select>
-              <p class="text-[9px] text-misty-gray">Leave empty to apply across all banks on this network</p>
+              <p class="text-[9px] text-misty-gray">Showing issuers for selected network. Leave empty for network-wide rule.</p>
             </div>
           </div>
 
@@ -197,15 +214,25 @@
           <p class="text-misty-gray font-medium text-sm mb-6">
             Are you sure you want to delete <strong>{{ deleteTargetName() }}</strong>? This cannot be undone.
           </p>
+
+          @if (deleteErrorMessage()) {
+            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm font-semibold text-red-700">
+              {{ deleteErrorMessage() }}
+            </div>
+          }
           
           <div class="flex gap-3">
-            <button (click)="cancelDelete()" 
-                    class="flex-1 h-12 bg-white border-2 border-charcoal/10 text-charcoal font-bold rounded-xl hover:bg-mist-cream transition-all">
+            <button (click)="cancelDelete()" type="button" [disabled]="isDeleting()"
+                    class="flex-1 h-12 bg-white border-2 border-charcoal/10 text-charcoal font-bold rounded-xl hover:bg-mist-cream transition-all disabled:opacity-60 disabled:cursor-not-allowed">
               Cancel
             </button>
-            <button (click)="deleteTier()" 
-                    class="flex-1 h-12 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20">
-              Delete
+            <button (click)="deleteTier()" type="button" [disabled]="isDeleting()"
+                    class="flex-1 h-12 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed">
+              @if (isDeleting()) {
+                Deleting...
+              } @else {
+                Delete
+              }
             </button>
           </div>
         </div>
