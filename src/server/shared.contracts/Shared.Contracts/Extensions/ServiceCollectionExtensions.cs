@@ -5,8 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-
-using Scalar.AspNetCore;
+using Swashbuckle.AspNetCore.Swagger;
 using Shared.Contracts.Configuration;
 using MassTransit;
 
@@ -45,6 +44,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddStandardApi(this IServiceCollection services)
     {
         services.AddOpenApi();
+        services.AddSwaggerGen();
         services.AddProblemDetails();
         return services;
     }
@@ -54,9 +54,9 @@ public static class ServiceCollectionExtensions
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
-            app.MapScalarApiReference(options =>
+            app.UseSwaggerUI(options =>
             {
-                options.Title = title;
+                options.SwaggerEndpoint("/openapi/v1.json", title);
             });
         }
         return app;

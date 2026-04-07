@@ -187,9 +187,4 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
     {
         return new List<CreditCard>();
     }
-
-    public async Task<bool> HasTransactionsAsync(Guid cardId, CancellationToken cancellationToken = default)
-    {
-        return await dbContext.CardTransactions.AnyAsync(x => x.CardId == cardId, cancellationToken);
-    }
 }

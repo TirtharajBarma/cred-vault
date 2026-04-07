@@ -3,8 +3,12 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DashboardService } from '../../../core/services/dashboard.service';
+import { RewardsService } from '../../../core/services/rewards.service';
+import { BillingService, Bill, BillStatus } from '../../../core/services/billing.service';
+import { PaymentService, PaymentInitiateRequest, PaymentInitiateResponse } from '../../../core/services/payment.service';
 import { CreditCard, CardTransaction } from '../../../core/models/card.models';
 import { ApiResponse } from '../../../core/models/auth.models';
+import { environment } from '../../../../environments/environment';
 import { finalize } from 'rxjs';
 
 @Component({
@@ -17,12 +21,51 @@ import { finalize } from 'rxjs';
 export class CardDetailsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private dashboardService = inject(DashboardService);
+  private rewardsService = inject(RewardsService);
+  private billingService = inject(BillingService);
+  private paymentService = inject(PaymentService);
+
+  // Bill Status enum for template access
+  billStatus = BillStatus;
 
   card = signal<CreditCard | null>(null);
   transactions = signal<CardTransaction[]>([]);
   rewards = signal<number>(0);
   isLoading = signal(true);
   error = signal<string | null>(null);
+
+  // Bill-related signals
+  currentBill = signal<Bill | null>(null);
+  isLoadingBill = signal(false);
+
+  // Payment-related signals
+  showPaymentModal = signal(false);
+  showOtpModal = signal(false);
+  showSuccessModal = signal(false);
+  paymentType = signal<'full' | 'min'>('full');
+  paymentStage = signal<'initiated' | 'otp_sent' | 'processing' | 'completed'>('initiated');
+  isProcessingPayment = signal(false);
+  paymentError = signal<string | null>(null);
+  currentPaymentId = signal<string | null>(null);
+  otpCode = '';
+  isVerifyingOtp = signal(false);
+  otpError = signal<string | null>(null);
+  canResendOtp = signal(true);
+  paidAmount = signal(0);
+  useRewards = signal(false);
+  readonly pointsToRupeeRate = environment.pointsToRupeeRate;
+
+  availablePoints = computed(() => Math.floor(this.rewards()));
+  rewardValue = computed(() => this.availablePoints() * this.pointsToRupeeRate);
+
+  maxRedeemablePoints = computed(() => {
+    const bill = this.currentBill();
+    if (!bill) return 0;
+
+    const outstanding = this.getBillOutstandingAmount(bill);
+    const maxPointsByAmount = Math.floor(outstanding / this.pointsToRupeeRate);
+    return Math.min(this.availablePoints(), maxPointsByAmount);
+  });
 
   // Pagination
   currentPage = signal(1);
@@ -132,9 +175,32 @@ export class CardDetailsComponent implements OnInit {
       if (cardId) {
         this.loadCardDetails(cardId);
         this.loadRewards();
+        this.loadBillForCard(cardId);
       } else {
         this.error.set('Card ID not found');
         this.isLoading.set(false);
+      }
+    });
+  }
+
+  loadBillForCard(cardId: string): void {
+    this.isLoadingBill.set(true);
+    this.billingService.getMyBills().subscribe({
+      next: (res: ApiResponse<Bill[]>) => {
+        if (res.success && res.data) {
+          // Find bill for this card that is pending/overdue/partially paid
+          const cardBill = res.data.find(b => 
+            b.cardId === cardId && 
+            (b.status === BillStatus.Pending || 
+             b.status === BillStatus.Overdue || 
+             b.status === BillStatus.PartiallyPaid)
+          );
+          this.currentBill.set(cardBill || null);
+        }
+        this.isLoadingBill.set(false);
+      },
+      error: () => {
+        this.isLoadingBill.set(false);
       }
     });
   }
@@ -166,7 +232,7 @@ export class CardDetailsComponent implements OnInit {
   }
 
   loadRewards(): void {
-    this.dashboardService.getRewardAccount().subscribe({
+    this.rewardsService.getRewardAccount().subscribe({
       next: (res: ApiResponse<any>) => {
         if (res.success && res.data) {
           this.rewards.set(res.data.pointsBalance || 0);
@@ -312,4 +378,185 @@ export class CardDetailsComponent implements OnInit {
       default: return 'bg-misty-gray';
     }
   }
+
+  // ==================== PAYMENT METHODS ====================
+
+  getBillOutstandingAmount(bill: Bill): number {
+    return Math.max(0, Number(bill.amount) - this.getBillAmountPaid(bill));
+  }
+
+  getPaymentAmount(bill: Bill | null, type: 'full' | 'min'): number {
+    if (!bill) return 0;
+
+    const outstanding = this.getBillOutstandingAmount(bill);
+    if (type === 'full') {
+      return outstanding;
+    }
+
+    return Math.min(outstanding, Number(bill.minDue));
+  }
+
+  getSelectedBillOutstanding(): number {
+    return this.getPaymentAmount(this.currentBill(), 'full');
+  }
+
+  private getBillAmountPaid(bill: Bill): number {
+    return Number(bill.amountPaid || 0);
+  }
+
+  toggleRewards(): void {
+    this.useRewards.update(value => !value);
+  }
+
+  resendOtp(): void {
+    if (!this.canResendOtp()) return;
+    this.canResendOtp.set(false);
+    setTimeout(() => this.canResendOtp.set(true), 30000);
+  }
+  
+  openPaymentModal(): void {
+    this.showPaymentModal.set(true);
+    this.paymentError.set(null);
+    this.paymentType.set('full');
+    this.paymentStage.set('initiated');
+    this.useRewards.set(false);
+    this.otpCode = '';
+    this.otpError.set(null);
+    this.loadRewards();
+  }
+
+  closePaymentModal(): void {
+    this.showPaymentModal.set(false);
+    this.resetPaymentState();
+  }
+
+  initiatePayment(): void {
+    const card = this.card();
+    const bill = this.currentBill();
+    
+    if (!card || !bill) return;
+
+    const amount = this.getPaymentAmount(bill, this.paymentType());
+    if (amount <= 0) {
+      this.paymentError.set('This bill is already settled.');
+      return;
+    }
+
+    this.isProcessingPayment.set(true);
+    this.paymentError.set(null);
+    this.paymentStage.set('processing');
+
+    const rewardsPoints = this.useRewards() ? this.maxRedeemablePoints() : null;
+
+    const request: PaymentInitiateRequest = {
+      cardId: card.id,
+      billId: bill.id,
+      amount,
+      paymentType: this.paymentType() === 'full' ? 'Full' : 'Partial',
+      rewardsPoints
+    };
+
+    this.paymentService.initiatePayment(request).pipe(
+      finalize(() => this.isProcessingPayment.set(false))
+    ).subscribe({
+      next: (res: ApiResponse<PaymentInitiateResponse>) => {
+        if (res.success && res.data) {
+          this.currentPaymentId.set(res.data.paymentId);
+          this.paymentStage.set('otp_sent');
+          this.showPaymentModal.set(false);
+          this.showOtpModal.set(true);
+        } else {
+          this.paymentError.set(res.message || 'Failed to initiate payment');
+          this.paymentStage.set('initiated');
+        }
+      },
+      error: () => {
+        this.paymentError.set('Network error. Please try again.');
+        this.paymentStage.set('initiated');
+      }
+    });
+  }
+
+  verifyOtp(): void {
+    if (this.otpCode.length !== 6) {
+      this.otpError.set('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    const paymentId = this.currentPaymentId();
+    if (!paymentId) return;
+
+    this.isVerifyingOtp.set(true);
+    this.otpError.set(null);
+
+    this.paymentService.verifyOtp(paymentId, this.otpCode).subscribe({
+      next: (res: ApiResponse<any>) => {
+        this.isVerifyingOtp.set(false);
+        if (res.success) {
+          this.showOtpModal.set(false);
+          this.showSuccessModal.set(true);
+
+          const bill = this.currentBill();
+          this.paidAmount.set(this.getPaymentAmount(bill, this.paymentType()));
+
+          const cardId = this.card()?.id;
+          if (cardId) {
+            this.loadCardDetails(cardId);
+            this.loadBillForCard(cardId);
+            this.loadRewards();
+          }
+        } else {
+          this.otpError.set(res.message || 'Invalid OTP');
+        }
+      },
+      error: () => {
+        this.isVerifyingOtp.set(false);
+        this.otpError.set('Verification failed. Please try again.');
+      }
+    });
+  }
+
+  closeSuccessModal(): void {
+    this.showSuccessModal.set(false);
+    this.resetPaymentState();
+  }
+
+  private resetPaymentState(): void {
+    this.paymentError.set(null);
+    this.otpError.set(null);
+    this.otpCode = '';
+    this.currentPaymentId.set(null);
+    this.paymentStage.set('initiated');
+    this.isProcessingPayment.set(false);
+    this.isVerifyingOtp.set(false);
+    this.canResendOtp.set(true);
+    this.useRewards.set(false);
+    this.paymentType.set('full');
+  }
+
+  getBillStatusLabel(status: number): string {
+    switch (status) {
+      case BillStatus.Pending: return 'Pending';
+      case BillStatus.Paid: return 'Paid';
+      case BillStatus.Overdue: return 'Overdue';
+      case BillStatus.PartiallyPaid: return 'Partial';
+      case BillStatus.Cancelled: return 'Cancelled';
+      default: return 'Unknown';
+    }
+  }
+
+  getBillStatusClass(status: number): string {
+    switch (status) {
+      case BillStatus.Pending: return 'status-pending';
+      case BillStatus.Paid: return 'status-paid';
+      case BillStatus.Overdue: return 'status-overdue';
+      case BillStatus.PartiallyPaid: return 'status-partial';
+      default: return 'status-unknown';
+    }
+  }
+
+  hasActiveBill = computed(() => {
+    const bill = this.currentBill();
+    return bill !== null && bill !== undefined;
+  });
 }

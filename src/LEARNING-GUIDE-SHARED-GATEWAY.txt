@@ -1,0 +1,962 @@
+# SHARED CONTRACTS & API GATEWAY - LEARNING GUIDE
+
+---
+
+## PART 1: SHARED CONTRACTS LIBRARY
+
+**Location:** `/server/shared.contracts/Shared.Contracts/`
+
+This is the **glue** that holds all microservices together. Every service references this library.
+
+---
+
+### Why Shared Contracts?
+
+In microservices, services need to communicate. Without shared contracts:
+
+```
+Problem:
+Service A sends: { "user_id": "abc", "amount": 100 }
+Service B expects: { "userId": "abc", "Amount": 100 }
+
+Result: Mismatch, bugs, failures
+```
+
+With shared contracts:
+
+```
+Solution:
+Shared.Contracts defines: IUserRegistered { Guid UserId, decimal Amount }
+All services use the same definition
+
+Result: Type safety, compile-time checking
+```
+
+---
+
+### Directory Structure
+
+```
+shared.contracts/
+├── Shared.Contracts/
+│   ├── Configuration/
+│   │   └── JwtOptions.cs              # JWT configuration
+│   ├── Controllers/
+│   │   └── BaseApiController.cs       # Base controller
+│   ├── DTOs/
+│   │   └── OperationResult.cs         # Result wrapper
+│   ├── Enums/
+│   │   └── CardNetwork.cs            # Shared enum
+│   ├── Events/                        # MESSAGE CONTRACTS
+│   │   ├── Identity/
+│   │   │   └── IdentityEvents.cs
+│   │   ├── Card/
+│   │   │   └── CardEvents.cs
+│   │   ├── Payment/
+│   │   │   └── PaymentEvents.cs
+│   │   ├── Billing/
+│   │   │   └── BillingEvents.cs
+│   │   └── Saga/
+│   │       └── SagaOrchestrationEvents.cs
+│   ├── Extensions/
+│   │   └── ServiceCollectionExtensions.cs  # DI helpers
+│   ├── Middleware/
+│   │   └── ExceptionHandlingMiddleware.cs  # Error handling
+│   ├── Models/
+│   │   └── ApiResponse.cs            # Standard response
+│   └── Shared.Contracts.csproj
+```
+
+---
+
+## Understanding Each File
+
+### 1. ApiResponse.cs (Standard Response)
+
+**Location:** `Shared.Contracts/Models/ApiResponse.cs`
+
+**What it is:** Standard wrapper for all API responses.
+
+```csharp
+public class ApiResponse<T>
+{
+    public bool Success { get; set; }
+    public string Message { get; set; }
+    public T? Data { get; set; }
+    public string? TraceId { get; set; }
+    public List<string>? Errors { get; set; }
+    
+    // Factory methods
+    public static ApiResponse<T> Success(T data, string message = "Success")
+    {
+        return new ApiResponse<T>
+        {
+            Success = true,
+            Message = message,
+            Data = data,
+            TraceId = GetTraceId()
+        };
+    }
+    
+    public static ApiResponse<T> Fail(string message, List<string>? errors = null)
+    {
+        return new ApiResponse<T>
+        {
+            Success = false,
+            Message = message,
+            Errors = errors,
+            TraceId = GetTraceId()
+        };
+    }
+}
+
+// Non-generic version for void operations
+public class ApiResponse : ApiResponse<object>
+{
+    public static ApiResponse Success(string message = "Success")
+    {
+        return new ApiResponse { Success = true, Message = message };
+    }
+    
+    public static ApiResponse Fail(string message)
+    {
+        return new ApiResponse { Success = false, Message = message };
+    }
+}
+```
+
+**Usage:**
+```csharp
+// Success response
+return ApiResponse<CardDto>.Success(card, "Card created");
+
+// Fail response
+return ApiResponse<CardDto>.Fail("Card not found");
+
+// Void success
+return ApiResponse.Success("Operation completed");
+```
+
+### 2. BaseApiController.cs
+
+**Location:** `Shared.Contracts/Controllers/BaseApiController.cs`
+
+**What it is:** Base controller providing common functionality to all controllers.
+
+```csharp
+public abstract class BaseApiController : ControllerBase
+{
+    protected Guid GetUserId()
+    {
+        // Get user ID from JWT claims
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user token");
+        }
+        return userId;
+    }
+    
+    protected string GetUserEmail()
+    {
+        var emailClaim = User.FindFirst(ClaimTypes.Email);
+        return emailClaim?.Value ?? "";
+    }
+    
+    protected string GetUserRole()
+    {
+        var roleClaim = User.FindFirst(ClaimTypes.Role);
+        return roleClaim?.Value ?? "User";
+    }
+    
+    protected bool IsAdmin()
+    {
+        return GetUserRole() == "Admin";
+    }
+    
+    protected string? GetTraceId()
+    {
+        return HttpContext.TraceIdentifier;
+    }
+}
+```
+
+**Every service controller inherits from this:**
+```csharp
+public class CardsController : BaseApiController  // Not ControllerBase!
+{
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetCards()
+    {
+        var userId = GetUserId();  // Available from BaseApiController
+        // ...
+    }
+}
+```
+
+### 3. ExceptionHandlingMiddleware.cs
+
+**Location:** `Shared.Contracts/Middleware/ExceptionHandlingMiddleware.cs`
+
+**What it is:** Global exception handler ensuring consistent error responses.
+
+```csharp
+public class ExceptionHandlingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+    
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
+        {
+            await _next(context);
+        }
+        catch (Exception ex)
+        {
+            await HandleExceptionAsync(context, ex);
+        }
+    }
+    
+    private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    {
+        _logger.LogError(exception, "Unhandled exception occurred");
+        
+        var (statusCode, message) = exception switch
+        {
+            UnauthorizedAccessException _ => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+            ArgumentException ex => (StatusCodes.Status400BadRequest, ex.Message),
+            KeyNotFoundException _ => (StatusCodes.Status404NotFound, "Resource not found"),
+            InvalidOperationException ex => (StatusCodes.Status400BadRequest, ex.Message),
+            _ => (StatusCodes.Status500InternalServerError, "An error occurred")
+        };
+        
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/json";
+        
+        var response = new
+        {
+            success = false,
+            message = message,
+            traceId = context.TraceIdentifier
+        };
+        
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+    }
+}
+```
+
+**Registration:**
+```csharp
+// In Program.cs
+app.UseExceptionHandling();  // Extension method from Shared.Contracts
+```
+
+### 4. JwtOptions.cs
+
+**Location:** `Shared.Contracts/Configuration/JwtOptions.cs`
+
+**What it is:** Configuration for JWT token generation and validation.
+
+```csharp
+public class JwtOptions
+{
+    public string Issuer { get; set; } = "CredVault";
+    public string Audience { get; set; } = "CredVault";
+    public string SecretKey { get; set; } = "your-256-bit-secret-key-here-min-32-chars";
+    public int AccessTokenMinutes { get; set; } = 1440;  // 24 hours
+    public int RefreshTokenMinutes { get; set; } = 10080;  // 7 days
+}
+```
+
+**appsettings.json:**
+```json
+{
+  "JwtOptions": {
+    "Issuer": "CredVault",
+    "Audience": "CredVault",
+    "SecretKey": "your-super-secret-key-at-least-32-characters-long",
+    "AccessTokenMinutes": 1440,
+    "RefreshTokenMinutes": 10080
+  }
+}
+```
+
+### 5. ServiceCollectionExtensions.cs
+
+**Location:** `Shared.Contracts/Extensions/ServiceCollectionExtensions.cs`
+
+**What it is:** Extension methods for common DI registration.
+
+```csharp
+public static class ServiceCollectionExtensions
+{
+    // Add JWT Authentication
+    public static IServiceCollection AddJwtAuthentication(
+        this IServiceCollection services,
+        JwtOptions jwtOptions)
+    {
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtOptions.Issuer,
+                ValidAudience = jwtOptions.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(jwtOptions.SecretKey))
+            };
+        });
+        
+        return services;
+    }
+    
+    // Add API Services (controllers, swagger, etc.)
+    public static IServiceCollection AddApiServices(this IServiceCollection services)
+    {
+        services.AddControllers();
+        services.AddEndpointsApiExplorer();
+        services.AddSwaggerGen(c =>
+        {
+            c.SwaggerDoc("v1", new OpenApiInfo 
+            { 
+                Title = "CredVault API", 
+                Version = "v1" 
+            });
+            
+            // Add JWT auth to Swagger
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Description = "JWT Authorization header using the Bearer scheme",
+                Name = "Authorization",
+                In = ParameterLocation.Header,
+                Type = SecuritySchemeType.ApiKey,
+                Scheme = "Bearer"
+            });
+        });
+        
+        return services;
+    }
+}
+```
+
+**Usage in Program.cs:**
+```csharp
+builder.Services.AddJwtAuthentication(jwtOptions);
+builder.Services.AddApiServices();
+```
+
+### 6. CardNetwork.cs (Shared Enum)
+
+**Location:** `Shared.Contracts/Enums/CardNetwork.cs`
+
+```csharp
+public enum CardNetwork
+{
+    Unknown = 0,
+    Visa = 1,
+    Mastercard = 2
+}
+```
+
+This enum is defined once and used across Identity, Card, and Billing services.
+
+---
+
+## Understanding Events (Message Contracts)
+
+Events are the **contracts** for asynchronous communication between services.
+
+### 1. IdentityEvents.cs
+
+```csharp
+// Published when user registers
+public record IUserRegistered : CorrelatedBy<Guid>
+{
+    public Guid UserId { get; init; }
+    public string Email { get; init; }
+    public string FullName { get; init; }
+    public string Otp { get; init; }
+    public DateTime Timestamp { get; init; }
+    public Guid CorrelationId { get; init; }
+}
+
+// Published when user is deleted
+public record IUserDeleted : CorrelatedBy<Guid>
+{
+    public Guid UserId { get; init; }
+    public DateTime Timestamp { get; init; }
+    public Guid CorrelationId { get; init; }
+}
+
+// Published when OTP is generated
+public record IUserOtpGenerated : CorrelatedBy<Guid>
+{
+    public Guid UserId { get; init; }
+    public string Email { get; init; }
+    public string OtpCode { get; init; }
+    public string OtpType { get; init; }
+    public DateTime Timestamp { get; init; }
+    public Guid CorrelationId { get; init; }
+}
+```
+
+### 2. CardEvents.cs
+
+```csharp
+// Published when card is added
+public record ICardAdded : CorrelatedBy<Guid>
+{
+    public Guid CardId { get; init; }
+    public Guid UserId { get; init; }
+    public string Last4 { get; init; }
+    public string CardholderName { get; init; }
+    public CardNetwork Network { get; init; }
+    public DateTime Timestamp { get; init; }
+    public Guid CorrelationId { get; init; }
+}
+```
+
+### 3. PaymentEvents.cs
+
+```csharp
+// Published when payment completes
+public record IPaymentCompleted : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public Guid UserId { get; init; }
+    public Guid CardId { get; init; }
+    public Guid BillId { get; init; }
+    public decimal Amount { get; init; }
+    public bool RewardsApplied { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+// Published when payment fails
+public record IPaymentFailed : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public string Error { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+// Published when OTP is generated for payment
+public record IPaymentOtpGenerated : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public Guid UserId { get; init; }
+    public string OtpCode { get; init; }
+    public DateTime ExpiresAt { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+// Published when payment is reversed
+public record IPaymentReversed : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public Guid CardId { get; init; }
+    public decimal Amount { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+```
+
+### 4. SagaOrchestrationEvents.cs
+
+These are the events used by the payment saga:
+
+```csharp
+// Start saga
+public record IStartPaymentOrchestration : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public Guid UserId { get; init; }
+    public Guid CardId { get; init; }
+    public Guid BillId { get; init; }
+    public decimal Amount { get; init; }
+    public decimal RewardsAmount { get; init; }
+    public bool RewardsRedeemed { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+// OTP events
+public record IOtpVerified : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+// Payment processing
+public record IStartPaymentProcess : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public Guid UserId { get; init; }
+    public Guid CardId { get; init; }
+    public Guid BillId { get; init; }
+    public decimal Amount { get; init; }
+    public decimal RewardsAmount { get; init; }
+}
+
+public record IPaymentProcessed : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+public record IPaymentProcessFailed : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public string Error { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+// Bill update
+public record IStartBillUpdate : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid PaymentId { get; init; }
+    public Guid BillId { get; init; }
+    public decimal AmountPaid { get; init; }
+    public decimal RewardsPoints { get; init; }
+}
+
+public record IBillUpdated : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid BillId { get; init; }
+    public decimal AmountPaid { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+public record IBillUpdateFailed : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid BillId { get; init; }
+    public string Error { get; init; }
+}
+
+// Reward redemption
+public record IStartRewardRedemption : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid UserId { get; init; }
+    public Guid BillId { get; init; }
+    public decimal Amount { get; init; }
+    public decimal RewardsAmount { get; init; }
+}
+
+public record IRewardRedemptionCompleted : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid UserId { get; init; }
+    public decimal PointsRedeemed { get; init; }
+    public decimal MonetaryValue { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+public record IRewardRedemptionFailed : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid UserId { get; init; }
+    public string Error { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+// Card deduction
+public record IStartCardDeduction : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid CardId { get; init; }
+    public decimal Amount { get; init; }
+    public Guid PaymentId { get; init; }
+}
+
+public record ICardDeducted : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid CardId { get; init; }
+    public decimal AmountDeducted { get; init; }
+    public decimal NewBalance { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+public record ICardDeductionFailed : CorrelatedBy<Guid>
+{
+    public Guid CorrelationId { get; init; }
+    public Guid CardId { get; init; }
+    public string Error { get; init; }
+}
+```
+
+---
+
+## PART 2: API GATEWAY
+
+**Location:** `/server/Gateway.API/`
+
+The API Gateway is the **single entry point** for all clients. It routes requests to appropriate microservices.
+
+---
+
+### Why API Gateway?
+
+```
+Without Gateway:
+Client → Identity Service (5001)
+Client → Card Service (5002)
+Client → Billing Service (5003)
+... (client needs to know all service URLs)
+
+With Gateway:
+Client → API Gateway (5006) → Routes to appropriate service
+```
+
+**Benefits:**
+- Single entry point
+- Authentication/authorization in one place
+- Rate limiting
+- Request routing
+- Protocol translation
+
+---
+
+### Ocelot Configuration
+
+**Location:** `/server/Gateway.API/ocelot.json`
+
+```json
+{
+  "Routes": [
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5001
+        }
+      ],
+      "UpstreamPathTemplate": "/api/v1/identity/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5002
+        }
+      ],
+      "UpstreamPathTemplate": "/api/v1/cards/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/issuers/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5002
+        }
+      ],
+      "UpstreamPathTemplate": "/api/v1/issuers/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5003
+        }
+      ],
+      "UpstreamPathTemplate": "/api/v1/billing/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/payments/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5004
+        }
+      ],
+      "UpstreamPathTemplate": "/api/v1/payments/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/notifications/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5005
+        }
+      ],
+      "UpstreamPathTemplate": "/api/v1/notifications/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    }
+  ],
+  "GlobalConfiguration": {
+    "BaseUrl": "http://localhost:5006",
+    "DownstreamScheme": "http"
+  }
+}
+```
+
+### Program.cs (Gateway)
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Add Ocelot
+builder.Services.AddOcelot();
+
+// Add JWT Authentication (same as services)
+builder.Services.AddJwtAuthentication(jwtOptions);
+
+// Add services for dependency injection
+builder.Services.AddControllers();
+
+// Add Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerForOcelot();
+
+var app = builder.Build();
+
+// Use Ocelot
+app.UseSwaggerForOcelotUI();
+app.UseOcelot().Wait();
+
+app.Run();
+```
+
+### How Requests Flow Through Gateway
+
+```
+Client Request: POST /api/v1/payments/initiate
+
+1. Request hits Gateway (port 5006)
+2. Ocelot reads ocelot.json
+3. Matches /api/v1/payments/{everything} route
+4. Forwards to: http://localhost:5004/api/v1/payments/initiate
+5. Payment Service processes request
+6. Response returned to Gateway
+7. Gateway returns response to Client
+```
+
+---
+
+## Understanding Dependency Injection Setup
+
+All services follow the same pattern in Program.cs:
+
+```csharp
+// 1. Add Controllers
+builder.Services.AddControllers();
+
+// 2. Add JWT Authentication (from Shared.Contracts)
+builder.Services.AddJwtAuthentication(jwtOptions);
+
+// 3. Add Database Context
+builder.Services.AddDbContext<MyDbContext>(options =>
+    options.UseSqlServer(connectionString));
+
+// 4. Add Repository
+builder.Services.AddScoped<IMyRepository, SqlMyRepository>();
+
+// 5. Add MediatR (discovers all Commands/Queries)
+builder.Services.AddMediatR(cfg =>
+    cfg.RegisterServicesFromAssembly(typeof(CreateItemCommand).Assembly));
+
+// 6. Add MassTransit (for RabbitMQ)
+builder.Services.AddMassTransit(x =>
+{
+    // Add consumers
+    x.AddConsumer<MyConsumer>();
+    
+    // Configure RabbitMQ
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host("localhost", "/", h => {
+            h.Username("guest");
+            h.Password("guest");
+        });
+        
+        cfg.ReceiveEndpoint("my-queue", e =>
+        {
+            e.ConfigureConsumer<MyConsumer>(context);
+        });
+    });
+});
+
+// 7. Add Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// 8. Add Background Services
+builder.Services.AddHostedService<MyBackgroundService>();
+
+// 9. Add HTTP Clients (for service-to-service calls)
+builder.Services.AddHttpClient<ICardServiceClient, CardServiceClient>();
+
+var app = builder.Build();
+
+// Middleware Pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseExceptionHandling();  // From Shared.Contracts
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+```
+
+---
+
+## Service-to-Service Communication
+
+### 1. Via Events (Asynchronous)
+
+Used for fire-and-forget operations:
+
+```csharp
+// Publishing
+await _publishEndpoint.Publish(new ICardAdded
+{
+    CardId = card.Id,
+    UserId = card.UserId,
+    Last4 = card.Last4
+});
+
+// Consuming (in another service)
+public class CardAddedConsumer : IConsumer<ICardAdded>
+{
+    public async Task Consume(ConsumeContext<ICardAdded> context)
+    {
+        var message = context.Message;
+        // Handle the event
+    }
+}
+```
+
+### 2. Via HTTP (Synchronous)
+
+Used when you need immediate response:
+
+```csharp
+// Define HTTP client interface
+public interface ICardServiceClient
+{
+    Task<CardDto?> GetCardAsync(Guid cardId);
+    Task<bool> ValidateCardOwnershipAsync(Guid cardId, Guid userId);
+}
+
+// Implementation
+public class CardServiceClient : ICardServiceClient
+{
+    private readonly HttpClient _httpClient;
+    
+    public CardServiceClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+        _httpClient.BaseAddress = new Uri("http://localhost:5002");
+    }
+    
+    public async Task<CardDto?> GetCardAsync(Guid cardId)
+    {
+        var response = await _httpClient.GetAsync($"/api/v1/cards/{cardId}");
+        if (!response.IsSuccessStatusCode) return null;
+        
+        var content = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<ApiResponse<CardDto>>(content)?.Data;
+    }
+}
+
+// Registration
+builder.Services.AddHttpClient<ICardServiceClient, CardServiceClient>();
+
+// Usage
+public class MyHandler : IRequestHandler<MyCommand, ApiResponse<MyResult>>
+{
+    private readonly ICardServiceClient _cardService;
+    
+    public MyHandler(ICardServiceClient cardService)
+    {
+        _cardService = cardService;
+    }
+    
+    public async Task<ApiResponse<MyResult>> Handle(MyCommand request, CancellationToken ct)
+    {
+        var card = await _cardService.GetCardAsync(request.CardId);
+        // ...
+    }
+}
+```
+
+---
+
+## Learning Sequence
+
+### Shared Contracts
+1. Read `ApiResponse.cs` - understand standard response format
+2. Read `BaseApiController.cs` - understand common controller features
+3. Read `ExceptionHandlingMiddleware.cs` - understand global error handling
+4. Read `JwtOptions.cs` - understand JWT configuration
+5. Read `ServiceCollectionExtensions.cs` - understand DI patterns
+6. Read all `Events/` files - understand message contracts
+
+### API Gateway
+1. Read `ocelot.json` - understand routing configuration
+2. Read `Program.cs` - understand gateway setup
+3. Trace a request through the gateway
+
+---
+
+*End of Shared Contracts & API Gateway Learning Guide*

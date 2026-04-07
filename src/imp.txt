@@ -1,0 +1,11 @@
+1. serilog register
+What else gets logged:
+- Application startup/shutdown events
+- MassTransit message publishing/consuming (if using message queues)
+- Background services (hosted services)
+- Dependency injection resolution
+- Health check results
+- Security events (login attempts, token generation)
+- External API calls (HTTP client requests)
+
+

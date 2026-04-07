@@ -2,11 +2,9 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using PaymentService.Application.Commands.Payments;
 using PaymentService.Application.Queries.Payments;
 using PaymentService.Domain.Enums;
-using PaymentService.Infrastructure.Persistence.Sql;
 using Shared.Contracts.Controllers;
 using Shared.Contracts.Models;
 

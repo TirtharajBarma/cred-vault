@@ -71,7 +71,7 @@ public sealed class CreateIssuerCommandHandler(
                 {
                     Id = issuer.Id,
                     Name = issuer.Name,
-                    Network = issuer.Network.ToString(),
+                    Network = (int)issuer.Network,
                     CreatedAtUtc = issuer.CreatedAtUtc,
                     UpdatedAtUtc = issuer.UpdatedAtUtc
                 }

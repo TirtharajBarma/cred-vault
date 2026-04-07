@@ -1,5 +1,4 @@
 using Shared.Contracts.Controllers;
-using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Commands.Cards;
 using CardService.Application.Commands.Transactions;
 using CardService.Application.Common;
@@ -149,29 +148,19 @@ public class CardsController(IMediator mediator) : BaseApiController
 
     [HttpGet("admin/{cardId:guid}")]
     [Authorize(Roles = "admin")]
-    public async Task<IActionResult> AdminGetCardById(
-        Guid cardId,
-        [FromServices] ICardRepository cardRepository,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> AdminGetCardById(Guid cardId, CancellationToken cancellationToken)
     {
-        var card = await cardRepository.GetByIdAsync(cardId, cancellationToken);
-        if (card is null) return CreateResponse(false, (object?)null, "Card not found.", "CardNotFound");
-
-        return CreateResponse(true, CardMapping.ToDto(card), "Card fetched successfully.");
+        var result = await mediator.Send(new AdminGetCardByIdQuery(cardId), cancellationToken);
+        if (!result.Success) return CreateResponse(false, (object?)null, result.Message);
+        return CreateResponse(result.Success, result.Data, result.Message);
     }
 
     [HttpGet("admin/{cardId:guid}/transactions")]
     [Authorize(Roles = "admin")]
-    public async Task<IActionResult> AdminGetCardTransactions(
-        Guid cardId,
-        [FromServices] ICardRepository cardRepository,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> AdminGetCardTransactions(Guid cardId, CancellationToken cancellationToken)
     {
-        var card = await cardRepository.GetByIdAsync(cardId, cancellationToken);
-        if (card is null) return CreateResponse(false, (object?)null, "Card not found.", "CardNotFound");
-
-        var txns = await cardRepository.GetTransactionsByCardIdAsync(cardId, cancellationToken);
-        return CreateResponse(true, txns, "Transactions fetched successfully.");
+        var result = await mediator.Send(new AdminGetCardTransactionsQuery(cardId), cancellationToken);
+        return CreateResponse(result.Success, result.Data, result.Message);
     }
 
     public sealed class UpdateCardByAdminRequest
@@ -187,46 +176,23 @@ public class CardsController(IMediator mediator) : BaseApiController
     public async Task<IActionResult> UpdateCardByAdmin(
         Guid cardId,
         [FromBody] UpdateCardByAdminRequest request,
-        [FromServices] ICardRepository cardRepository,
         CancellationToken cancellationToken)
     {
-        var card = await cardRepository.GetByIdAsync(cardId, cancellationToken);
-        if (card is null) return CreateResponse(false, (object?)null, "Card not found.", "CardNotFound");
-
-        if (!string.IsNullOrWhiteSpace(request.CardholderName))
-            card.CardholderName = request.CardholderName;
-
-        if (request.CreditLimit > 0)
-            card.CreditLimit = request.CreditLimit;
-
-        if (request.OutstandingBalance.HasValue)
-            card.OutstandingBalance = request.OutstandingBalance.Value;
-
-        if (request.BillingCycleStartDay.HasValue)
-        {
-            if (!CardHelpers.IsValidBillingCycleStartDay(request.BillingCycleStartDay.Value))
-            {
-                return CreateResponse(false, (object?)null, "Billing cycle day must be between 1 and 31.", "ValidationError");
-            }
-
-            card.BillingCycleStartDay = request.BillingCycleStartDay.Value;
-        }
-
-        card.UpdatedAtUtc = DateTime.UtcNow;
-        await cardRepository.UpdateAsync(card, cancellationToken);
-
-        return CreateResponse(true, CardMapping.ToDto(card), "Card updated successfully.");
+        var result = await mediator.Send(new UpdateCardByAdminCommand(
+            cardId,
+            request.CardholderName,
+            request.CreditLimit,
+            request.OutstandingBalance,
+            request.BillingCycleStartDay
+        ), cancellationToken);
+        return CreateResponse(result.Success, result.Data, result.Message);
     }
 
     [HttpGet("user/{userId:guid}")]
     [Authorize(Roles = "admin")]
-    public async Task<IActionResult> GetCardsByUserId(
-        Guid userId,
-        [FromServices] ICardRepository cardRepository,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> GetCardsByUserId(Guid userId, CancellationToken cancellationToken)
     {
-        var cards = await cardRepository.ListByUserIdAsync(userId, cancellationToken);
-        var dtos = cards.Select(CardMapping.ToDto).ToList();
-        return CreateResponse(true, dtos, "Cards fetched successfully.");
+        var result = await mediator.Send(new GetCardsByUserIdQuery(userId), cancellationToken);
+        return CreateResponse(result.Success, result.Data, result.Message);
     }
 }

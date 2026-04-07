@@ -30,6 +30,15 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
             cancellationToken);
     }
 
+    public async Task<bool> HasPendingBillForCardAsync(Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Bills.AnyAsync(
+            x => x.CardId == cardId
+                 && x.Status != BillStatus.Cancelled
+                 && (x.AmountPaid ?? 0) < x.Amount,
+            cancellationToken);
+    }
+
     public async Task<List<Bill>> GetOverdueBillsAsync(CancellationToken cancellationToken = default)
     {
         return await dbContext.Bills

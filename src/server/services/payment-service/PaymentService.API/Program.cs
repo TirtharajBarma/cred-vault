@@ -36,6 +36,7 @@ try
     builder.Host.UseSerilog();
 
     builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddStandardApi();
     builder.Services.AddCors(options =>
     {

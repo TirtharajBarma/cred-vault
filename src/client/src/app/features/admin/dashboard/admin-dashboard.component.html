@@ -74,7 +74,7 @@
   </div>
 
   <!-- Secondary Stats Row -->
-  <div class="grid grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
+  <div class="grid grid-cols-2 gap-3 lg:gap-4">
     <div class="glass-card-premium p-4 rounded-xl lg:rounded-2xl text-center">
       <p class="text-xl lg:text-2xl font-black text-red-500">{{ isLoading() ? '...' : stats().suspendedUsers }}</p>
       <p class="text-[9px] lg:text-[10px] font-bold text-misty-gray uppercase tracking-wider mt-1">Suspended</p>
@@ -82,10 +82,6 @@
     <div class="glass-card-premium p-4 rounded-xl lg:rounded-2xl text-center">
       <p class="text-xl lg:text-2xl font-black text-amber-500">{{ isLoading() ? '...' : stats().pendingUsers }}</p>
       <p class="text-[9px] lg:text-[10px] font-bold text-misty-gray uppercase tracking-wider mt-1">Pending</p>
-    </div>
-    <div class="glass-card-premium p-4 rounded-xl lg:rounded-2xl text-center col-span-2 lg:col-span-3">
-      <p class="text-xl lg:text-2xl font-black text-emerald-600">{{ stats().systemUptime }}</p>
-      <p class="text-[9px] lg:text-[10px] font-bold text-misty-gray uppercase tracking-wider mt-1">System Uptime</p>
     </div>
   </div>
 
@@ -141,7 +137,7 @@
     <!-- Quick Actions -->
     <section class="space-y-4">
       <h3 class="text-lg lg:text-xl font-black tracking-tight text-charcoal px-2">Administrative Actions</h3>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4">
         <button (click)="onGrantAccess()" class="glass-card-premium p-5 lg:p-6 rounded-2xl text-left group hover:bg-charcoal hover:translate-y-[-4px] transition-all duration-300">
           <div class="w-12 h-12 bg-primary rounded-xl lg:rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
             <span class="material-symbols-outlined text-charcoal font-black text-xl">person_add</span>
@@ -156,22 +152,6 @@
           </div>
           <h4 class="text-base lg:text-lg font-bold text-charcoal group-hover:text-white transition-colors">Bill Generation</h4>
           <p class="text-[9px] lg:text-[10px] font-semibold text-misty-gray group-hover:text-white/40 transition-colors mt-1">Create bills</p>
-        </button>
-
-        <button (click)="onResyncAssets()" class="glass-card-premium p-5 lg:p-6 rounded-2xl text-left group hover:bg-blue-600 hover:translate-y-[-4px] transition-all duration-300">
-          <div class="w-12 h-12 bg-blue-500/10 rounded-xl lg:rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/10 transition-all">
-            <span class="material-symbols-outlined text-blue-600 group-hover:text-white text-xl">sync</span>
-          </div>
-          <h4 class="text-base lg:text-lg font-bold text-charcoal group-hover:text-white transition-colors">Re-sync Assets</h4>
-          <p class="text-[9px] lg:text-[10px] font-semibold text-misty-gray group-hover:text-white/40 transition-colors mt-1">Sync balances</p>
-        </button>
-
-        <button (click)="onBlastUpdate()" class="glass-card-premium p-5 lg:p-6 rounded-2xl text-left group hover:bg-purple-600 hover:translate-y-[-4px] transition-all duration-300">
-          <div class="w-12 h-12 bg-purple-500/10 rounded-xl lg:rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/10 transition-all">
-            <span class="material-symbols-outlined text-purple-600 group-hover:text-white text-xl">mail</span>
-          </div>
-          <h4 class="text-base lg:text-lg font-bold text-charcoal group-hover:text-white transition-colors">Blast Update</h4>
-          <p class="text-[9px] lg:text-[10px] font-semibold text-misty-gray group-hover:text-white/40 transition-colors mt-1">Send notification</p>
         </button>
       </div>
 

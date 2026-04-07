@@ -13,6 +13,7 @@ public interface IRewardRepository
     Task DeleteTierAsync(RewardTier tier, CancellationToken cancellationToken = default);
 
     Task<RewardAccount?> GetAccountByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<List<RewardAccount>> GetAccountsByTierIdAsync(Guid tierId, CancellationToken cancellationToken = default);
     Task AddAccountAsync(RewardAccount account, CancellationToken cancellationToken = default);
     Task UpdateAccountAsync(RewardAccount account, CancellationToken cancellationToken = default);
 

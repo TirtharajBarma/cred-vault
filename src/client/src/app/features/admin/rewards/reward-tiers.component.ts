@@ -143,6 +143,11 @@ export class RewardTiersComponent implements OnInit {
   }
 
   confirmDelete(tier: RewardTier) {
+    if (!tier?.id || tier.id === 'null' || tier.id === 'undefined') {
+      this.errorMessage.set('Unable to delete this tier right now. Please refresh and try again.');
+      return;
+    }
+
     this.deleteErrorMessage.set(null);
     this.errorMessage.set(null);
     this.successMessage.set(null);
@@ -183,7 +188,26 @@ export class RewardTiersComponent implements OnInit {
         this.isDeleting.set(false);
       },
       error: (err) => {
+        const status = err?.status;
         const backendMessage = err?.error?.message || 'Failed to delete tier';
+        if (status === 401 || status === 403) {
+          this.errorMessage.set('Your session expired or you do not have permission to delete this tier. Please sign in again.');
+          this.deleteErrorMessage.set(this.errorMessage());
+          this.isDeleting.set(false);
+          return;
+        }
+
+        if (status === 404) {
+          this.errorMessage.set('Tier not found. It may have already been deleted. Refreshing list...');
+          this.deleteErrorMessage.set(this.errorMessage());
+          this.showDeleteConfirm.set(false);
+          this.deleteTargetId.set(null);
+          this.deleteTargetName.set('');
+          this.fetchTiers();
+          this.isDeleting.set(false);
+          return;
+        }
+
         const message = backendMessage.includes('existing reward accounts')
           ? `${backendMessage} This tier is currently in use by user reward accounts.`
           : backendMessage;
@@ -250,8 +274,16 @@ export class RewardTiersComponent implements OnInit {
 
   getAvailableIssuersForSelectedNetwork(): CardIssuer[] {
     const selectedNetwork = this.tierForm.get('cardNetwork')?.value;
-    if (!selectedNetwork) return this.issuers();
-    return this.issuers().filter((issuer) => issuer.network === selectedNetwork);
+    return [...this.issuers()].sort((a, b) => {
+      const aPriority = selectedNetwork && a.network === selectedNetwork ? 0 : 1;
+      const bPriority = selectedNetwork && b.network === selectedNetwork ? 0 : 1;
+
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
   }
 
   onNetworkSelectionChange(): void {
@@ -262,6 +294,19 @@ export class RewardTiersComponent implements OnInit {
     const selectedIssuer = this.issuers().find((issuer) => issuer.id === selectedIssuerId);
     if (!selectedIssuer || selectedIssuer.network !== selectedNetwork) {
       this.tierForm.patchValue({ issuerId: null });
+    }
+  }
+
+  onIssuerSelectionChange(): void {
+    const selectedIssuerId = this.tierForm.get('issuerId')?.value;
+    if (!selectedIssuerId) return;
+
+    const selectedIssuer = this.issuers().find((issuer) => issuer.id === selectedIssuerId);
+    if (!selectedIssuer) return;
+
+    const selectedNetwork = this.tierForm.get('cardNetwork')?.value;
+    if (selectedNetwork !== selectedIssuer.network) {
+      this.tierForm.patchValue({ cardNetwork: selectedIssuer.network });
     }
   }
 

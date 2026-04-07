@@ -43,24 +43,7 @@ export class StatementDetailComponent implements OnInit {
       error: () => this.cards.set([])
     });
 
-    this.statementService.getStatementByBillId(id).subscribe({
-      next: (billRes) => {
-        const billLookupData = billRes.data;
-        const statementFromBill = Array.isArray(billLookupData)
-          ? billLookupData[0]
-          : billLookupData;
-
-        if (billRes.success && statementFromBill?.id) {
-          this.fetchStatementDetail(statementFromBill.id);
-          return;
-        }
-
-        this.fetchStatementDetail(id);
-      },
-      error: () => {
-        this.fetchStatementDetail(id);
-      }
-    });
+    this.fetchStatementDetail(id);
   }
 
   private fetchStatementDetail(statementId: string): void {

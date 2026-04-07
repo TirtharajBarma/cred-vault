@@ -1,0 +1,590 @@
+# CREDVAULT MICROSERVICES - COMPLETE LEARNING GUIDE
+
+## System Overview
+
+CredVault is a **credit card management platform** built with microservices architecture. It allows users to:
+- Register/login (with email verification, OTP, Google auth)
+- Add and manage credit cards
+- Track card transactions
+- View bills and statements
+- Make payments
+- Earn and redeem reward points
+
+---
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT (Angular 21)                        │
+└─────────────────────────────────┬───────────────────────────────────────┘
+                                  │ HTTP/REST
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          API GATEWAY (Ocelot)                          │
+│                        Port: 5006                                      │
+│              Routes requests to appropriate services                   │
+└─┬───────┬───────┬───────┬───────────┬───────────┬─────────────────────┘
+  │       │       │       │           │           │
+  ▼       ▼       ▼       ▼           ▼           ▼
+┌────┐ ┌────┐ ┌────┐ ┌────────┐ ┌─────────┐ ┌────────────┐
+│Iden│ │Card│ │Bill│ │Payment │ │Notification│ │  (Shared)   │
+│tity│ │Svc │ │Svc │ │ Service │ │  Service  │ │ Contracts  │
+│:5001│ :5002│ :5003│ │ :5004  │ │  :5005   │ │            │
+└──┬──┘ └──┬─┘ └──┬─┘ └───┬───┘ └────┬────┘ └────────────┘
+   │        │       │        │          │
+   │        │       │        │          │  MassTransit/RabbitMQ
+   │        │       │        │          │  (Async messaging)
+   │        │       │        │          │
+   ▼        ▼       ▼        ▼          ▼
+┌─────────────────────────────────────────────────┐
+│                    SQL Server                    │
+│  ┌──────────┐ ┌──────────┐ ┌─────────────────┐  │
+│  │credvault │ │credvault │ │ credvault_      │  │
+│  │_identity │ │_cards    │ │ billing         │  │
+│  └──────────┘ └──────────┘ └─────────────────┘  │
+│  ┌────────────────┐  ┌────────────────────────┐  │
+│  │credvault_      │  │ (notifications use    │  │
+│  │payments        │  │  per-service DB)     │  │
+│  └────────────────┘  └────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## All Services Summary
+
+| Service | Port | Database | Purpose |
+|---------|------|----------|---------|
+| **Identity Service** | 5001 | credvault_identity | User authentication, registration, JWT |
+| **Card Service** | 5002 | credvault_cards | Credit cards, issuers, transactions |
+| **Billing Service** | 5003 | credvault_billing | Bills, statements, rewards |
+| **Payment Service** | 5004 | credvault_payments | Payment processing, sagas |
+| **Notification Service** | 5005 | Per-service | Emails, audit logs |
+| **API Gateway** | 5006 | N/A | Routes requests |
+| **Shared Contracts** | N/A | N/A | Events, DTOs, helpers |
+
+---
+
+## How Data Flows Through the System
+
+### 1. User Registration Flow
+```
+Angular App
+    │
+    ▼ POST /api/v1/identity/auth/register
+Identity Service
+    ├── Creates user in identity_users table
+    ├── Generates OTP for email verification
+    └── Publishes IUserRegistered event
+          │
+          ▼ (RabbitMQ)
+Notification Service
+    ├── Sends verification email
+    └── Logs notification
+```
+
+### 2. Add Card Flow
+```
+Angular App
+    │
+    ▼ POST /api/v1/cards
+Card Service
+    ├── Validates card number (Luhn algorithm)
+    ├── Detects card network (Visa/Mastercard)
+    ├── Creates CreditCard record
+    ├── Publishes ICardAdded event
+    └── Returns card (masked)
+          │
+          ▼ (RabbitMQ)
+Notification Service
+    └── Logs card addition
+```
+
+### 3. Make Payment Flow (Saga Orchestration)
+```
+Angular App
+    │
+    ▼ POST /api/v1/payments/initiate
+Payment Service
+    │
+    ├── Creates Payment record (Status: Initiated)
+    ├── Publishes IStartPaymentOrchestration
+    └── Starts PaymentOrchestrationSaga
+          │
+          ▼ OTP Step
+    Saga State: AwaitingOtpVerification
+    ├── Generates OTP
+    └── Publishes IPaymentOtpGenerated
+          │
+          ▼ (RabbitMQ)
+Notification Service
+    └── Sends OTP via email/SMS
+          │
+          ▼ User submits OTP
+    ▼ POST /api/v1/payments/verify-otp
+Payment Service
+    ├── Saga: OtpVerified = true
+    ├── Publishes IPaymentOtpVerified
+    └── Saga transitions to AwaitingPaymentConfirmation
+          │
+          ▼ Payment Processing Step
+    Saga State: AwaitingPaymentConfirmation
+    ├── Calls Billing Service (verify bill)
+    └── Publishes IStartPaymentProcess
+          │
+          ▼ (RabbitMQ)
+    PaymentProcessConsumer
+    ├── Updates Payment (Status: Processing)
+    └── Publishes IPaymentProcessed
+          │
+          ▼ Bill Update Step
+    Saga State: AwaitingBillUpdate
+    └── Publishes IStartBillUpdate
+          │
+          ▼ (RabbitMQ)
+    BillUpdateSagaConsumer (in Billing Service)
+    ├── Updates Bill (Status: Paid/PartiallyPaid)
+    └── Publishes IBillUpdated
+          │
+          ▼ Reward Redemption Step
+    Saga State: AwaitingRewardRedemption
+    └── Publishes IStartRewardRedemption
+          │
+          ▼ (RabbitMQ)
+    RewardRedemptionConsumer
+    ├── Calculates rewards
+    ├── Updates RewardAccount
+    └── Publishes IRewardRedemptionCompleted
+          │
+          ▼ Card Deduction Step
+    Saga State: AwaitingCardDeduction
+    └── Publishes IStartCardDeduction
+          │
+          ▼ (RabbitMQ)
+    CardDeductionSagaConsumer (in Card Service)
+    ├── Updates CreditCard (balance deducted)
+    └── Publishes ICardDeducted
+          │
+          ▼ Completion
+    Saga State: Completed
+    └── Publishes IPaymentCompleted
+          │
+          ▼ (RabbitMQ)
+    PaymentCompletedConsumer
+    ├── Updates Payment (Status: Completed)
+    ├── Creates Transaction ledger record
+    └── Publishes IPaymentCompleted (for notification)
+          │
+          ▼ (RabbitMQ)
+    DomainEventConsumer
+    └── Sends payment confirmation email
+```
+
+### 4. If Payment Fails (Compensation)
+```
+Saga State: Compensating
+    │
+    ├── CardDeducted = true? → Publish IRevertCardDeduction
+    ├── BillUpdated = true? → Publish IRevertBill
+    └── RewardsRedeemed = true? → Publish IRevertRewardRedemption
+    │
+    ▼
+Saga State: Compensated
+    └── Payment (Status: Failed)
+```
+
+---
+
+## Shared Components
+
+### Shared Contracts Library (`/server/shared.contracts/`)
+
+This is the **glue** that holds all services together:
+
+```
+shared.contracts/
+├── Configuration/
+│   └── JwtOptions.cs          # JWT settings
+├── Controllers/
+│   └── BaseApiController.cs   # Base controller for all
+├── DTOs/
+│   └── OperationResult.cs     # Standard result type
+├── Enums/
+│   └── CardNetwork.cs         # Visa, Mastercard enum
+├── Events/                     # MASSAGING CONTRACTS
+│   ├── Identity/
+│   │   └── IdentityEvents.cs  # User events
+│   ├── Card/
+│   │   └── CardEvents.cs      # Card events
+│   ├── Payment/
+│   │   └── PaymentEvents.cs   # Payment events
+│   ├── Billing/
+│   │   └── BillingEvents.cs   # Billing events
+│   └── Saga/
+│       └── SagaOrchestrationEvents.cs  # Saga events
+├── Extensions/
+│   └── ServiceCollectionExtensions.cs  # DI helpers
+├── Middleware/
+│   └── ExceptionHandlingMiddleware.cs  # Global error handling
+└── Models/
+    └── ApiResponse.cs         # Standard API response
+```
+
+---
+
+## Common Patterns Used Everywhere
+
+### 1. Clean Architecture (per service)
+```
+Service/
+├── Service.Domain/           # Entities, Enums, Interfaces
+│   ├── Entities/
+│   ├── Enums/
+│   └── Interfaces/
+├── Service.Application/     # Business Logic
+│   ├── Commands/           # Write operations
+│   ├── Queries/            # Read operations
+│   ├── Interfaces/         # Repository interfaces
+│   └── Services/           # Application services
+├── Service.Infrastructure/  # External concerns
+│   ├── Persistence/        # EF Core, Repositories
+│   ├── Messaging/          # MassTransit config
+│   └── Services/           # External integrations
+└── Service.API/             # Controllers
+    ├── Controllers/
+    └── Program.cs
+```
+
+### 2. Command/Query Pattern (MediatR)
+```csharp
+// Commands = Write operations
+public class CreateCardCommand : IRequest<ApiResponse<Guid>>
+{
+    public string CardNumber { get; set; }
+    // ...
+}
+
+// Query = Read operations
+public class ListMyCardsQuery : IRequest<ApiResponse<List<CardDto>>>
+{
+    // ...
+}
+```
+
+### 3. Repository Pattern
+```csharp
+// Interface (Application layer)
+public interface ICardRepository
+{
+    Task<CreditCard> GetByIdAsync(Guid id);
+    Task<List<CreditCard>> GetByUserIdAsync(Guid userId);
+    Task<CreditCard> AddAsync(CreditCard card);
+    // ...
+}
+
+// Implementation (Infrastructure layer)
+public class SqlCardRepository : ICardRepository
+{
+    private readonly CardDbContext _context;
+    // ... implementation
+}
+```
+
+### 4. Event-Driven Communication
+```csharp
+// Publishing an event
+await _publishEndpoint.Publish(new ICardAdded
+{
+    CardId = card.Id,
+    UserId = card.UserId,
+    Last4 = card.Last4
+});
+
+// Consuming an event
+public class UserDeletedConsumer : IConsumer<IUserDeleted>
+{
+    public async Task Consume(ConsumeContext<IUserDeleted> context)
+    {
+        // Handle the event
+    }
+}
+```
+
+---
+
+## Database Schema Overview
+
+### Identity Service (`credvault_identity`)
+```
+identity_users
+├── Id (PK, GUID)
+├── Email (unique)
+├── FullName
+├── PasswordHash
+├── IsEmailVerified
+├── EmailVerificationOtp / ExpiresAt
+├── PasswordResetOtp / ExpiresAt
+├── Status (pending-verification/active/suspended/blocked/deleted)
+├── Role (admin/user)
+├── CreatedAtUtc
+└── UpdatedAtUtc
+```
+
+### Card Service (`credvault_cards`)
+```
+card_issuers
+├── Id (PK)
+├── Name
+├── Network (Visa/Mastercard)
+├── CreatedAtUtc
+└── UpdatedAtUtc
+
+credit_cards
+├── Id (PK)
+├── UserId (FK → identity_users)
+├── IssuerId (FK → card_issuers)
+├── CardholderName
+├── ExpMonth / ExpYear
+├── Last4 / MaskedNumber
+├── CreditLimit / OutstandingBalance
+├── BillingCycleStartDay
+├── IsDefault
+├── IsVerified / VerifiedAtUtc
+├── IsDeleted / DeletedAtUtc (soft delete)
+├── CreatedAtUtc
+└── UpdatedAtUtc
+
+card_transactions
+├── Id (PK)
+├── CardId (FK → credit_cards)
+├── UserId
+├── Type (Purchase/Payment/Refund)
+├── Amount
+├── Description
+├── DateUtc
+└── (no soft delete - permanent record)
+```
+
+### Billing Service (`credvault_billing`)
+```
+bills
+├── Id (PK)
+├── UserId (FK → identity_users)
+├── CardId (FK → credit_cards)
+├── CardNetwork / IssuerId
+├── Amount / MinDue
+├── Currency (INR)
+├── BillingDateUtc / DueDateUtc
+├── AmountPaid / PaidAtUtc
+├── Status (Pending/Paid/Overdue/Cancelled/PartiallyPaid)
+├── CreatedAtUtc
+└── UpdatedAtUtc
+
+reward_tiers
+├── Id (PK)
+├── CardNetwork / IssuerId
+├── MinSpend
+├── RewardRate (e.g., 0.015 = 1.5%)
+├── EffectiveFromUtc / EffectiveToUtc
+├── CreatedAtUtc
+└── UpdatedAtUtc
+
+reward_accounts
+├── Id (PK)
+├── UserId (unique FK → identity_users)
+├── RewardTierId (FK → reward_tiers)
+├── PointsBalance
+├── CreatedAtUtc
+└── UpdatedAtUtc
+
+reward_transactions
+├── Id (PK)
+├── RewardAccountId (FK → reward_accounts)
+├── BillId (FK → bills, nullable)
+├── Points
+├── Type (Earned/Adjusted/Redeemed/Reversed)
+├── CreatedAtUtc
+└── ReversedAtUtc
+
+statements
+├── Id (PK)
+├── UserId / CardId / BillId
+├── StatementPeriod
+├── PeriodStartUtc / PeriodEndUtc
+├── OpeningBalance / ClosingBalance
+├── TotalPurchases / TotalPayments / TotalRefunds
+├── PenaltyCharges / InterestCharges
+├── MinimumDue / AmountPaid
+├── Status
+├── CardLast4 / CardNetwork / IssuerName
+├── CreditLimit / AvailableCredit
+├── CreatedAtUtc
+└── UpdatedAtUtc
+
+statement_transactions
+├── Id (PK)
+├── StatementId (FK → statements)
+├── SourceTransactionId (FK → card_transactions)
+├── Type / Amount / Description / DateUtc
+└── CreatedAtUtc
+```
+
+### Payment Service (`credvault_payments`)
+```
+payments
+├── Id (PK)
+├── UserId / CardId / BillId
+├── Amount
+├── PaymentType (Full/Partial/Scheduled)
+├── Status (Initiated/Processing/Completed/Failed/Reversed/Cancelled)
+├── FailureReason
+├── OtpCode / OtpExpiresAtUtc
+├── CreatedAtUtc
+└── UpdatedAtUtc
+
+transactions (ledger)
+├── Id (PK)
+├── PaymentId (FK → payments)
+├── UserId
+├── Amount
+├── Type (Payment/Reversal)
+├── Description
+└── CreatedAtUtc
+
+payment_orchestration_saga_state (MassTransit)
+├── CorrelationId (PK)
+├── CurrentState
+├── PaymentId / UserId
+├── CardId / BillId / Amount
+├── OtpVerified
+├── PaymentProcessed / BillUpdated / CardDeducted
+├── RewardsRedeemed / RewardsAmount
+├── Various Error fields
+├── CompensationReason / CompensationAttempts
+├── CreatedAtUtc
+└── UpdatedAtUtc
+```
+
+---
+
+## API Endpoints Summary
+
+### Identity Service (5001)
+```
+POST   /api/v1/identity/auth/register         # Register
+POST   /api/v1/identity/auth/login            # Login (returns JWT)
+POST   /api/v1/identity/auth/google           # Google OAuth
+POST   /api/v1/identity/auth/verify-email      # Verify email OTP
+POST   /api/v1/identity/auth/forgot-password   # Forgot password
+POST   /api/v1/identity/auth/reset-password    # Reset with OTP
+POST   /api/v1/identity/auth/resend-otp        # Resend verification OTP
+
+GET    /api/v1/identity/users/me              # Get current user
+PUT    /api/v1/identity/users/me              # Update profile
+PUT    /api/v1/identity/users/me/password      # Change password
+GET    /api/v1/identity/users                  # Admin: list users
+GET    /api/v1/identity/users/:id             # Admin: get user
+PUT    /api/v1/identity/users/:id/status      # Admin: update status
+PUT    /api/v1/identity/users/:id/role        # Admin: update role
+
+GET    /api/v1/identity/health                # Health check
+```
+
+### Card Service (5002)
+```
+POST   /api/v1/cards                          # Add card
+GET    /api/v1/cards                          # List my cards
+GET    /api/v1/cards/:id                      # Get card details
+PUT    /api/v1/cards/:id                      # Update card
+DELETE /api/v1/cards/:id                      # Delete card
+PUT    /api/v1/cards/:id/admin                # Admin: update limits
+
+POST   /api/v1/cards/:id/transactions         # Add transaction
+GET    /api/v1/cards/:id/transactions         # List card transactions
+GET    /api/v1/cards/transactions             # List all my transactions
+
+POST   /api/v1/issuers                        # Admin: create issuer
+GET    /api/v1/issuers                        # List issuers
+GET    /api/v1/issuers/:id                    # Get issuer
+PUT    /api/v1/issuers/:id                    # Admin: update issuer
+DELETE /api/v1/issuers/:id                    # Admin: delete issuer
+
+GET    /api/v1/cards/health                   # Health check
+```
+
+### Billing Service (5003)
+```
+POST   /api/v1/billing/bills/generate         # Admin: generate bill
+GET    /api/v1/billing/bills                   # List user's bills
+GET    /api/v1/billing/bills/:id              # Get bill details
+PUT    /api/v1/billing/bills/:id/mark-paid    # Mark as paid
+POST   /api/v1/billing/bills/check-overdue    # Admin: check overdue
+
+GET    /api/v1/billing/statements             # List statements
+GET    /api/v1/billing/statements/:id         # Get statement
+POST   /api/v1/billing/statements/generate    # Generate statement
+
+GET    /api/v1/billing/rewards/tiers          # List reward tiers
+POST   /api/v1/billing/rewards/tiers          # Admin: create tier
+PUT    /api/v1/billing/rewards/tiers/:id     # Admin: update tier
+DELETE /api/v1/billing/rewards/tiers/:id     # Admin: delete tier
+GET    /api/v1/billing/rewards/account        # Get my rewards account
+POST   /api/v1/billing/rewards/redeem          # Redeem points
+
+GET    /api/v1/billing/health                 # Health check
+```
+
+### Payment Service (5004)
+```
+POST   /api/v1/payments/initiate              # Start payment
+POST   /api/v1/payments/verify-otp            # Verify OTP
+POST   /api/v1/payments/resend-otp            # Resend OTP
+GET    /api/v1/payments                       # List my payments
+GET    /api/v1/payments/:id                   # Get payment details
+
+GET    /api/v1/payments/health               # Health check
+```
+
+### Notification Service (5005)
+```
+GET    /api/v1/notifications/logs             # Get notification logs
+GET    /api/v1/notifications/audit            # Get audit logs
+
+GET    /api/v1/notifications/health          # Health check
+```
+
+---
+
+## Learning Path
+
+### Phase 1: Foundation (Start Here)
+1. **Shared Contracts** - Understand the common types, events, and patterns
+2. **Identity Service** - Simplest service, introduces basic patterns
+
+### Phase 2: Core Services
+3. **Card Service** - Entities, CRUD, basic event publishing
+4. **Billing Service** - More complex entities, background jobs
+
+### Phase 3: Advanced
+5. **Payment Service** - Saga orchestration (most complex)
+6. **API Gateway** - How routing works
+
+### Phase 4: Integration
+7. **Understanding the flow** - How services communicate
+8. **Testing strategies** - Unit tests, integration tests
+
+---
+
+## Key Files to Read First
+
+1. `/server/shared.contracts/Shared.Contracts/Events/` - All message contracts
+2. `/server/shared.contracts/Shared.Contracts/Models/ApiResponse.cs` - Response format
+3. `/server/shared.contracts/Shared.Contracts/Controllers/BaseApiController.cs` - Base controller
+4. `/server/shared.contracts/Shared.Contracts/Middleware/ExceptionHandlingMiddleware.cs` - Error handling
+5. Any service's `Program.cs` - DI configuration
+6. Any service's `*DbContext.cs` - Database schema definition
+
+---
+
+*Document for Capgemini Sprint Learning*

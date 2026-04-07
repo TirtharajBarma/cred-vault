@@ -1,6 +1,7 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DashboardService } from '../../core/services/dashboard.service';
+import { AdminService } from '../../core/services/admin.service';
 import { AuthService } from '../../core/services/auth.service';
 import { CreditCard, CardTransaction, TransactionType } from '../../core/models/card.models';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -18,6 +19,7 @@ import { RouterLink } from '@angular/router';
 })
 export class DashboardComponent implements OnInit {
   private dashboardService = inject(DashboardService);
+  private adminService = inject(AdminService);
   private authService = inject(AuthService);
   private fb = inject(FormBuilder);
 
@@ -84,7 +86,7 @@ export class DashboardComponent implements OnInit {
   }
 
   loadIssuers(): void {
-    this.dashboardService.getIssuers().subscribe(res => {
+    this.adminService.getIssuers().subscribe(res => {
       if (res.success) this.issuers.set(res.data || []);
     });
   }
@@ -264,12 +266,31 @@ export class DashboardComponent implements OnInit {
   showDeleteConfirm = signal(false);
   deleteCardId = signal<string | null>(null);
   deleteCardName = signal<string | null>(null);
+  deleteErrorMessage = signal<string | null>(null);
+  deleteBlockedReason = signal<string | null>(null);
+
+  hasOutstandingBalance(cardId: string | null): boolean {
+    if (!cardId) return false;
+    const card = this.cards().find(item => item.id === cardId);
+    if (!card) return false;
+
+    return Number(card.outstandingBalance) > 0;
+  }
 
   confirmDeleteCard(cardId: string, cardName: string, event: Event): void {
     event.stopPropagation();
     event.preventDefault();
+
+    this.deleteErrorMessage.set(null);
     this.deleteCardId.set(cardId);
     this.deleteCardName.set(cardName);
+
+    if (this.hasOutstandingBalance(cardId)) {
+      this.deleteBlockedReason.set('Cannot delete card with outstanding balance. Pay your bill first.');
+    } else {
+      this.deleteBlockedReason.set(null);
+    }
+
     this.showDeleteConfirm.set(true);
   }
 
@@ -277,11 +298,17 @@ export class DashboardComponent implements OnInit {
     this.showDeleteConfirm.set(false);
     this.deleteCardId.set(null);
     this.deleteCardName.set(null);
+    this.deleteErrorMessage.set(null);
+    this.deleteBlockedReason.set(null);
   }
 
   executeDeleteCard(): void {
     const cardId = this.deleteCardId();
     if (!cardId) return;
+
+    if (this.deleteBlockedReason()) {
+      return;
+    }
 
     this.dashboardService.deleteCard(cardId).subscribe({
       next: () => {
@@ -290,16 +317,10 @@ export class DashboardComponent implements OnInit {
       },
       error: (err) => {
         console.error('[Dashboard] Delete card failed:', err);
-        this.cancelDelete();
+
+        const backendMessage = err?.error?.message;
+        this.deleteErrorMessage.set(backendMessage || 'Unable to delete this card right now. Please try again.');
       }
     });
-  }
-
-  showNotConfiguredModal = signal(false);
-  notConfiguredCard = signal<CreditCard | null>(null);
-
-  openCardNotConfigured(event: Event): void {
-    event.stopPropagation();
-    event.preventDefault();
   }
 }

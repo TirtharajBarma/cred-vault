@@ -28,7 +28,8 @@ export class StatementsComponent implements OnInit {
   itemsPerPage = 7;
 
   sortedStatements = computed(() => {
-    let filtered = this.statements();
+    const visibleCardIds = new Set(this.cardOptions().map(card => card.id));
+    let filtered = this.statements().filter(statement => visibleCardIds.has(statement.cardId));
     const cardFilter = this.selectedCardFilter();
     const monthFilter = this.selectedMonthFilter();
     
@@ -52,7 +53,7 @@ export class StatementsComponent implements OnInit {
   cardOptions = computed(() => {
     const statementCardIds = new Set(this.statements().map(s => s.cardId));
 
-    const cardsFromProfile = this.cards()
+    return this.cards()
       .filter(c => statementCardIds.has(c.id))
       .map(c => ({
         id: c.id,
@@ -60,22 +61,6 @@ export class StatementsComponent implements OnInit {
         issuerName: c.issuerName,
         network: c.network
       }));
-
-    const cardsFromStatements = this.statements()
-      .filter(s => !cardsFromProfile.some(c => c.id === s.cardId))
-      .reduce((acc, s) => {
-        if (!acc.some(c => c.id === s.cardId)) {
-          acc.push({
-            id: s.cardId,
-            last4: s.cardLast4,
-            issuerName: s.issuerName,
-            network: s.cardNetwork
-          });
-        }
-        return acc;
-      }, [] as Array<{ id: string; last4: string; issuerName: string; network: string }>);
-
-    return [...cardsFromProfile, ...cardsFromStatements];
   });
 
   getCardDisplay(cardId: string): string {
@@ -111,16 +96,28 @@ export class StatementsComponent implements OnInit {
     this.dashboardService.getCards().subscribe({
       next: (res) => {
         this.cards.set(res.data || []);
+        this.syncSelectedCardFilter();
       },
       error: () => this.isLoading.set(false)
     });
     this.statementService.getMyStatements().subscribe({
       next: (res) => {
         this.statements.set(res.data || []);
+        this.syncSelectedCardFilter();
         this.isLoading.set(false);
       },
       error: () => this.isLoading.set(false)
     });
+  }
+
+  private syncSelectedCardFilter(): void {
+    const selected = this.selectedCardFilter();
+    if (selected === 'all') return;
+
+    const isVisibleOption = this.cardOptions().some(card => card.id === selected);
+    if (!isVisibleOption) {
+      this.selectedCardFilter.set('all');
+    }
   }
 
   toggleFilterDropdown(): void {

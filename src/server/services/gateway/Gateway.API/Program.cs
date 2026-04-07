@@ -18,14 +18,14 @@ builder.Configuration
     .AddJsonFile("ocelot.json", optional: false, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Services.AddOpenApi();
+builder.Services.AddStandardApi();
 builder.Services.AddOcelot(builder.Configuration);
 
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseStandardApi("Gateway API");
 }
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "gateway" }));

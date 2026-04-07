@@ -59,6 +59,13 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
         return await dbContext.RewardAccounts.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
     }
 
+    public async Task<List<RewardAccount>> GetAccountsByTierIdAsync(Guid tierId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RewardAccounts
+            .Where(x => x.RewardTierId == tierId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAccountAsync(RewardAccount account, CancellationToken cancellationToken = default)
     {
         await dbContext.RewardAccounts.AddAsync(account, cancellationToken);

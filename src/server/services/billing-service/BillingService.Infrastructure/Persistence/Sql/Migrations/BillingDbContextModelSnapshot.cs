@@ -95,7 +95,7 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.Property<decimal>("PointsBalance")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<Guid>("RewardTierId")
+                    b.Property<Guid?>("RewardTierId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("UpdatedAtUtc")
@@ -105,8 +105,6 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("RewardTierId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -332,15 +330,6 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.HasIndex("StatementId");
 
                     b.ToTable("StatementTransactions", (string)null);
-                });
-
-            modelBuilder.Entity("BillingService.Domain.Entities.RewardAccount", b =>
-                {
-                    b.HasOne("BillingService.Domain.Entities.RewardTier", null)
-                        .WithMany()
-                        .HasForeignKey("RewardTierId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("BillingService.Domain.Entities.RewardTransaction", b =>

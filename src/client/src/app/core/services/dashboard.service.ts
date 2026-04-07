@@ -18,16 +18,8 @@ export class DashboardService {
     return this.http.get<ApiResponse<CreditCard[]>>(this.baseUrl);
   }
 
-  getIssuers(): Observable<ApiResponse<CardIssuer[]>> {
-    return this.http.get<ApiResponse<CardIssuer[]>>(`${API_GATEWAY}/api/v1/issuers`);
-  }
-
   getAllTransactions(): Observable<ApiResponse<CardTransaction[]>> {
     return this.http.get<ApiResponse<CardTransaction[]>>(`${this.baseUrl}/transactions`);
-  }
-
-  getRewardAccount(): Observable<ApiResponse<any>> {
-    return this.http.get<ApiResponse<any>>(`${API_GATEWAY}/api/v1/billing/rewards/account`);
   }
 
   getCardById(cardId: string): Observable<ApiResponse<CreditCard>> {

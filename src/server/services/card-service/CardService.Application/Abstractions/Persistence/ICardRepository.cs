@@ -29,5 +29,4 @@ public interface ICardRepository
     Task<bool> HasCardsByIssuerAsync(Guid issuerId, CancellationToken cancellationToken = default);
 
     Task<List<CreditCard>> GetBlockedCardsAsync(CancellationToken cancellationToken = default);
-    Task<bool> HasTransactionsAsync(Guid cardId, CancellationToken cancellationToken = default);
 }

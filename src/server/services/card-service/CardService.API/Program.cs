@@ -1,10 +1,12 @@
 using Shared.Contracts.Middleware;
 using Shared.Contracts.Extensions;
 using CardService.Application.Abstractions.Persistence;
+using CardService.Application.Interfaces;
 using CardService.Application.Commands.Cards;
 using CardService.Application.Queries.Cards;
 using CardService.API.Messaging;
 using CardService.Infrastructure.Persistence.Sql;
+using CardService.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using MassTransit;
 using Shared.Contracts.Events.Identity;
@@ -32,6 +34,7 @@ try
     builder.Host.UseSerilog();
 
     builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddStandardApi();
     builder.Services.AddCors(options =>
     {
@@ -56,6 +59,7 @@ try
         o.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     });
     builder.Services.AddScoped<ICardRepository, SqlCardRepository>();
+    builder.Services.AddHttpClient<IBillingServiceClient, BillingServiceClient>();
 
     builder.Services.AddMassTransit(x =>
     {
@@ -63,7 +67,6 @@ try
         x.AddConsumer<PaymentReversedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<CardDeductionSagaConsumer>();
-        x.AddConsumer<BillPaidConsumer>();
 
         x.UsingRabbitMq((ctx, cfg) =>
         {
@@ -81,13 +84,11 @@ try
 
                 e.Bind<IUserDeleted>();
                 e.Bind<ICardDeductionRequested>();
-                e.Bind<IBillUpdateSucceeded>();
                 e.Bind<IPaymentReversed>();
 
                 e.ConfigureConsumer<PaymentReversedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<CardDeductionSagaConsumer>(ctx);
-                e.ConfigureConsumer<BillPaidConsumer>(ctx);
             });
         });
     });

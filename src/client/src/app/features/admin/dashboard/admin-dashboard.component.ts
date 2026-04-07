@@ -85,22 +85,6 @@ export class AdminDashboardComponent implements OnInit {
     this.router.navigate(['/admin/bills']);
   }
 
-  onResyncAssets() {
-    if (confirm('This will re-sync all card balances across all nodes. Continue?')) {
-      this.isRefreshing.set(true);
-      setTimeout(() => {
-        this.fetchDashboardData();
-      }, 2000);
-    }
-  }
-
-  onBlastUpdate() {
-    const message = prompt('Enter the broadcast message for all active users:');
-    if (message && message.trim()) {
-      alert(`Broadcast queued: "${message}"\n\nThis feature would send a notification to all active users.`);
-    }
-  }
-
   navigateToLogs() {
     this.router.navigate(['/admin/logs']);
   }

@@ -79,4 +79,12 @@ public class BillsController(IMediator mediator) : BaseApiController
         var result = await mediator.Send(new CheckOverdueBillsCommand(), cancellationToken);
         return Ok(result);
     }
+
+    [HttpGet("has-pending/{cardId:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> HasPendingBill(Guid cardId, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new HasPendingBillQuery(cardId), cancellationToken);
+        return Ok(result);
+    }
 }

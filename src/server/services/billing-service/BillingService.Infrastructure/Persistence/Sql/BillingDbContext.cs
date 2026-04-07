@@ -67,16 +67,12 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options)
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.UserId).IsRequired();
-            entity.Property(x => x.RewardTierId).IsRequired();
+            entity.Property(x => x.RewardTierId).IsRequired(false);
+
             entity.Property(x => x.PointsBalance).IsRequired().HasColumnType("decimal(18,2)");
 
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
-
-            entity.HasOne<RewardTier>()
-                .WithMany()
-                .HasForeignKey(x => x.RewardTierId)
-                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(x => x.UserId).IsUnique();
         });

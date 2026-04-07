@@ -21,13 +21,11 @@ public sealed class DeleteRewardTierCommandHandler(IRewardRepository rewardRepos
             };
         }
 
-        if (await rewardRepository.HasAccountsByTierAsync(request.Id, cancellationToken))
+        var accounts = await rewardRepository.GetAccountsByTierIdAsync(request.Id, cancellationToken);
+        foreach (var account in accounts)
         {
-            return new DeleteRewardTierResult
-            {
-                Success = false,
-                Message = "Cannot delete tier with existing reward accounts. Reassign or remove accounts first."
-            };
+            account.RewardTierId = null;
+            await rewardRepository.UpdateAccountAsync(account, cancellationToken);
         }
 
         await rewardRepository.DeleteTierAsync(tier, cancellationToken);

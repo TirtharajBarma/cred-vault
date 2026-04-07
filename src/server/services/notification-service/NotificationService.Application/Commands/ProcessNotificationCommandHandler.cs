@@ -17,7 +17,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
         logger.LogInformation("Processing {EventType} for {Email}, UserId={UserId}, TraceId={TraceId}", 
             request.EventType, request.Email, userId, traceId);
 
-        db.AuditLogs.Add(new AuditLog
+        db.AddAuditLog(new AuditLog
         {
             Id = Guid.NewGuid(),
             EntityName = request.EventType,
@@ -53,7 +53,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             notificationLog.Body = success ? body : JsonConvert.SerializeObject(request.Payload);
             notificationLog.ErrorMessage = error;
 
-            db.AuditLogs.Add(new AuditLog
+            db.AddAuditLog(new AuditLog
             {
                 Id = Guid.NewGuid(),
                 EntityName = request.EventType,
@@ -72,7 +72,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             notificationLog.ErrorMessage = "No email provided";
             logger.LogWarning("No email for {EventType}", request.EventType);
 
-            db.AuditLogs.Add(new AuditLog
+            db.AddAuditLog(new AuditLog
             {
                 Id = Guid.NewGuid(),
                 EntityName = request.EventType,
@@ -85,7 +85,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             });
         }
 
-        db.NotificationLogs.Add(notificationLog);
+        db.AddNotificationLog(notificationLog);
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("Completed {EventType}, UserId={UserId}, TraceId={TraceId}", request.EventType, userId, traceId);

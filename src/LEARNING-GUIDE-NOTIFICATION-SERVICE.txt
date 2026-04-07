@@ -1,0 +1,913 @@
+# NOTIFICATION SERVICE - COMPLETE LEARNING GUIDE
+**Port: 5005 | Database: Per-service (shared)**
+
+---
+
+## What This Service Does
+
+The Notification Service handles **emails, SMS, and audit logging**. It listens to events from all services and sends notifications.
+
+**Capabilities:**
+- Email sending via SMTP (Gmail)
+- SMS sending (via external provider)
+- Audit logging of all entity changes
+- Notification logging for delivery tracking
+- Event-driven notification dispatch
+
+---
+
+## Directory Structure
+
+```
+notification-service/
+├── NotificationService.Domain/
+│   ├── Entities/
+│   │   ├── AuditLog.cs                 # Entity change audit
+│   │   └── NotificationLog.cs          # Sent notifications
+│   ├── Enums/
+│   │   └── NotificationType.cs         # Email/SMS
+│   └── NotificationService.Domain.csproj
+│
+├── NotificationService.Application/
+│   ├── Commands/
+│   │   ├── ProcessNotificationCommand.cs
+│   │   └── ProcessNotificationCommandHandler.cs
+│   │
+│   ├── Interfaces/
+│   │   ├── IEmailSender.cs              # Email abstraction
+│   │   ├── ISmsSender.cs                # SMS abstraction
+│   │   └── INotificationDbContext.cs   # Database access
+│   │
+│   └── NotificationService.Application.csproj
+│
+├── NotificationService.Infrastructure/
+│   ├── Persistence/
+│   │   ├── NotificationDbContext.cs    # EF Core context
+│   │   ├── Migrations/
+│   │   └── EmailSender/
+│   │       └── GmailSmtpEmailSender.cs  # SMTP implementation
+│   │
+│   ├── SmsSender/
+│   │   └── TwilioSmsSender.cs          # SMS implementation (if used)
+│   │
+│   ├── Consumers/                       # MassTransit consumers
+│   │   ├── DomainEventConsumer.cs      # Main event handler
+│   │   ├── UserRegisteredConsumer.cs
+│   │   ├── CardAddedConsumer.cs
+│   │   ├── PaymentCompletedConsumer.cs
+│   │   ├── PaymentFailedConsumer.cs
+│   │   └── PaymentOtpConsumer.cs
+│   │
+│   └── NotificationService.Infrastructure.csproj
+│
+└── NotificationService.API/
+    ├── Controllers/
+    │   ├── NotificationsController.cs
+    │   └── HealthController.cs
+    ├── Program.cs
+    └── NotificationService.API.csproj
+```
+
+---
+
+## Domain Layer - Understanding Each File
+
+### 1. AuditLog.cs (Entity)
+
+**Location:** `NotificationService.Domain/Entities/AuditLog.cs`
+
+**What it is:** Tracks all changes to entities for compliance and debugging.
+
+```csharp
+public class AuditLog
+{
+    public Guid Id { get; set; }
+    
+    [Required, MaxLength(100)]
+    public string EntityName { get; set; }     // e.g., "Payment", "Bill"
+    
+    [Required, MaxLength(100)]
+    public string EntityId { get; set; }       // ID of the entity
+    
+    [Required, MaxLength(100)]
+    public string Action { get; set; }         // "Created", "Updated", "Deleted"
+    
+    [MaxLength(100)]
+    public string? UserId { get; set; }        // Who did it (nullable for system)
+    
+    public string? Changes { get; set; }        // JSON of what changed
+    
+    [MaxLength(128)]
+    public string? TraceId { get; set; }       // Request trace ID
+    
+    public DateTime CreatedAtUtc { get; set; }
+}
+```
+
+**Example Changes JSON:**
+```json
+{
+  "Bill.Status": {
+    "old": "Pending",
+    "new": "Paid"
+  },
+  "Bill.AmountPaid": {
+    "old": null,
+    "new": 15000.00
+  }
+}
+```
+
+### 2. NotificationLog.cs (Entity)
+
+**Location:** `NotificationService.Domain/Entities/NotificationLog.cs`
+
+**What it is:** Log of all notifications sent (emails/SMS) for tracking.
+
+```csharp
+public class NotificationLog
+{
+    public Guid Id { get; set; }
+    
+    public Guid? UserId { get; set; }          // Recipient user (nullable)
+    
+    [Required, MaxLength(255)]
+    public string Recipient { get; set; }       // Email or phone number
+    
+    [Required, MaxLength(500)]
+    public string Subject { get; set; }         // Email subject
+    
+    public string Body { get; set; }            // Email/SMS content
+    
+    [Required, MaxLength(50)]
+    public string Type { get; set; }            // "Email" or "SMS"
+    
+    public bool IsSuccess { get; set; }         // Delivery status
+    
+    public string? ErrorMessage { get; set; }   // If failed, why
+    
+    [MaxLength(128)]
+    public string? TraceId { get; set; }        // Request trace ID
+    
+    public DateTime CreatedAtUtc { get; set; }
+}
+```
+
+### 3. NotificationType.cs (Enum)
+
+```csharp
+public enum NotificationType
+{
+    Email = 1,
+    Sms = 2,
+    Push = 3,      // For future mobile push
+    InApp = 4      // For future in-app notifications
+}
+```
+
+---
+
+## Application Layer - Understanding Each File
+
+### 1. IEmailSender.cs (Interface)
+
+**Location:** `NotificationService.Application/Interfaces/IEmailSender.cs`
+
+```csharp
+public interface IEmailSender
+{
+    Task<EmailSendResult> SendAsync(EmailMessage message);
+}
+
+public class EmailMessage
+{
+    public string To { get; set; }
+    public string Subject { get; set; }
+    public string Body { get; set; }
+    public bool IsHtml { get; set; } = false;
+}
+
+public class EmailSendResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? MessageId { get; set; }
+}
+```
+
+### 2. ISmsSender.cs (Interface)
+
+```csharp
+public interface ISmsSender
+{
+    Task<SmsSendResult> SendAsync(SmsMessage message);
+}
+
+public class SmsMessage
+{
+    public string To { get; set; }
+    public string Body { get; set; }
+}
+
+public class SmsSendResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? MessageId { get; set; }
+}
+```
+
+### 3. ProcessNotificationCommand & Handler
+
+**Location:** `NotificationService.Application/Commands/ProcessNotificationCommandHandler.cs`
+
+**What it is:** Generic command to process various notification events.
+
+```csharp
+public class ProcessNotificationCommandHandler : IRequestHandler<ProcessNotificationCommand, ApiResponse<bool>>
+{
+    private readonly IEmailSender _emailSender;
+    private readonly INotificationDbContext _context;
+    
+    public async Task<ApiResponse<bool>> Handle(
+        ProcessNotificationCommand request, 
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            switch (request.NotificationType)
+            {
+                case NotificationType.Email:
+                    return await SendEmailAsync(request);
+                    
+                case NotificationType.Sms:
+                    return await SendSmsAsync(request);
+                    
+                default:
+                    return ApiResponse<bool>.Fail("Unknown notification type");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log the failure
+            await LogNotificationAsync(request, false, ex.Message);
+            return ApiResponse<bool>.Fail($"Notification failed: {ex.Message}");
+        }
+    }
+    
+    private async Task<ApiResponse<bool>> SendEmailAsync(ProcessNotificationCommand request)
+    {
+        var message = new EmailMessage
+        {
+            To = request.Recipient,
+            Subject = request.Subject,
+            Body = request.Body,
+            IsHtml = request.IsHtml
+        };
+        
+        var result = await _emailSender.SendAsync(message);
+        
+        // Log the attempt
+        await LogNotificationAsync(request, result.Success, result.ErrorMessage);
+        
+        if (result.Success)
+            return ApiResponse<bool>.Success(true, "Email sent");
+            
+        return ApiResponse<bool>.Fail(result.ErrorMessage ?? "Failed to send email");
+    }
+    
+    private async Task LogNotificationAsync(
+        ProcessNotificationCommand request, 
+        bool success, 
+        string? error)
+    {
+        var log = new NotificationLog
+        {
+            Id = Guid.NewGuid(),
+            UserId = request.UserId,
+            Recipient = request.Recipient,
+            Subject = request.Subject,
+            Body = request.Body,
+            Type = request.NotificationType.ToString(),
+            IsSuccess = success,
+            ErrorMessage = error,
+            TraceId = request.TraceId,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        
+        _context.NotificationLogs.Add(log);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+}
+```
+
+---
+
+## Infrastructure Layer - Understanding Each File
+
+### 1. NotificationDbContext.cs
+
+**Location:** `NotificationService.Infrastructure/Persistence/NotificationDbContext.cs`
+
+```csharp
+public class NotificationDbContext : DbContext, INotificationDbContext
+{
+    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<NotificationLog> NotificationLogs { get; set; }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        
+        // AuditLog configuration
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("audit_logs");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EntityName, e.EntityId });
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.CreatedAtUtc);
+        });
+        
+        // NotificationLog configuration
+        modelBuilder.Entity<NotificationLog>(entity =>
+        {
+            entity.ToTable("notification_logs");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Recipient);
+            entity.HasIndex(e => e.CreatedAtUtc);
+            entity.Property(e => e.Type).HasMaxLength(50);
+        });
+    }
+}
+```
+
+### 2. GmailSmtpEmailSender.cs
+
+**Location:** `NotificationService.Infrastructure/Persistence/EmailSender/GmailSmtpEmailSender.cs`
+
+**What it teaches:** How to send emails via SMTP.
+
+```csharp
+public class GmailSmtpEmailSender : IEmailSender
+{
+    private readonly SmtpSettings _settings;
+    private readonly ILogger<GmailSmtpEmailSender> _logger;
+    
+    public GmailSmtpEmailSender(
+        IOptions<SmtpSettings> settings,
+        ILogger<GmailSmtpEmailSender> logger)
+    {
+        _settings = settings.Value;
+        _logger = logger;
+    }
+    
+    public async Task<EmailSendResult> SendAsync(EmailMessage message)
+    {
+        try
+        {
+            using var client = new SmtpClient
+            {
+                Host = _settings.Host,
+                Port = _settings.Port,
+                EnableSsl = true,
+                Credentials = new NetworkCredential(
+                    _settings.Username, 
+                    _settings.Password)
+            };
+            
+            var mailMessage = new MailMessage
+            {
+                From = new MailAddress(_settings.FromEmail, _settings.FromName),
+                Subject = message.Subject,
+                Body = message.Body,
+                IsBodyHtml = message.IsHtml
+            };
+            
+            mailMessage.To.Add(message.To);
+            
+            await client.SendMailAsync(mailMessage);
+            
+            _logger.LogInformation("Email sent to {Recipient}: {Subject}", 
+                message.To, message.Subject);
+            
+            return new EmailSendResult 
+            { 
+                Success = true,
+                MessageId = Guid.NewGuid().ToString()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email to {Recipient}", message.To);
+            
+            return new EmailSendResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+}
+
+// Configuration class
+public class SmtpSettings
+{
+    public string Host { get; set; } = "smtp.gmail.com";
+    public int Port { get; set; } = 587;
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string FromEmail { get; set; } = "";
+    public string FromName { get; set; } = "CredVault";
+}
+```
+
+**appsettings.json configuration:**
+```json
+{
+  "SmtpSettings": {
+    "Host": "smtp.gmail.com",
+    "Port": 587,
+    "Username": "your-email@gmail.com",
+    "Password": "your-app-password",
+    "FromEmail": "noreply@credvault.com",
+    "FromName": "CredVault"
+  }
+}
+```
+
+### 3. DomainEventConsumer.cs (Main Event Handler)
+
+**Location:** `NotificationService.Infrastructure/Consumers/DomainEventConsumer.cs`
+
+**What it is:** Central consumer that routes all events to appropriate notification logic.
+
+```csharp
+public class DomainEventConsumer : IConsumer<IUserRegistered>,
+                                    IConsumer<ICardAdded>,
+                                    IConsumer<IPaymentCompleted>,
+                                    IConsumer<IPaymentFailed>,
+                                    IConsumer<IPaymentOtpGenerated>,
+                                    IConsumer<IBillGenerated>,
+                                    IConsumer<IBillDueReminder>
+{
+    private readonly IEmailSender _emailSender;
+    private readonly IIdentityServiceClient _identityService;  // HTTP to Identity
+    private readonly ILogger<DomainEventConsumer> _logger;
+    
+    public async Task Consume(ConsumeContext<IUserRegistered> context)
+    {
+        var message = context.Message;
+        
+        // Get user's email (from event or call Identity Service)
+        var userEmail = message.Email;
+        var userName = message.FullName;
+        
+        var subject = "Verify your CredVault account";
+        var body = $@"
+            <h1>Welcome to CredVault, {userName}!</h1>
+            <p>Your verification code is: <strong>{message.Otp}</strong></p>
+            <p>This code expires in 15 minutes.</p>
+            <p>Thank you for registering!</p>
+        ";
+        
+        await SendEmailAsync(userEmail, subject, body);
+    }
+    
+    public async Task Consume(ConsumeContext<ICardAdded> context)
+    {
+        var message = context.Message;
+        
+        var subject = "New Card Added to CredVault";
+        var body = $@"
+            <h1>Card Added</h1>
+            <p>A new card ending in {message.Last4} has been added to your account.</p>
+            <p>Cardholder: {message.CardholderName}</p>
+            <p>Network: {message.Network}</p>
+            <p>If you didn't add this card, please contact support immediately.</p>
+        ";
+        
+        await SendEmailAsync(message.UserEmail, subject, body);
+    }
+    
+    public async Task Consume(ConsumeContext<IPaymentCompleted> context)
+    {
+        var message = context.Message;
+        
+        var subject = "Payment Successful - CredVault";
+        var body = $@"
+            <h1>Payment Confirmed</h1>
+            <p>Your payment of ₹{message.Amount:N2} has been successfully processed.</p>
+            <p>Payment ID: {message.PaymentId}</p>
+            <p>Thank you for using CredVault!</p>
+        ";
+        
+        await SendEmailAsync(message.UserEmail, subject, body);
+    }
+    
+    public async Task Consume(ConsumeContext<IPaymentFailed> context)
+    {
+        var message = context.Message;
+        
+        var subject = "Payment Failed - CredVault";
+        var body = $@"
+            <h1>Payment Unsuccessful</h1>
+            <p>We were unable to process your payment.</p>
+            <p>Reason: {message.Error}</p>
+            <p>Payment ID: {message.PaymentId}</p>
+            <p>Please try again or contact support.</p>
+        ";
+        
+        await SendEmailAsync(message.UserEmail, subject, body);
+    }
+    
+    public async Task Consume(ConsumeContext<IPaymentOtpGenerated> context)
+    {
+        var message = context.Message;
+        
+        var subject = "Your CredVault Payment Verification Code";
+        var body = $@"
+            <h1>Verification Code</h1>
+            <p>Your code is: <strong style='font-size: 24px;'>{message.OtpCode}</strong></p>
+            <p>This code expires in 10 minutes.</p>
+            <p>If you didn't initiate this payment, please ignore this email.</p>
+        ";
+        
+        await SendEmailAsync(message.UserEmail, subject, body);
+    }
+    
+    public async Task Consume(ConsumeContext<IBillGenerated> context)
+    {
+        var message = context.Message;
+        
+        var subject = "New Bill Generated - CredVault";
+        var body = $@"
+            <h1>Your Bill is Ready</h1>
+            <p>A new bill of ₹{message.Amount:N2} has been generated.</p>
+            <p>Due Date: {message.DueDate:MMMM dd, yyyy}</p>
+            <p>Please make payment before the due date to avoid late fees.</p>
+        ";
+        
+        await SendEmailAsync(message.UserEmail, subject, body);
+    }
+    
+    private async Task SendEmailAsync(string to, string subject, string body)
+    {
+        try
+        {
+            await _emailSender.SendAsync(new EmailMessage
+            {
+                To = to,
+                Subject = subject,
+                Body = body,
+                IsHtml = true
+            });
+            
+            _logger.LogInformation("Sent email to {To}: {Subject}", to, subject);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email to {To}", to);
+        }
+    }
+}
+```
+
+### 4. Individual Event Consumers (Alternative Pattern)
+
+Instead of one big consumer, you might have separate consumers:
+
+```csharp
+// Separate consumers for better separation of concerns
+public class UserRegisteredConsumer : IConsumer<IUserRegistered>
+{
+    private readonly IEmailSender _emailSender;
+    
+    public async Task Consume(ConsumeContext<IUserRegistered> context)
+    {
+        var message = context.Message;
+        
+        await _emailSender.SendAsync(new EmailMessage
+        {
+            To = message.Email,
+            Subject = "Verify your CredVault account",
+            Body = $"Your OTP is: {message.Otp}",
+            IsHtml = false
+        });
+    }
+}
+
+public class PaymentCompletedConsumer : IConsumer<IPaymentCompleted>
+{
+    private readonly IEmailSender _emailSender;
+    
+    public async Task Consume(ConsumeContext<IPaymentCompleted> context)
+    {
+        var message = context.Message;
+        
+        await _emailSender.SendAsync(new EmailMessage
+        {
+            To = message.UserEmail,
+            Subject = "Payment Successful",
+            Body = $"Your payment of ₹{message.Amount} was successful.",
+            IsHtml = true
+        });
+    }
+}
+```
+
+### 5. Audit Logging Consumer
+
+**Location:** `NotificationService.Infrastructure/Consumers/AuditLogConsumer.cs`
+
+```csharp
+public class AuditLogConsumer : IConsumer<IAuditEvent>
+{
+    private readonly INotificationDbContext _context;
+    
+    public async Task Consume(ConsumeContext<IAuditEvent> context)
+    {
+        var message = context.Message;
+        
+        var auditLog = new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            EntityName = message.EntityName,
+            EntityId = message.EntityId,
+            Action = message.Action,
+            UserId = message.UserId,
+            Changes = message.Changes,  // JSON string
+            TraceId = context.MessageId?.ToString(),
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        
+        _context.AuditLogs.Add(auditLog);
+        await _context.SaveChangesAsync();
+    }
+}
+
+// Example audit event
+public interface IAuditEvent
+{
+    string EntityName { get; }
+    string EntityId { get; }
+    string Action { get; }
+    string UserId { get; }
+    string Changes { get; }
+}
+```
+
+---
+
+## API Layer - Understanding Each File
+
+### NotificationsController.cs
+
+**Location:** `NotificationService.API/Controllers/NotificationsController.cs`
+
+```csharp
+[ApiController]
+[Route("api/v1/notifications")]
+public class NotificationsController : BaseApiController
+{
+    // ==========================================
+    // Get Notification Logs (Admin)
+    // GET /api/v1/notifications/logs
+    // ==========================================
+    [HttpGet("logs")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetLogs(
+        [FromQuery] Guid? userId = null,
+        [FromQuery] string? type = null,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = new GetNotificationLogsQuery
+        {
+            UserId = userId,
+            Type = type,
+            FromDate = fromDate,
+            ToDate = toDate,
+            Page = page,
+            PageSize = pageSize
+        };
+        
+        var result = await _mediator.Send(query);
+        return Ok(result);
+    }
+    
+    // ==========================================
+    // Get Audit Logs (Admin)
+    // GET /api/v1/notifications/audit
+    // ==========================================
+    [HttpGet("audit")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAuditLogs(
+        [FromQuery] string? entityName = null,
+        [FromQuery] string? entityId = null,
+        [FromQuery] string? action = null,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = new GetAuditLogsQuery
+        {
+            EntityName = entityName,
+            EntityId = entityId,
+            Action = action,
+            FromDate = fromDate,
+            ToDate = toDate,
+            Page = page,
+            PageSize = pageSize
+        };
+        
+        var result = await _mediator.Send(query);
+        return Ok(result);
+    }
+    
+    // ==========================================
+    // Get My Notifications (User)
+    // GET /api/v1/notifications/my
+    // ==========================================
+    [HttpGet("my")]
+    [Authorize]
+    public async Task<IActionResult> GetMyNotifications(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = new GetMyNotificationsQuery
+        {
+            UserId = GetUserId(),
+            Page = page,
+            PageSize = pageSize
+        };
+        
+        var result = await _mediator.Send(query);
+        return Ok(result);
+    }
+    
+    // ==========================================
+    // Resend Notification (Admin)
+    // POST /api/v1/notifications/:id/resend
+    // ==========================================
+    [HttpPost("{id:guid}/resend")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ResendNotification(Guid id)
+    {
+        var result = await _mediator.Send(new ResendNotificationCommand { NotificationLogId = id });
+        return Ok(result);
+    }
+}
+```
+
+---
+
+## Events Consumed by Notification Service
+
+| Event | Consumer | Action |
+|-------|----------|--------|
+| `IUserRegistered` | `UserRegisteredConsumer` | Send verification email |
+| `ICardAdded` | `CardAddedConsumer` | Send card added confirmation |
+| `IPaymentCompleted` | `PaymentCompletedConsumer` | Send payment success email |
+| `IPaymentFailed` | `PaymentFailedConsumer` | Send payment failure email |
+| `IPaymentOtpGenerated` | `PaymentOtpConsumer` | Send OTP email |
+| `IBillGenerated` | `BillGeneratedConsumer` | Send bill notification |
+| `IBillDueReminder` | `BillDueReminderConsumer` | Send due date reminder |
+| `IAuditEvent` | `AuditLogConsumer` | Log to audit trail |
+
+---
+
+## Email Templates
+
+### 1. Registration Welcome Email
+```html
+<h1>Welcome to CredVault!</h1>
+<p>Hi {FullName},</p>
+<p>Thank you for registering. Please verify your email with the code below:</p>
+<p style="font-size: 24px; font-weight: bold;">{OtpCode}</p>
+<p>This code expires in 15 minutes.</p>
+<p>Welcome aboard!</p>
+```
+
+### 2. Payment OTP Email
+```html
+<h1>Payment Verification</h1>
+<p>Your verification code for payment of ₹{Amount}:</p>
+<p style="font-size: 32px; font-weight: bold; text-align: center;">{OtpCode}</p>
+<p>Expires in 10 minutes.</p>
+<p>If you didn't initiate this payment, please ignore this email.</p>
+```
+
+### 3. Payment Success Email
+```html
+<h1>Payment Successful</h1>
+<p>Hi {FullName},</p>
+<p>Your payment has been processed successfully.</p>
+<table>
+  <tr><td>Amount:</td><td>₹{Amount}</td></tr>
+  <tr><td>Payment ID:</td><td>{PaymentId}</td></tr>
+  <tr><td>Date:</td><td>{Timestamp}</td></tr>
+</table>
+<p>Thank you for using CredVault!</p>
+```
+
+### 4. Bill Generated Email
+```html
+<h1>Your Bill is Ready</h1>
+<p>Hi {FullName},</p>
+<p>Your statement for {StatementPeriod} is ready.</p>
+<p><strong>Amount Due:</strong> ₹{Amount}</p>
+<p><strong>Due Date:</strong> {DueDate}</p>
+<p>Please make payment to avoid late fees.</p>
+<a href="{PayNowUrl}">Pay Now</a>
+```
+
+---
+
+## Learning Sequence
+
+### Step 1: Understand the Domain Entities
+Read `AuditLog.cs` and `NotificationLog.cs` - simple but important.
+
+### Step 2: Understand Email Sending
+Read `IEmailSender.cs` interface and `GmailSmtpEmailSender.cs` implementation.
+
+### Step 3: Understand Event Consumption
+Read `DomainEventConsumer.cs` - see how events are handled.
+
+### Step 4: Understand the Consumer Pattern
+Read individual consumer files if they exist.
+
+### Step 5: Read the Controller
+Read `NotificationsController.cs` - admin views for logs.
+
+### Step 6: Understand SMTP Configuration
+Look at `appsettings.json` for SMTP settings.
+
+---
+
+## Exercise: Add a New Email Notification
+
+1. **Define the event** (in Shared.Contracts/Events/):
+```csharp
+public record ICardExpiringSoon
+{
+    public Guid UserId { get; init; }
+    public string UserEmail { get; init; }
+    public string Last4 { get; init; }
+    public int ExpMonth { get; init; }
+    public int ExpYear { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+```
+
+2. **Create a consumer**:
+```csharp
+public class CardExpiringSoonConsumer : IConsumer<ICardExpiringSoon>
+{
+    private readonly IEmailSender _emailSender;
+    
+    public async Task Consume(ConsumeContext<ICardExpiringSoon> context)
+    {
+        var msg = context.Message;
+        
+        await _emailSender.SendAsync(new EmailMessage
+        {
+            To = msg.UserEmail,
+            Subject = "Your CredVault card is expiring soon",
+            Body = $@"
+                <h1>Card Expiring</h1>
+                <p>Your card ending in {msg.Last4} expires on {msg.ExpMonth}/{msg.ExpYear}.</p>
+                <p>Please add a new card to continue using CredVault.</p>
+            ",
+            IsHtml = true
+        });
+    }
+}
+```
+
+3. **Register in Program.cs**:
+```csharp
+x.AddConsumer<CardExpiringSoonConsumer>();
+```
+
+4. **Publish the event** (from Card Service):
+```csharp
+await _publishEndpoint.Publish(new ICardExpiringSoon
+{
+    UserId = card.UserId,
+    UserEmail = userEmail,
+    Last4 = card.Last4,
+    ExpMonth = card.ExpMonth,
+    ExpYear = card.ExpYear,
+    Timestamp = DateTime.UtcNow
+});
+```
+
+---
+
+*End of Notification Service Learning Guide*

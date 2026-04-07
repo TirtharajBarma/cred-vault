@@ -1,3 +1,3 @@
 export const runtimeEnv = {
-  apiGatewayUrl: "http://localhost:5006"
+  apiGatewayUrl: "https://your-gateway-domain.com"
 } as const;

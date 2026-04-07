@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { catchError, forkJoin, of } from 'rxjs';
 import { RewardsService, RewardAccount, RewardTransaction, RewardTier } from '../../core/services/rewards.service';
 import { DashboardService } from '../../core/services/dashboard.service';
+import { AdminService } from '../../core/services/admin.service';
 import { BillingService } from '../../core/services/billing.service';
 
 @Component({
@@ -15,6 +16,7 @@ import { BillingService } from '../../core/services/billing.service';
 export class RewardsComponent implements OnInit {
   private rewardsService = inject(RewardsService);
   private dashboardService = inject(DashboardService);
+  private adminService = inject(AdminService);
   private billingService = inject(BillingService);
 
   Math = Math;
@@ -79,7 +81,7 @@ export class RewardsComponent implements OnInit {
       bills: this.billingService.getMyBills().pipe(
         catchError(() => of({ success: false, message: 'Failed to load bills', data: [], traceId: '' }))
       ),
-      issuers: this.dashboardService.getIssuers().pipe(
+      issuers: this.adminService.getIssuers().pipe(
         catchError(() => of({ success: false, message: 'Failed to load issuers', data: [], traceId: '' }))
       )
     }).subscribe({

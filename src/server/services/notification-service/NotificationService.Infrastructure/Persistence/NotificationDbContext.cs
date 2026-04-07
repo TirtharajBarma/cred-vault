@@ -11,6 +11,12 @@ public class NotificationDbContext : DbContext, INotificationDbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<NotificationLog> NotificationLogs => Set<NotificationLog>();
 
+    IQueryable<AuditLog> INotificationDbContext.AuditLogs => AuditLogs;
+    IQueryable<NotificationLog> INotificationDbContext.NotificationLogs => NotificationLogs;
+
+    public void AddAuditLog(AuditLog log) => AuditLogs.Add(log);
+    public void AddNotificationLog(NotificationLog log) => NotificationLogs.Add(log);
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
