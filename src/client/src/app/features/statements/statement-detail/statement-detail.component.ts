@@ -4,11 +4,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { StatementService, StatementDetail } from '../../../core/services/rewards.service';
 import { DashboardService } from '../../../core/services/dashboard.service';
 import { CreditCard } from '../../../core/models/card.models';
+import { StatementAnalyticsComponent } from '../analytics/analytics.component';
 
 @Component({
   selector: 'app-statement-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, StatementAnalyticsComponent],
   templateUrl: './statement-detail.component.html'
 })
 export class StatementDetailComponent implements OnInit {
@@ -21,9 +22,15 @@ export class StatementDetailComponent implements OnInit {
   isLoading = signal(true);
   error = signal<string | null>(null);
   currentPage = signal(1);
+  activeTab = signal<'analytics' | 'transactions'>('analytics');
   readonly itemsPerPage = 7;
 
   ngOnInit(): void {
+    const requestedTab = this.route.snapshot.queryParamMap.get('tab');
+    if (requestedTab === 'transactions') {
+      this.activeTab.set('transactions');
+    }
+
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.loadStatement(id);

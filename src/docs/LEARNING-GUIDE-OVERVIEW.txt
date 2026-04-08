@@ -1,4 +1,4 @@
-# CREDVAULT MICROSERVICES - COMPLETE LEARNING GUIDE
+    # CREDVAULT MICROSERVICES - COMPLETE LEARNING GUIDE
 
 ## System Overview
 
@@ -468,91 +468,367 @@ payment_orchestration_saga_state (MassTransit)
 
 ---
 
-## API Endpoints Summary
+## API Endpoints Summary (Verified From Controllers)
 
-### Identity Service (5001)
-```
-POST   /api/v1/identity/auth/register         # Register
-POST   /api/v1/identity/auth/login            # Login (returns JWT)
-POST   /api/v1/identity/auth/google           # Google OAuth
-POST   /api/v1/identity/auth/verify-email      # Verify email OTP
-POST   /api/v1/identity/auth/forgot-password   # Forgot password
-POST   /api/v1/identity/auth/reset-password    # Reset with OTP
-POST   /api/v1/identity/auth/resend-otp        # Resend verification OTP
+### Standard API Envelope
+Most service endpoints return this structure:
 
-GET    /api/v1/identity/users/me              # Get current user
-PUT    /api/v1/identity/users/me              # Update profile
-PUT    /api/v1/identity/users/me/password      # Change password
-GET    /api/v1/identity/users                  # Admin: list users
-GET    /api/v1/identity/users/:id             # Admin: get user
-PUT    /api/v1/identity/users/:id/status      # Admin: update status
-PUT    /api/v1/identity/users/:id/role        # Admin: update role
+{
+    "success": boolean,
+    "message": string,
+    "data": any,
+    "traceId": string
+}
 
-GET    /api/v1/identity/health                # Health check
-```
+Notes:
+- Some endpoints return direct objects instead of the standard envelope (explicitly marked below).
+- Error status codes are mapped primarily by BaseApiController error codes:
+    - ValidationError -> 400
+    - NotFound/UserNotFound/CardNotFound -> 404
+    - Conflict/DuplicateEmail -> 409
+    - Unauthorized/InvalidCredentials -> 401
+    - Forbidden/AccountLocked -> 403
+    - ServiceUnavailable -> 503
 
-### Card Service (5002)
-```
-POST   /api/v1/cards                          # Add card
-GET    /api/v1/cards                          # List my cards
-GET    /api/v1/cards/:id                      # Get card details
-PUT    /api/v1/cards/:id                      # Update card
-DELETE /api/v1/cards/:id                      # Delete card
-PUT    /api/v1/cards/:id/admin                # Admin: update limits
+### Identity Service (Port 5001)
 
-POST   /api/v1/cards/:id/transactions         # Add transaction
-GET    /api/v1/cards/:id/transactions         # List card transactions
-GET    /api/v1/cards/transactions             # List all my transactions
+Base routes:
+- /api/v1/identity/auth
+- /api/v1/identity/users
+- /api/v1/identity/health
 
-POST   /api/v1/issuers                        # Admin: create issuer
-GET    /api/v1/issuers                        # List issuers
-GET    /api/v1/issuers/:id                    # Get issuer
-PUT    /api/v1/issuers/:id                    # Admin: update issuer
-DELETE /api/v1/issuers/:id                    # Admin: delete issuer
+Auth endpoints (public):
+- POST /api/v1/identity/auth/register
+    - Purpose: Register a new user and trigger verification flow.
+    - Success: 201 Created
+    - Data: AuthResult { success, message, errorCode?, accessToken?, user? }
+- POST /api/v1/identity/auth/login
+    - Purpose: Authenticate with email/password.
+    - Success: 200 OK
+    - Data: AuthResult (token + user on success)
+- POST /api/v1/identity/auth/google
+    - Purpose: Authenticate using Google ID token.
+    - Success: 200 OK
+    - Data: AuthResult
+- POST /api/v1/identity/auth/resend-verification
+    - Purpose: Resend email verification OTP.
+    - Success: 200 OK
+    - Data: OperationResult { success, message, errorCode?, data? }
+- POST /api/v1/identity/auth/verify-email-otp
+    - Purpose: Verify email OTP and activate account.
+    - Success: 200 OK
+    - Data: AuthResult
+- POST /api/v1/identity/auth/forgot-password
+    - Purpose: Send password reset OTP.
+    - Success: 200 OK
+    - Data: OperationResult
+- POST /api/v1/identity/auth/reset-password
+    - Purpose: Reset password using OTP.
+    - Success: 200 OK
+    - Data: OperationResult
 
-GET    /api/v1/cards/health                   # Health check
-```
+User endpoints (authenticated):
+- GET /api/v1/identity/users/me
+    - Purpose: Fetch current user profile.
+    - Success: 200 OK
+    - Data: { user: UserSummary, accessToken?: string }
+- PUT /api/v1/identity/users/me
+    - Purpose: Update current user profile.
+    - Success: 200 OK
+    - Data: { user: UserSummary, accessToken?: string }
+- PUT /api/v1/identity/users/me/password
+    - Purpose: Change current user password.
+    - Success: 200 OK
+    - Data: OperationResult
 
-### Billing Service (5003)
-```
-POST   /api/v1/billing/bills/generate         # Admin: generate bill
-GET    /api/v1/billing/bills                   # List user's bills
-GET    /api/v1/billing/bills/:id              # Get bill details
-PUT    /api/v1/billing/bills/:id/mark-paid    # Mark as paid
-POST   /api/v1/billing/bills/check-overdue    # Admin: check overdue
+Admin-only user endpoints:
+- GET /api/v1/identity/users/{userId}
+    - Purpose: Fetch any user by id.
+    - Success: 200 OK
+    - Data: { user: UserSummary, accessToken?: string }
+- PUT /api/v1/identity/users/{userId}/status
+    - Purpose: Update user status (active/suspended/etc).
+    - Success: 200 OK
+    - Data: OperationResult
+- PUT /api/v1/identity/users/{userId}/role
+    - Purpose: Update user role (admin/user).
+    - Success: 200 OK
+    - Data: OperationResult
+- GET /api/v1/identity/users?page=&pageSize=&search=&status=
+    - Purpose: Paginated user listing.
+    - Success: 200 OK
+    - Data: OperationResult.Data = { total, page, pageSize, users[] }
+- GET /api/v1/identity/users/stats
+    - Purpose: User status counters.
+    - Success: 200 OK
+    - Data: OperationResult.Data = { totalUsers, activeUsers, pendingUsers, suspendedUsers, blockedUsers }
 
-GET    /api/v1/billing/statements             # List statements
-GET    /api/v1/billing/statements/:id         # Get statement
-POST   /api/v1/billing/statements/generate    # Generate statement
+Health:
+- GET /api/v1/identity/health
+    - Public health check.
+    - Data: "Identity Service Healthy"
 
-GET    /api/v1/billing/rewards/tiers          # List reward tiers
-POST   /api/v1/billing/rewards/tiers          # Admin: create tier
-PUT    /api/v1/billing/rewards/tiers/:id     # Admin: update tier
-DELETE /api/v1/billing/rewards/tiers/:id     # Admin: delete tier
-GET    /api/v1/billing/rewards/account        # Get my rewards account
-POST   /api/v1/billing/rewards/redeem          # Redeem points
+### Card Service (Port 5002)
 
-GET    /api/v1/billing/health                 # Health check
-```
+Base routes:
+- /api/v1/cards
+- /api/v1/issuers
+- /api/v1/cards/health
 
-### Payment Service (5004)
-```
-POST   /api/v1/payments/initiate              # Start payment
-POST   /api/v1/payments/verify-otp            # Verify OTP
-POST   /api/v1/payments/resend-otp            # Resend OTP
-GET    /api/v1/payments                       # List my payments
-GET    /api/v1/payments/:id                   # Get payment details
+Card endpoints (authenticated):
+- POST /api/v1/cards
+    - Purpose: Add a new card.
+    - Success: 201 Created
+    - Data: CardDto
+- GET /api/v1/cards
+    - Purpose: List current user cards.
+    - Success: 200 OK
+    - Data: List<CardDto>
+- GET /api/v1/cards/{cardId}
+    - Purpose: Get card details for current user.
+    - Success: 200 OK
+    - Data: CardDto
+- PUT /api/v1/cards/{cardId}
+    - Purpose: Update card metadata.
+    - Success: 200 OK
+    - Data: CardDto
+- DELETE /api/v1/cards/{cardId}
+    - Purpose: Delete card (blocked if outstanding balance/pending bill exists).
+    - Success: 200 OK
+    - Data: OperationResult
 
-GET    /api/v1/payments/health               # Health check
-```
+Transaction endpoints:
+- GET /api/v1/cards/transactions
+    - Purpose: List all transactions for current user.
+    - Success: 200 OK
+    - Data: List<CardTransactionDto>
+- GET /api/v1/cards/{cardId}/transactions
+    - Purpose: List transactions for a specific card.
+    - Success: 200 OK
+    - Data: List<CardTransaction> (domain entity)
+- POST /api/v1/cards/{cardId}/transactions
+    - Purpose: Add purchase/payment/refund transaction.
+    - Success: 201 Created
+    - Data: CardTransaction (domain entity)
 
-### Notification Service (5005)
-```
-GET    /api/v1/notifications/logs             # Get notification logs
-GET    /api/v1/notifications/audit            # Get audit logs
+Admin card endpoints:
+- GET /api/v1/cards/admin/{cardId}
+    - Purpose: Admin fetch of any card.
+    - Success: 200 OK
+    - Data: CardDto
+- GET /api/v1/cards/admin/{cardId}/transactions
+    - Purpose: Admin fetch of all card transactions.
+    - Success: 200 OK
+    - Data: List<CardTransaction>
+- PUT /api/v1/cards/{cardId}/admin
+    - Purpose: Admin update of credit/limits/billing cycle.
+    - Success: 200 OK
+    - Data: Updated card payload
+- GET /api/v1/cards/user/{userId}
+    - Purpose: Admin list cards by user.
+    - Success: 200 OK
+    - Data: List<CardDto>
 
-GET    /api/v1/notifications/health          # Health check
-```
+Issuer endpoints:
+- GET /api/v1/issuers
+    - Purpose: List issuers.
+    - Success: 200 OK
+    - Data: List<CardIssuerDto>
+- GET /api/v1/issuers/{id}
+    - Purpose: Get issuer by id.
+    - Success: 200 OK
+    - Data: CardIssuerDto
+- POST /api/v1/issuers (admin)
+    - Purpose: Create issuer.
+    - Success: 201 Created
+    - Data: CardIssuerDto
+- PUT /api/v1/issuers/{id} (admin)
+    - Purpose: Update issuer.
+    - Success: 200 OK
+    - Data: CardIssuerDto
+- DELETE /api/v1/issuers/{id} (admin)
+    - Purpose: Delete issuer.
+    - Success: 200 OK
+    - Data: null/object
+
+Health:
+- GET /api/v1/cards/health
+    - Public health check.
+    - Data: "Card Service Healthy"
+
+### Billing Service (Port 5003)
+
+Base routes:
+- /api/v1/billing/bills
+- /api/v1/billing/statements
+- /api/v1/billing/rewards
+- /api/v1/billing/health
+
+Bills endpoints:
+- GET /api/v1/billing/bills
+    - Purpose: List bills for current user (or specific user when admin + userId query).
+    - Success: 200 OK
+    - Data: List<Bill>
+- GET /api/v1/billing/bills/{billId}
+    - Purpose: Get one bill for current user.
+    - Success: 200 OK
+    - Data: Bill
+    - Not found: 404
+- POST /api/v1/billing/bills/admin/generate-bill (admin)
+    - Purpose: Generate bill for a user/card.
+    - Success: 201 Created
+    - Data: Bill
+    - Common errors: 400, 404, 503
+- POST /api/v1/billing/bills/admin/check-overdue (admin)
+    - Purpose: Mark overdue bills and publish overdue events.
+    - Success: 200 OK
+    - Data: OverdueCheckResult { billsChecked, overdueCount }
+- GET /api/v1/billing/bills/has-pending/{cardId}
+    - Purpose: Internal card deletion guard.
+    - Auth: AllowAnonymous (internal usage)
+    - Success: 200 OK
+    - Response is direct object (not wrapped): { hasPendingBill: boolean }
+
+Statements endpoints:
+- GET /api/v1/billing/statements
+    - Purpose: List statements for current user (or selected user when admin + userId query).
+    - Success: 200 OK
+    - Data: List<StatementDto>
+- GET /api/v1/billing/statements/{statementId}
+    - Purpose: Get statement details for current user.
+    - Success: 200 OK
+    - Data: StatementDetailDto
+- POST /api/v1/billing/statements/generate
+    - Purpose: Generate statement for current user card.
+    - Success: 200 OK
+    - Data: { statementId: Guid? }
+- POST /api/v1/billing/statements/admin/generate (admin)
+    - Purpose: Generate statement for any user/card.
+    - Success: 200 OK
+    - Data: { statementId: Guid? }
+- GET /api/v1/billing/statements/admin/all (admin)
+    - Purpose: List all statements.
+    - Success: 200 OK
+    - Data: List<StatementDto>
+- GET /api/v1/billing/statements/bill/{billId}
+    - Purpose: Resolve statement from a bill id.
+    - Success: 200 OK
+    - Data: List<StatementDto>
+- GET /api/v1/billing/statements/{statementId}/transactions
+    - Purpose: Get statement transactions.
+    - Success: 200 OK
+    - Data: List<StatementTransactionDto>
+- GET /api/v1/billing/statements/admin/{statementId}/full (admin)
+    - Purpose: Full aggregate payload for support/debug.
+    - Success: 200 OK
+    - Data: { statement, bill, transactions, rewards }
+    - Not found: 404
+
+Rewards endpoints:
+- GET /api/v1/billing/rewards/tiers
+    - Purpose: List reward tiers.
+    - Success: 200 OK
+    - Data: List<RewardTier>
+- POST /api/v1/billing/rewards/tiers (admin)
+    - Purpose: Create reward tier.
+    - Success: 201 Created
+    - Data: RewardTier
+- PUT /api/v1/billing/rewards/tiers/{id} (admin)
+    - Purpose: Update reward tier.
+    - Success: 200 OK
+    - Data: RewardTier
+- DELETE /api/v1/billing/rewards/tiers/{id} (admin)
+    - Purpose: Delete reward tier.
+    - Success: 200 OK
+    - Data: null/object
+- GET /api/v1/billing/rewards/account
+    - Purpose: Get current user's reward account.
+    - Success: 200 OK
+    - Data: RewardAccount | null
+- GET /api/v1/billing/rewards/transactions
+    - Purpose: Get reward transactions (admin can target another user via userId query).
+    - Success: 200 OK
+    - Data: List<RewardTransaction>
+- POST /api/v1/billing/rewards/redeem
+    - Purpose: Redeem points to account credit or bill.
+    - Success: 200 OK
+    - Data: RedeemRewardsResult { pointsRedeemed, dollarValue, message, billId?, newPointsBalance }
+- POST /api/v1/billing/rewards/internal/redeem
+    - Purpose: Internal service-to-service redemption.
+    - Auth: AllowAnonymous (internal)
+    - Success: 200 OK
+    - Data: RedeemRewardsResult
+
+Health:
+- GET /api/v1/billing/health
+    - Public health check.
+    - Data: "Billing Service Healthy"
+
+### Payment Service (Port 5004)
+
+Base routes:
+- /api/v1/payments
+- /api/v1/payments/health
+
+Payment endpoints (authenticated):
+- POST /api/v1/payments/initiate
+    - Purpose: Start payment, generate OTP, start saga.
+    - Success: 201 Created
+    - Data: {
+            paymentId,
+            otpRequired,
+            status,
+            rewardsApplied,
+            rewardsAmount,
+            finalAmount
+        }
+- POST /api/v1/payments/{paymentId}/verify-otp
+    - Purpose: Verify OTP and advance saga.
+    - Success: 200 OK
+    - Data: { paymentId, status }
+- POST /api/v1/payments/{paymentId}/resend-otp
+    - Purpose: Regenerate and resend OTP.
+    - Success: 200 OK
+    - Data: { paymentId, otpExpiresAtUtc }
+- GET /api/v1/payments
+    - Purpose: List current user payments.
+    - Success: 200 OK
+    - Data: List<PaymentDto>
+- GET /api/v1/payments/{paymentId}
+    - Purpose: Get single payment.
+    - Success: 200 OK
+    - Data: PaymentDto
+    - Not found: 404
+- GET /api/v1/payments/{paymentId}/transactions
+    - Purpose: Get payment ledger transactions.
+    - Success: 200 OK
+    - Data: List<TransactionDto>
+
+Health:
+- GET /api/v1/payments/health
+    - Public health check.
+    - Data: "Payment Service Healthy"
+
+### Notification Service (Port 5005)
+
+Base route:
+- /api/v1/notifications
+
+Notification endpoints (authenticated):
+- GET /api/v1/notifications/logs?email=&page=&pageSize=
+    - Purpose: Paginated notification delivery logs.
+    - Success: 200 OK
+    - Data: GetNotificationLogsResult { total, page, pageSize, logs[] }
+    - logs[] item fields: id, userId?, recipient, subject, body, type, isSuccess, errorMessage?, traceId?, createdAtUtc
+- GET /api/v1/notifications/audit?userId=&traceId=&page=&pageSize=
+    - Purpose: Paginated audit trail entries.
+    - Success: 200 OK
+    - Data: GetAuditLogsResult { total, page, pageSize, logs[] }
+    - logs[] item fields: id, entityName, entityId, action, userId, changes?, traceId?, createdAtUtc
+
+Health note:
+- There is currently no notifications health controller route.
+- GET /api/v1/notifications/health currently returns 404.
 
 ---
 

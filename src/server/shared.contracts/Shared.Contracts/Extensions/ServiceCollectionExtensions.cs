@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-using Swashbuckle.AspNetCore.Swagger;
+using Microsoft.OpenApi;
 using Shared.Contracts.Configuration;
 using MassTransit;
 
@@ -44,7 +44,26 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddStandardApi(this IServiceCollection services)
     {
         services.AddOpenApi();
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(options =>
+        {
+            options.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "API",
+                Version = "v1"
+            });
+
+            var bearerSecurityScheme = new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
+                Description = "Enter JWT token.",
+                In = ParameterLocation.Header,
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT"
+            };
+
+            options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, bearerSecurityScheme);
+        });
         services.AddProblemDetails();
         return services;
     }
@@ -54,9 +73,10 @@ public static class ServiceCollectionExtensions
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
+            app.UseSwagger();
             app.UseSwaggerUI(options =>
             {
-                options.SwaggerEndpoint("/openapi/v1.json", title);
+                options.SwaggerEndpoint("/swagger/v1/swagger.json", title);
             });
         }
         return app;

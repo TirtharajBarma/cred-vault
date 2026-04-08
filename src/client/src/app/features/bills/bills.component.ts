@@ -5,7 +5,7 @@ import { RouterModule, Router } from '@angular/router';
 import { BillingService, Bill, BillStatus } from '../../core/services/billing.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { PaymentService } from '../../core/services/payment.service';
-import { RewardsService } from '../../core/services/rewards.service';
+import { RewardsService, StatementService, Statement } from '../../core/services/rewards.service';
 import { CreditCard } from '../../core/models/card.models';
 
 type MilestoneDisplay = {
@@ -28,6 +28,7 @@ export class BillsComponent implements OnInit {
   private dashboardService = inject(DashboardService);
   private paymentService = inject(PaymentService);
   private rewardsService = inject(RewardsService);
+  private statementService = inject(StatementService);
   private router = inject(Router);
 
   bills = signal<Bill[]>([]);
@@ -405,7 +406,27 @@ export class BillsComponent implements OnInit {
   }
 
   viewStatement(bill: Bill): void {
-    this.router.navigate(['/statements', bill.id]);
+    this.statementService.getStatementByBillId(bill.id).subscribe({
+      next: (res) => {
+        if (!res.success || !res.data) {
+          this.router.navigate(['/statements']);
+          return;
+        }
+
+        const data = Array.isArray(res.data) ? res.data : [res.data];
+        const statement = data[0] as Statement | undefined;
+
+        if (statement?.id) {
+          this.router.navigate(['/statements', statement.id], {
+            queryParams: { tab: 'transactions' }
+          });
+          return;
+        }
+
+        this.router.navigate(['/statements']);
+      },
+      error: () => this.router.navigate(['/statements'])
+    });
   }
 
   openPayment(bill: Bill): void {

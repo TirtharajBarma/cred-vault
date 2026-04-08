@@ -131,34 +131,42 @@
             }
 
             <!-- Real-Time Metrics Grid -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+            <div class="grid grid-cols-2 gap-4 sm:gap-6">
+              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-5 sm:p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between">
                 <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest mb-3">Credit Limit</p>
-                <p class="text-2xl font-black text-[#1b1c1c]">{{ c.creditLimit | currency:'INR' }}</p>
+                <div>
+                  <p class="text-xl sm:text-2xl font-black text-[#1b1c1c] break-words">{{ c.creditLimit | currency:'INR' }}</p>
+                </div>
               </div>
-              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-5 sm:p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between">
                 <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest mb-3">Available</p>
-                <p class="text-2xl font-black text-emerald-500">{{ (c.creditLimit - c.outstandingBalance) | currency:'INR' }}</p>
+                <div>
+                  <p class="text-xl sm:text-2xl font-black text-emerald-500 break-words">{{ (c.creditLimit - c.outstandingBalance) | currency:'INR' }}</p>
+                </div>
               </div>
-              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-5 sm:p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between">
                 <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest mb-3">Rewards</p>
-                <p class="text-2xl font-black text-[#8a5100]">{{ rewards() | number }} <span class="text-xs">pts</span></p>
+                <div>
+                  <p class="text-xl sm:text-2xl font-black text-[#8a5100] break-words">{{ rewards() | number }} <span class="text-sm">pts</span></p>
+                </div>
               </div>
-              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
-                <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest mb-3 flex items-center gap-1">
-                    Health Score
-                    <span class="group relative inline-block">
-                      <span class="w-4 h-4 rounded-full bg-primary/20 text-[#8a5100] text-[10px] font-bold flex items-center justify-center cursor-pointer">?</span>
-                      <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-charcoal text-white text-[10px] leading-relaxed p-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        <span class="font-bold text-[#8a5100]">What is this?</span><br>
-                        Your credit utilization = (Balance ÷ Credit Limit) × 100<br>
-                        <span class="text-[#615e5c]">Keep it below 30% for best score.</span>
-                      </span>
-                    </span>
+              <div class="bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] p-5 sm:p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between">
+                <div class="flex items-center gap-1 mb-3">
+                  <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest">
+                      Health Score
                   </p>
-                <div class="flex items-end gap-2">
-                  <p class="text-2xl font-black text-[#1b1c1c]">{{ healthScore() }}</p>
-                  <span [class]="'text-[10px] font-bold mb-1 uppercase ' + healthColor()">{{ healthLabel() }}</span>
+                  <span class="group relative inline-block shrink-0">
+                    <span class="w-4 h-4 rounded-full bg-primary/20 text-[#8a5100] text-[10px] font-bold flex items-center justify-center cursor-pointer">?</span>
+                    <span class="absolute bottom-full right-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-48 bg-charcoal text-white text-[10px] leading-relaxed p-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      <span class="font-bold text-[#8a5100]">What is this?</span><br>
+                      Your credit utilization = (Balance ÷ Credit Limit) × 100<br>
+                      <span class="text-[#615e5c]">Keep it below 30% for best score.</span>
+                    </span>
+                  </span>
+                </div>
+                <div class="flex items-end gap-2 flex-wrap">
+                  <p class="text-xl sm:text-2xl font-black text-[#1b1c1c] break-words">{{ healthScore() }}</p>
+                  <span [class]="'text-[10px] font-bold mb-1.5 uppercase shrink-0 ' + healthColor()">{{ healthLabel() }}</span>
                 </div>
               </div>
             </div>

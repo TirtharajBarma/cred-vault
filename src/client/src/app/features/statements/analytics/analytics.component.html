@@ -1,0 +1,87 @@
+<div class="w-full mt-6 grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 animate-fade-in">
+  <section class="xl:col-span-7 rounded-[2.25rem] border border-[#d8c3b2]/20 bg-white/70 p-6 sm:p-8 shadow-sm">
+    <div class="mb-6 flex items-start justify-between gap-4">
+      <div>
+        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a5100]">Spend Composition</p>
+        <h3 class="mt-2 text-3xl sm:text-[2.1rem] font-black leading-tight text-[#1b1c1c]">
+          {{ topCategoryPercentage }} on {{ topCategoryName }}
+        </h3>
+        <p class="mt-2 text-sm font-medium text-[#615e5c]">Category concentration for this statement cycle.</p>
+      </div>
+      <div class="hidden sm:flex flex-col items-end rounded-2xl border border-[#e9e1db] bg-[#fbf8f6] px-4 py-3">
+        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-[#8a5100]/80">Total Spend</span>
+        <span class="text-lg font-black text-[#1b1c1c]">{{ totalSpend() | currency:'INR' }}</span>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#615e5c]">{{ totalTransactions() }} txns</span>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+      <div class="relative mx-auto h-[280px] w-full max-w-[300px] rounded-[2rem] border border-[#efe7e1] bg-[#fcfaf9] p-4">
+        <canvas #categoryChart width="280" height="280"></canvas>
+      </div>
+
+      <div class="space-y-3">
+        @if (categories.length > 0) {
+          @for (cat of categories; track cat.name) {
+            <div class="flex items-center justify-between rounded-2xl border border-[#eadfd5] bg-[#fbf8f6] px-4 py-3.5 transition-all hover:border-[#d0b79f] hover:bg-white">
+              <div class="flex items-center gap-3">
+                <span class="size-2.5 rounded-full" [style.backgroundColor]="cat.color"></span>
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-black text-[#1b1c1c]">{{ cat.name }}</p>
+                  <p class="text-[10px] font-bold uppercase tracking-widest text-[#615e5c]">{{ cat.count }} transactions</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-sm font-black text-[#1b1c1c]">{{ cat.amount | currency:'INR' }}</p>
+                <p class="text-[11px] font-black text-[#8a5100]">{{ cat.percentage | number:'1.1-1' }}%</p>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="rounded-2xl border border-dashed border-[#d8c3b2]/40 bg-[#fbf8f6] px-5 py-8 text-center">
+            <p class="text-sm font-bold text-[#615e5c]">No categorized spends found for this statement.</p>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="xl:col-span-5 rounded-[2.25rem] border border-[#d8c3b2]/20 bg-white/70 p-6 sm:p-8 shadow-sm">
+    <div class="mb-6">
+      <p class="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a5100]">Top Merchants</p>
+      <h3 class="mt-2 text-2xl font-black text-[#1b1c1c]">Who got most of your spend</h3>
+      <p class="mt-1 text-sm font-medium text-[#615e5c]">Sorted by amount within this statement period.</p>
+    </div>
+
+    @if (topMerchants.length > 0) {
+      <div class="mb-4 rounded-2xl border border-[#eadfd5] bg-[#fbf8f6] p-4">
+        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[#8a5100]/80">Highest Merchant</p>
+        <div class="mt-2 flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="truncate text-lg font-black text-[#1b1c1c]">{{ topMerchants[0].name }}</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-[#615e5c]">Largest share</p>
+          </div>
+          <p class="shrink-0 text-lg font-black text-[#8a5100]">{{ topMerchants[0].amount | currency:'INR' }}</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 sm:gap-4">
+        @for (merchant of topMerchants.slice(0, 6); track merchant.name) {
+          <div class="rounded-2xl border border-[#eadfd5] bg-[#fbf8f6] p-4 transition-all hover:-translate-y-0.5 hover:border-[#d0b79f] hover:bg-white">
+            <div class="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#1b1c1c] text-sm font-black text-white">
+              {{ merchant.initials }}
+            </div>
+            <p class="truncate text-base font-black text-[#1b1c1c]">{{ merchant.amount | currency:'INR' }}</p>
+            <p class="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-[#615e5c]" [title]="merchant.name">
+              {{ merchant.name }}
+            </p>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="rounded-2xl border border-dashed border-[#d8c3b2]/40 bg-[#fbf8f6] px-5 py-8 text-center">
+        <p class="text-sm font-bold text-[#615e5c]">No merchant-level transactions available.</p>
+      </div>
+    }
+  </section>
+</div>
