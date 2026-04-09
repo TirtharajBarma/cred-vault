@@ -6,11 +6,6 @@ namespace BillingService.Infrastructure.Persistence.Sql.Repositories;
 
 public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillRepository
 {
-    public async Task<Bill?> GetByIdAsync(Guid billId, CancellationToken cancellationToken = default)
-    {
-        return await dbContext.Bills.FirstOrDefaultAsync(x => x.Id == billId, cancellationToken);
-    }
-
     public async Task<Bill?> GetByIdAndUserIdAsync(Guid billId, Guid userId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Bills.FirstOrDefaultAsync(x => x.Id == billId && x.UserId == userId, cancellationToken);
@@ -22,6 +17,34 @@ public sealed class SqlBillRepository(BillingDbContext dbContext) : IBillReposit
             .AsNoTracking()
             .Where(x => x.UserId == userId)
             .OrderByDescending(x => x.BillingDateUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> HasPendingBillAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Bills.AnyAsync(
+            x => x.UserId == userId
+                 && x.CardId == cardId
+                 && x.Status != BillStatus.Cancelled
+                 && (x.AmountPaid ?? 0) < x.Amount,
+            cancellationToken);
+    }
+
+    public async Task<bool> HasPendingBillForCardAsync(Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Bills.AnyAsync(
+            x => x.CardId == cardId
+                 && x.Status != BillStatus.Cancelled
+                 && (x.AmountPaid ?? 0) < x.Amount,
+            cancellationToken);
+    }
+
+    public async Task<List<Bill>> GetOverdueBillsAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Bills
+            .Where(x => x.Status != BillStatus.Cancelled
+                     && x.DueDateUtc < DateTime.UtcNow
+                     && (x.AmountPaid ?? 0) < x.Amount)
             .ToListAsync(cancellationToken);
     }
 

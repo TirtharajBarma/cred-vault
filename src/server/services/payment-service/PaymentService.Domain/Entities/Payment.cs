@@ -13,13 +13,11 @@ public sealed class Payment
     public PaymentStatus Status { get; set; }
     public string? FailureReason { get; set; }
     
-    public bool IsDeleted { get; set; }
-    public DateTime? DeletedAtUtc { get; set; }
+    public string? OtpCode { get; set; }
+    public DateTime? OtpExpiresAtUtc { get; set; }
+    
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
-    // Navigation
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
-    public RiskScore? RiskScore { get; set; }
-    public FraudAlert? FraudAlert { get; set; }
 }

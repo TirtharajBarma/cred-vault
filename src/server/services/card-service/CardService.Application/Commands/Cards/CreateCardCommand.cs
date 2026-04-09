@@ -1,112 +1,98 @@
 using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Common;
-using CardService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Card.Responses;
 using CardService.Domain.Entities;
 using Shared.Contracts.Enums;
 using Shared.Contracts.Events.Card;
 using Shared.Contracts.Models;
 using MediatR;
 using MassTransit;
-using System.Net.Http.Headers;
-using System.Text.Json;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace CardService.Application.Commands.Cards;
 
-public sealed record CreateCardCommand(
-    Guid UserId,
-    string CardholderName,
-    int ExpMonth,
-    int ExpYear,
-    string CardNumber,
-    Guid IssuerId,
-    bool IsDefault,
-    string AuthorizationHeader) : IRequest<CardResult>;
+public sealed record CreateCardCommand(Guid UserId, string CardholderName, int ExpMonth, int ExpYear, string CardNumber, Guid IssuerId, bool IsDefault) : IRequest<CardResult>;
 
-public record UserDto(Guid Id, string Email, string FullName);
-
-public sealed class CreateCardCommandHandler(
-    ICardRepository cardRepository,
-    IPublishEndpoint publishEndpoint,
-    IHttpClientFactory httpClientFactory,
-    IConfiguration configuration)
-    : IRequestHandler<CreateCardCommand, CardResult>
+public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndpoint publisher, ILogger<CreateCardCommandHandler> logger) : IRequestHandler<CreateCardCommand, CardResult>
 {
-    public async Task<CardResult> Handle(CreateCardCommand request, CancellationToken cancellationToken)
+    public async Task<CardResult> Handle(CreateCardCommand request, CancellationToken ct)
     {
-        if (request.UserId == Guid.Empty) return new CardResult { Success = false, ErrorCode = "Forbidden", Message = "Not authorized." };
+        logger.LogInformation("CreateCard requested: UserId={UserId}", request.UserId);
+
+        if (request.UserId == Guid.Empty)
+        {
+            logger.LogWarning("CreateCard rejected: UserId is empty");
+            return new() { Success = false, ErrorCode = "Forbidden", Message = "Not authorized" };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CardNumber) || string.IsNullOrWhiteSpace(request.CardholderName))
+        {
+            logger.LogWarning("CreateCard rejected: missing card number or holder name");
+            return new() { Success = false, ErrorCode = "ValidationError", Message = "Card number and holder name required" };
+        }
+
+        if (request.ExpMonth < 1 || request.ExpMonth > 12)
+        {
+            logger.LogWarning("CreateCard rejected: invalid exp month {ExpMonth}", request.ExpMonth);
+            return new() { Success = false, ErrorCode = "ValidationError", Message = "Expiration month must be between 1 and 12" };
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        if (request.ExpYear < nowUtc.Year || request.ExpYear > nowUtc.Year + 25)
+        {
+            logger.LogWarning("CreateCard rejected: invalid exp year {ExpYear}", request.ExpYear);
+            return new() { Success = false, ErrorCode = "ValidationError", Message = "Expiration year is invalid" };
+        }
 
         var digits = CardHelpers.DigitsOnly(request.CardNumber);
-        var network = CardHelpers.DetectNetwork(digits);
-        if (network == CardNetwork.Unknown) return new CardResult { Success = false, Message = "Unsupported card network." };
+        if (digits.Length < 13 || digits.Length > 19)
+        {
+            logger.LogWarning("CreateCard rejected: invalid card number length {Length}", digits.Length);
+            return new() { Success = false, Message = "Invalid card number length" };
+        }
 
-        var issuer = await cardRepository.GetIssuerByIdAsync(request.IssuerId, cancellationToken);
-        if (issuer is null || issuer.Network != network) return new CardResult { Success = false, Message = "Issuer mismatch or not found." };
+        var issuer = await cards.GetIssuerByIdAsync(request.IssuerId, ct);
+        if (issuer == null)
+        {
+            logger.LogWarning("CreateCard rejected: issuer {IssuerId} not found", request.IssuerId);
+            return new() { Success = false, Message = "Issuer not found" };
+        }
+
+        var detectedNetwork = CardHelpers.DetectNetwork(digits);
+        if (detectedNetwork != CardNetwork.Unknown && issuer.Network != detectedNetwork)
+        {
+            logger.LogWarning("CreateCard rejected: issuer/network mismatch");
+            return new() { Success = false, Message = "Issuer doesn't support this card network" };
+        }
+
+        var network = issuer.Network;
 
         var last4 = digits.Length >= 4 ? digits[^4..] : digits;
+        if (await cards.HasDuplicateCardAsync(request.UserId, network, last4, ct))
+        {
+            logger.LogWarning("CreateCard rejected: duplicate card for UserId={UserId}", request.UserId);
+            return new() { Success = false, Message = "Duplicate card" };
+        }
 
-        var isDuplicate = await cardRepository.HasDuplicateCardAsync(request.UserId, network, last4, cancellationToken);
-        if (isDuplicate) return new CardResult { Success = false, Message = "A card with the same network and last 4 digits already exists." };
         var card = new CreditCard
         {
-            Id = Guid.NewGuid(),
-            UserId = request.UserId,
-            CardholderName = request.CardholderName.Trim(),
-            ExpMonth = request.ExpMonth,
-            ExpYear = request.ExpYear,
-            Last4 = last4,
-            MaskedNumber = CardHelpers.MaskCardNumber(digits),
-            IssuerId = issuer.Id,
-            CreditLimit = 0,
-            OutstandingBalance = 0,
-            BillingCycleStartDay = DateTime.UtcNow.Day,
-            IsDefault = request.IsDefault,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            Id = Guid.NewGuid(), UserId = request.UserId, CardholderName = request.CardholderName.Trim(),
+            ExpMonth = request.ExpMonth, ExpYear = request.ExpYear, Last4 = last4,
+            MaskedNumber = CardHelpers.MaskCardNumber(digits), IssuerId = issuer.Id,
+            CreditLimit = 0, OutstandingBalance = 0, BillingCycleStartDay = DateTime.UtcNow.Day,
+            IsDefault = request.IsDefault, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         };
 
-        if (card.IsDefault) await cardRepository.UnsetDefaultForUserAsync(request.UserId, null, cancellationToken);
-        await cardRepository.AddAsync(card, cancellationToken);
+        if (card.IsDefault) await cards.UnsetDefaultForUserAsync(request.UserId, null, ct);
+        await cards.AddAsync(card, ct);
+        logger.LogInformation("Card created: {CardId}, UserId={UserId}, Last4={Last4}", card.Id, request.UserId, last4);
 
-        // Fetch user details for notification
-        var (userSuccess, user, _) = await FetchUserDetailsAsync(request.UserId, request.AuthorizationHeader, cancellationToken);
-        if (userSuccess && user is not null)
-        {
-            await publishEndpoint.Publish<ICardAdded>(new
-            {
-                CardId = card.Id,
-                card.UserId,
-                user.Email,
-                user.FullName,
-                CardNumberLast4 = card.Last4,
-                CardHolderName = card.CardholderName,
-                AddedAt = card.CreatedAtUtc
-            }, cancellationToken);
-        }
+        var userEmail = $"user-{request.UserId}@credvault.local";
+        var userName = request.CardholderName.Trim();
 
-        return new CardResult { Success = true, Message = "Card created.", Card = CardMapping.ToDto(card) };
-    }
+        await publisher.Publish<ICardAdded>(new { CardId = card.Id, UserId = card.UserId, Email = userEmail, FullName = userName, CardNumberLast4 = card.Last4, CardHolderName = card.CardholderName, AddedAt = card.CreatedAtUtc }, ct);
+        logger.LogInformation("Published ICardAdded for {CardId}", card.Id);
 
-    private async Task<(bool Success, UserDto? User, string? Error)> FetchUserDetailsAsync(Guid userId, string authHeader, CancellationToken ct)
-    {
-        try
-        {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
-            client.BaseAddress = new Uri(baseUrl);
-
-            var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/identity/users/{userId}");
-            if (!string.IsNullOrEmpty(authHeader))
-                request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
-
-            var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode) return (false, null, $"Failed to fetch user: {response.ReasonPhrase}");
-
-            var content = await response.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<ApiResponse<UserDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            
-            return (result?.Success ?? false, result?.Data, result?.Message);
-        }
-        catch (Exception ex) { return (false, null, ex.Message); }
+        return new() { Success = true, Message = "Card created", Card = CardMapping.ToDto(card) };
     }
 }

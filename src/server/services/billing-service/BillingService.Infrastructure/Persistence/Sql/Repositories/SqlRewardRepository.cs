@@ -24,11 +24,23 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
             .Where(x => x.CardNetwork == network && 
                         (x.IssuerId == issuerId || x.IssuerId == null) &&
                         x.EffectiveFromUtc <= dateUtc && 
-                        (x.EffectiveToUtc == null || x.EffectiveToUtc >= dateUtc) &&
+                        (x.EffectiveToUtc == null || x.EffectiveToUtc > dateUtc) &&
                         amount >= x.MinSpend)
             .OrderByDescending(x => x.IssuerId != null) // Prioritize Issuer-specific tiers over network defaults
-            .ThenByDescending(x => x.MinSpend)
+            .ThenByDescending(x => x.MinSpend)          // Higher spend threshold first
+            .ThenByDescending(x => x.RewardRate)        // Higher reward rate for same MinSpend
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<RewardTier?> GetTierByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RewardTiers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    }
+
+    public async Task DeleteTierAsync(RewardTier tier, CancellationToken cancellationToken = default)
+    {
+        dbContext.RewardTiers.Remove(tier);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task AddTierAsync(RewardTier tier, CancellationToken cancellationToken = default)
@@ -36,9 +48,22 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
         await dbContext.RewardTiers.AddAsync(tier, cancellationToken);
     }
 
+    public Task UpdateTierAsync(RewardTier tier, CancellationToken cancellationToken = default)
+    {
+        dbContext.RewardTiers.Update(tier);
+        return Task.CompletedTask;
+    }
+
     public async Task<RewardAccount?> GetAccountByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await dbContext.RewardAccounts.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+    }
+
+    public async Task<List<RewardAccount>> GetAccountsByTierIdAsync(Guid tierId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RewardAccounts
+            .Where(x => x.RewardTierId == tierId)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task AddAccountAsync(RewardAccount account, CancellationToken cancellationToken = default)
@@ -69,7 +94,7 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
     public async Task<bool> HasTransactionForBillAsync(Guid billId, CancellationToken cancellationToken = default)
     {
         return await dbContext.RewardTransactions
-            .AnyAsync(x => x.BillId == billId, cancellationToken);
+            .AnyAsync(x => x.BillId == billId && x.Type == RewardTransactionType.Earned, cancellationToken);
     }
 
     public async Task<RewardTransaction?> GetTransactionByBillIdAsync(Guid billId, CancellationToken cancellationToken = default)
@@ -82,5 +107,10 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
     {
         dbContext.RewardTransactions.Update(transaction);
         return Task.CompletedTask;
+    }
+
+    public Task<bool> HasAccountsByTierAsync(Guid tierId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.RewardAccounts.AnyAsync(x => x.RewardTierId == tierId, cancellationToken);
     }
 }

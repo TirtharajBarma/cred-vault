@@ -16,7 +16,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Email).IsRequired().HasMaxLength(256);
             entity.Property(x => x.FullName).IsRequired().HasMaxLength(256);
-            entity.Property(x => x.PasswordHash).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.PasswordHash).IsRequired(false).HasMaxLength(500);
             entity.Property(x => x.EmailVerificationOtp).HasMaxLength(16);
             entity.Property(x => x.PasswordResetOtp).HasMaxLength(16);
             entity.Property(x => x.Status)

@@ -1,0 +1,182 @@
+<div class="space-y-8 lg:space-y-12 animate-in fade-in duration-700">
+  <!-- Header Info -->
+  <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div>
+      <h1 class="text-3xl lg:text-5xl font-black tracking-tight text-charcoal mb-2">System Health</h1>
+      <p class="text-misty-gray font-medium text-sm lg:text-lg">Comprehensive overview of CredVault's global infrastructure.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      @if (lastUpdated()) {
+        <span class="text-xs text-misty-gray">Updated {{ formatTime(lastUpdated()) }}</span>
+      }
+      <button (click)="onAuditRefresh()" [disabled]="isLoading() || isRefreshing()"
+              class="h-10 px-4 bg-white border border-charcoal/10 rounded-xl font-bold text-charcoal hover:bg-mist-cream transition-all flex items-center gap-2 disabled:opacity-50">
+        <span [class.animate-spin]="isLoading() || isRefreshing()" class="material-symbols-outlined text-sm">refresh</span>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+    <!-- Total Users -->
+    <div class="glass-card-premium p-5 lg:p-6 rounded-2xl lg:rounded-[2rem] flex flex-col justify-between h-32 lg:h-40 group hover:-translate-y-1 transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div class="w-10 h-10 lg:w-12 lg:h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+          <span class="material-symbols-outlined font-black text-lg lg:text-xl">group</span>
+        </div>
+        <span class="text-[8px] lg:text-[9px] font-black uppercase tracking-widest text-primary/60 bg-primary/5 px-2 py-1 rounded-lg">Total</span>
+      </div>
+      <div>
+        <p class="text-3xl lg:text-4xl font-black text-charcoal">{{ isLoading() ? '...' : stats().totalUsers }}</p>
+        <p class="text-[10px] lg:text-xs font-bold text-misty-gray uppercase tracking-widest mt-1">Platform Users</p>
+      </div>
+    </div>
+
+    <!-- Active Users -->
+    <div class="glass-card-premium p-5 lg:p-6 rounded-2xl lg:rounded-[2rem] flex flex-col justify-between h-32 lg:h-40 group hover:-translate-y-1 transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div class="w-10 h-10 lg:w-12 lg:h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+          <span class="material-symbols-outlined font-black text-lg lg:text-xl">verified_user</span>
+        </div>
+      </div>
+      <div>
+        <p class="text-3xl lg:text-4xl font-black text-charcoal">{{ isLoading() ? '...' : stats().activeUsers }}</p>
+        <p class="text-[10px] lg:text-xs font-bold text-misty-gray uppercase tracking-widest mt-1">Active Users</p>
+      </div>
+    </div>
+
+    <!-- Active Issuers -->
+    <div class="glass-card-premium p-5 lg:p-6 rounded-2xl lg:rounded-[2rem] flex flex-col justify-between h-32 lg:h-40 group hover:-translate-y-1 transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div class="w-10 h-10 lg:w-12 lg:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+          <span class="material-symbols-outlined font-black text-lg lg:text-xl">account_balance</span>
+        </div>
+      </div>
+      <div>
+        <p class="text-3xl lg:text-4xl font-black text-charcoal">{{ isLoading() ? '...' : stats().activeIssuers }}</p>
+        <p class="text-[10px] lg:text-xs font-bold text-misty-gray uppercase tracking-widest mt-1">Active Issuers</p>
+      </div>
+    </div>
+
+    <!-- Reward Tiers -->
+    <div class="glass-card-premium p-5 lg:p-6 rounded-2xl lg:rounded-[2rem] flex flex-col justify-between h-32 lg:h-40 group hover:-translate-y-1 transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div class="w-10 h-10 lg:w-12 lg:h-12 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+          <span class="material-symbols-outlined font-black text-lg lg:text-xl">military_tech</span>
+        </div>
+      </div>
+      <div>
+        <p class="text-3xl lg:text-4xl font-black text-charcoal">{{ isLoading() ? '...' : stats().rewardTiers }}</p>
+        <p class="text-[10px] lg:text-xs font-bold text-misty-gray uppercase tracking-widest mt-1">Reward Tiers</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Secondary Stats Row -->
+  <div class="grid grid-cols-2 gap-3 lg:gap-4">
+    <div class="glass-card-premium p-4 rounded-xl lg:rounded-2xl text-center">
+      <p class="text-xl lg:text-2xl font-black text-red-500">{{ isLoading() ? '...' : stats().suspendedUsers }}</p>
+      <p class="text-[9px] lg:text-[10px] font-bold text-misty-gray uppercase tracking-wider mt-1">Suspended</p>
+    </div>
+    <div class="glass-card-premium p-4 rounded-xl lg:rounded-2xl text-center">
+      <p class="text-xl lg:text-2xl font-black text-amber-500">{{ isLoading() ? '...' : stats().pendingUsers }}</p>
+      <p class="text-[9px] lg:text-[10px] font-bold text-misty-gray uppercase tracking-wider mt-1">Pending</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+    <!-- Audit Trail -->
+    <section class="space-y-4">
+      <div class="flex items-center justify-between px-2">
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg lg:text-xl font-black tracking-tight text-charcoal">Recent Audit Trail</h3>
+          <button (click)="onAuditRefresh()" [disabled]="isLoading()"
+                  [class.animate-spin]="isLoading()"
+                  class="p-1.5 hover:bg-charcoal/5 rounded-lg transition-all text-charcoal/40 hover:text-primary">
+            <span class="material-symbols-outlined text-sm">refresh</span>
+          </button>
+        </div>
+        <button (click)="navigateToLogs()" 
+                class="text-xs font-black text-primary uppercase tracking-widest hover:translate-x-1 transition-transform flex items-center gap-2">
+          View All Logs <span class="material-symbols-outlined text-xs">arrow_forward</span>
+        </button>
+      </div>
+
+      <div class="glass-card-premium rounded-2xl p-3 lg:p-4 min-h-[280px] lg:min-h-[360px]">
+        @if (recentLogs().length > 0) {
+          <div class="space-y-2">
+            @for (log of recentLogs(); track log.id || $index) {
+              <div class="flex items-center gap-3 p-3 hover:bg-mist-cream/50 rounded-xl transition-all border border-transparent hover:border-charcoal/5">
+                <div class="w-10 h-10 bg-charcoal/5 rounded-xl flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-misty-gray text-lg">{{ getActionIcon(log.action) }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <h4 class="font-bold text-charcoal text-sm truncate">{{ log.entityName || 'System Event' }}</h4>
+                  <p class="text-[9px] font-bold text-misty-gray uppercase tracking-wider mt-0.5">
+                    {{ log.createdAtUtc | date:'MMM dd, HH:mm':'Asia/Kolkata' }} IST • {{ log.action || 'N/A' }}
+                  </p>
+                </div>
+                <span [class]="log.isSuccess === false ? 'bg-red-500/10 text-red-600 border-red-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'" 
+                      class="px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shrink-0">
+                  {{ log.isSuccess === false ? 'Failed' : 'Success' }}
+                </span>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="h-full flex flex-col items-center justify-center py-12 text-center opacity-40">
+            <span class="material-symbols-outlined text-4xl mb-3">history_toggle_off</span>
+            <p class="font-bold text-sm">No recent system events</p>
+            <p class="text-xs text-misty-gray mt-1">Events will appear here when triggered</p>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="space-y-4">
+      <h3 class="text-lg lg:text-xl font-black tracking-tight text-charcoal px-2">Administrative Actions</h3>
+      <div class="grid grid-cols-1 gap-4">
+        <button (click)="onGrantAccess()" class="glass-card-premium p-5 lg:p-6 rounded-2xl text-left group hover:bg-charcoal hover:translate-y-[-4px] transition-all duration-300">
+          <div class="w-12 h-12 bg-primary rounded-xl lg:rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
+            <span class="material-symbols-outlined text-charcoal font-black text-xl">person_add</span>
+          </div>
+          <h4 class="text-base lg:text-lg font-bold text-charcoal group-hover:text-white transition-colors">Grant Access</h4>
+          <p class="text-[9px] lg:text-[10px] font-semibold text-misty-gray group-hover:text-white/40 transition-colors mt-1">User management</p>
+        </button>
+
+        <button (click)="onEmergencyBill()" class="glass-card-premium p-5 lg:p-6 rounded-2xl text-left group hover:bg-emerald-600 hover:translate-y-[-4px] transition-all duration-300">
+          <div class="w-12 h-12 bg-emerald-500/10 rounded-xl lg:rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/10 transition-all">
+            <span class="material-symbols-outlined text-emerald-600 group-hover:text-white text-xl">receipt_long</span>
+          </div>
+          <h4 class="text-base lg:text-lg font-bold text-charcoal group-hover:text-white transition-colors">Bill Generation</h4>
+          <p class="text-[9px] lg:text-[10px] font-semibold text-misty-gray group-hover:text-white/40 transition-colors mt-1">Create bills</p>
+        </button>
+      </div>
+
+      <!-- Quick Links -->
+      <div class="glass-card-premium p-4 rounded-2xl">
+        <h4 class="text-sm font-black text-charcoal mb-3">Quick Navigation</h4>
+        <div class="grid grid-cols-2 gap-2">
+          <a routerLink="/admin/issuers" class="flex items-center gap-2 p-3 rounded-xl hover:bg-mist-cream/50 transition-colors text-sm font-bold text-charcoal/70">
+            <span class="material-symbols-outlined text-primary text-sm">account_balance</span>
+            Card Issuers
+          </a>
+          <a routerLink="/admin/rewards" class="flex items-center gap-2 p-3 rounded-xl hover:bg-mist-cream/50 transition-colors text-sm font-bold text-charcoal/70">
+            <span class="material-symbols-outlined text-primary text-sm">military_tech</span>
+            Reward Tiers
+          </a>
+          <a routerLink="/admin/logs" class="flex items-center gap-2 p-3 rounded-xl hover:bg-mist-cream/50 transition-colors text-sm font-bold text-charcoal/70">
+            <span class="material-symbols-outlined text-primary text-sm">database</span>
+            System Logs
+          </a>
+          <a routerLink="/admin/users" class="flex items-center gap-2 p-3 rounded-xl hover:bg-mist-cream/50 transition-colors text-sm font-bold text-charcoal/70">
+            <span class="material-symbols-outlined text-primary text-sm">group</span>
+            All Users
+          </a>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Shared.Contracts.Enums;
 using Shared.Contracts.Models;
+using Shared.Contracts.Exceptions;
 
 namespace BillingService.Application.Commands.Bills;
 
@@ -26,31 +27,31 @@ public class RevertBillPaidCommandHandler(
         if (bill is null)
         {
             logger.LogWarning("Bill not found: BillId={BillId} UserId={UserId}", request.BillId, request.UserId);
-            return new ApiResponse<bool> { Success = false, Message = "Bill not found.", Data = false };
+            throw new NotFoundException("Bill", request.BillId);
         }
 
-        if (bill.Status != BillStatus.Paid)
+        if (bill.Status == BillStatus.Pending || bill.Status == BillStatus.Cancelled)
         {
-            logger.LogInformation("Bill {BillId} is not paid, nothing to revert", request.BillId);
+            logger.LogInformation("Bill {BillId} is {Status}, nothing to revert", request.BillId, bill.Status);
             return new ApiResponse<bool> { Success = true, Message = "Bill is not paid.", Data = true };
         }
 
-        // Revert bill status
-        bill.Status = BillStatus.Pending;
-        bill.AmountPaid = null;
-        bill.PaidAtUtc = null;
-        bill.UpdatedAtUtc = DateTime.UtcNow;
-
-        await billRepository.UpdateAsync(bill, cancellationToken);
-
-        // Deduct rewards - find the reward transaction for this bill and reverse it
+        // Revert rewards - find the reward transaction for this bill and reverse it
         var rewardTx = await rewardRepository.GetTransactionByBillIdAsync(request.BillId, cancellationToken);
         if (rewardTx != null)
         {
             var account = await rewardRepository.GetAccountByUserIdAsync(request.UserId, cancellationToken);
-            if (account != null && account.PointsBalance >= rewardTx.Points)
+            if (account != null)
             {
-                account.PointsBalance -= rewardTx.Points;
+                // Prevent balance from going negative
+                if (account.PointsBalance >= rewardTx.Points)
+                {
+                    account.PointsBalance -= rewardTx.Points;
+                }
+                else
+                {
+                    account.PointsBalance = 0;
+                }
                 account.UpdatedAtUtc = DateTime.UtcNow;
                 await rewardRepository.UpdateAccountAsync(account, cancellationToken);
 
@@ -59,9 +60,32 @@ public class RevertBillPaidCommandHandler(
                 rewardTx.ReversedAtUtc = DateTime.UtcNow;
                 await rewardRepository.UpdateTransactionAsync(rewardTx, cancellationToken);
 
-                logger.LogInformation("Deducted {Points} points from user {UserId} account", rewardTx.Points, request.UserId);
+                logger.LogInformation("Reversed {Points} points from user {UserId} account", rewardTx.Points, request.UserId);
             }
         }
+
+        // Revert bill status - handle both Paid and PartiallyPaid
+        var currentPaid = bill.AmountPaid ?? 0;
+        var revertAmount = request.Amount;
+
+        if (bill.Status == BillStatus.Paid && revertAmount >= currentPaid)
+        {
+            // Full reversal
+            bill.Status = BillStatus.Pending;
+            bill.AmountPaid = null;
+            bill.PaidAtUtc = null;
+        }
+        else
+        {
+            // Partial reversal
+            var newPaid = Math.Max(0, currentPaid - revertAmount);
+            bill.AmountPaid = newPaid > 0 ? newPaid : null;
+            bill.Status = newPaid > 0 ? BillStatus.PartiallyPaid : BillStatus.Pending;
+            bill.PaidAtUtc = newPaid > 0 ? bill.PaidAtUtc : null;
+        }
+
+        bill.UpdatedAtUtc = DateTime.UtcNow;
+        await billRepository.UpdateAsync(bill, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

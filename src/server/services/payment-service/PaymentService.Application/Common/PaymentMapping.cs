@@ -1,4 +1,4 @@
-using PaymentService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Payment.Responses;
 using PaymentService.Domain.Entities;
 
 namespace PaymentService.Application.Common;
@@ -28,15 +28,5 @@ public static class PaymentMapping
         Type         = t.Type.ToString(),
         Description  = t.Description,
         CreatedAtUtc = t.CreatedAtUtc
-    };
-
-    public static RiskScoreDto ToDto(RiskScore r) => new()
-    {
-        Id           = r.Id,
-        PaymentId    = r.PaymentId,
-        UserId       = r.UserId,
-        Score        = r.Score,
-        Decision     = r.Decision.ToString(),
-        CreatedAtUtc = r.CreatedAtUtc
     };
 }

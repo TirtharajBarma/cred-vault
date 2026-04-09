@@ -1,0 +1,502 @@
+<div class="bills-page relative overflow-hidden min-h-full bg-[#F0EDEB] text-[#1b1c1c]">
+  <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+    <div class="glow-cloud glow-cloud-1"></div>
+    <div class="glow-cloud glow-cloud-2"></div>
+    <div class="absolute inset-0 bg-gradient-to-b from-[#dcd9d9]/20 to-[#fbf9f8]"></div>
+  </div>
+
+  <main class="mx-auto max-w-7xl px-5 pb-16 pt-32 md:px-8 md:pt-36">
+    <header class="mb-12 space-y-4 md:mb-16">
+      <div class="inline-block rounded-full border border-[#f0a046]/20 bg-[#f0a046]/10 px-3 py-1">
+        <span class="text-[0.65rem] font-bold uppercase tracking-[0.15em] text-[#8a5100]">Financial Overview</span>
+      </div>
+      <h1 class="text-5xl font-extrabold leading-tight tracking-tight md:text-[3.5rem]">
+        Bills &
+        <span class="text-[#8a5100] italic font-[Georgia,Times,serif] font-light">Payments</span>
+      </h1>
+      <p class="max-w-2xl text-base font-light leading-relaxed text-[#534437] md:text-lg">
+        Effortlessly manage your recurring obligations. Our intelligent system tracks and schedules your
+        payments for maximum reliability.
+      </p>
+    </header>
+
+    <section class="mb-16 grid grid-cols-1 gap-6 md:mb-20 md:grid-cols-3 md:gap-8">
+      <article class="mist-blur group relative overflow-hidden rounded-[2rem] bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] transition-all hover:-translate-y-1 md:p-8">
+        <div class="absolute right-0 top-0 p-6 opacity-10 transition-opacity group-hover:opacity-20">
+          <span class="material-symbols-outlined text-6xl">account_balance_wallet</span>
+        </div>
+        <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Total Outstanding</label>
+        <div class="mb-2 text-4xl font-extrabold tracking-tight">{{ totalOutstanding() | currency:'INR' }}</div>
+        <div class="flex items-center gap-2 text-sm font-semibold text-[#8a5100]">
+          <span class="material-symbols-outlined text-sm">trending_up</span>
+          <span>All unpaid bills</span>
+        </div>
+      </article>
+
+      <article class="mist-blur relative overflow-hidden rounded-[2rem] border-l-4 border-[#8a5100]/20 bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] transition-all hover:-translate-y-1 md:p-8">
+        <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Upcoming Milestone</label>
+        <div class="mb-3 text-4xl font-extrabold tracking-tight tabular-nums">
+          {{ getMilestoneDate() ? (getMilestoneDate()! | date:'MMM dd, yyyy') : 'No Date' }}
+        </div>
+        @if (getMilestoneDate()) {
+          <div class="space-y-2">
+            <div class="inline-flex items-center rounded-full bg-[#8a5100]/10 px-3 py-1">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-[#8a5100]">{{ getMilestoneBadgeLabel() }}</span>
+            </div>
+            <p class="text-sm font-semibold text-[#1b1c1c] truncate">{{ getUpcomingMilestoneCardLabel() }}</p>
+            <div class="flex items-center gap-2 text-xs font-semibold text-[#615e5c]">
+              <span class="material-symbols-outlined text-sm">schedule</span>
+              {{ getUpcomingMilestoneSubtitle() }}
+            </div>
+            <p class="text-[11px] font-medium text-[#8b8681]">{{ getUpcomingMilestoneSupportText() }}</p>
+          </div>
+        } @else {
+          <div class="text-sm font-medium text-[#534437]">No pending bills</div>
+        }
+      </article>
+
+      <article class="mist-blur group relative overflow-hidden rounded-[2rem] bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] transition-all hover:-translate-y-1 md:p-8">
+        <div class="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-[#8a5100]/5"></div>
+        <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Reliability Score</label>
+        <div class="mb-2 text-4xl font-extrabold tracking-tight">99.8%</div>
+        <div class="flex items-center gap-1">
+          <div class="flex">
+            @for (i of [1, 2, 3, 4, 5]; track i) {
+              <span class="material-symbols-outlined fill-icon text-xs text-[#8a5100]">star</span>
+            }
+          </div>
+          <span class="ml-2 text-xs text-[#534437]">Elite Status</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="space-y-6 md:space-y-8">
+      <div class="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+        <h2 class="text-2xl font-bold tracking-tight">Upcoming Obligations</h2>
+        <div class="flex flex-wrap gap-3 md:gap-4">
+          <div class="flex items-center gap-2 rounded-full bg-[#f6f3f2] px-4 py-2 text-sm font-medium text-[#534437]">
+            <button (click)="setFilter(null)" [class.bg-primary-container]="filterStatus() === null" class="px-3 py-1 rounded-full hover:bg-[#eae8e7]">All</button>
+            <button (click)="setFilter('due')" [class.bg-primary-container]="filterStatus() === 'due'" class="px-3 py-1 rounded-full hover:bg-[#eae8e7]">Due</button>
+            <button (click)="setFilter(2)" [class.bg-primary-container]="filterStatus() === 2" class="px-3 py-1 rounded-full hover:bg-[#eae8e7]">Paid</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mist-blur overflow-hidden rounded-[2.5rem] bg-white/60 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)]">
+        <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <table class="min-w-[920px] w-full border-collapse text-left">
+            <thead>
+              <tr class="border-b border-[#d8c3b2]/20">
+                <th class="px-8 py-6 text-[0.65rem] font-bold uppercase tracking-widest text-[#615e5c]">Payee / Card</th>
+                <th class="px-8 py-6 text-[0.65rem] font-bold uppercase tracking-widest text-[#615e5c]">Category</th>
+                <th class="px-8 py-6 text-[0.65rem] font-bold uppercase tracking-widest text-[#615e5c]">Due Date</th>
+                <th class="px-8 py-6 text-[0.65rem] font-bold uppercase tracking-widest text-[#615e5c]">Amount</th>
+                <th class="px-8 py-6 text-[0.65rem] font-bold uppercase tracking-widest text-[#615e5c]">Status</th>
+                <th class="px-8 py-6"></th>
+              </tr>
+            </thead>
+
+            @if (isLoading()) {
+              <tbody>
+                @for (i of [1, 2, 3, 4]; track i) {
+                  <tr class="border-b border-[#d8c3b2]/10">
+                    <td colspan="6" class="p-4">
+                      <div class="skeleton h-20 rounded-2xl"></div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            } @else if (paginatedBills().length > 0) {
+              <tbody class="divide-y divide-[#d8c3b2]/10">
+                @for (bill of paginatedBills(); track bill.id) {
+                  <tr 
+                    class="group transition-colors hover:bg-[#8a5100]/5 cursor-pointer"
+                    (click)="viewStatement(bill)"
+                  >
+                    <td class="px-8 py-6">
+                      <div class="flex items-center gap-4">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eae8e7]">
+                          <span class="material-symbols-outlined text-[#8a5100]">{{ getPayeeInfo(bill).icon }}</span>
+                        </div>
+                        <div>
+                          <div class="font-bold">{{ getPayeeInfo(bill).name }}</div>
+                          <div class="text-xs text-[#534437]">{{ getPayeeInfo(bill).sub }}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td class="px-8 py-6">
+                      <span class="rounded-full bg-[#e7e1df]/50 px-3 py-1 text-[0.7rem] font-bold uppercase tracking-tighter text-[#494645]">
+                        {{ getPayeeInfo(bill).category }}
+                      </span>
+                    </td>
+
+                    <td class="px-8 py-6">
+                      <div class="text-sm font-medium">{{ bill.dueDateUtc | date:'MMM dd, yyyy' }}</div>
+                      <div
+                        class="text-[0.65rem] font-bold uppercase"
+                        [ngClass]="{ 'text-[#ba1a1a]': isBillPayable(bill), 'text-[#615e5c]': !isBillPayable(bill) }"
+                      >
+                        {{ getBillSecondaryStatusText(bill) }}
+                      </div>
+                    </td>
+
+                    <td class="px-8 py-6">
+                      @if (isBillPaid(bill)) {
+                        <div class="text-lg font-bold">{{ bill.amount | currency:'INR' }}</div>
+                      } @else {
+                        <div class="text-lg font-bold">{{ getBillOutstandingAmount(bill) | currency:'INR' }}</div>
+                      }
+                      <div class="text-xs text-[#534437]">Min: {{ bill.minDue | currency:'INR' }}</div>
+                    </td>
+
+                    <td class="px-8 py-6">
+                      <div class="flex items-center gap-2">
+                        <div
+                          class="h-1.5 w-1.5 rounded-full"
+                          [ngClass]="{ 'bg-[#f0a046] animate-pulse': isBillPayable(bill) && getBillStatusLabel(bill) !== 'Overdue', 'bg-[#ba1a1a] animate-pulse': getBillStatusLabel(bill) === 'Overdue', 'bg-[#4caf50]': isBillPaid(bill) }"
+                        ></div>
+                        <span class="text-xs font-semibold text-[#534437]">
+                          {{ getBillStatusLabel(bill) }}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td class="px-8 py-6 text-right" (click)="$event.stopPropagation()">
+                      @if (isBillPayable(bill)) {
+                        <button
+                          (click)="openPayment(bill)"
+                          class="rounded-full bg-[#8a5100] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-[#8a5100]/20 transition-all hover:scale-105 active:scale-95"
+                        >
+                          Pay Bill
+                        </button>
+                      } @else if (isBillPaid(bill)) {
+                        <span class="text-xs font-semibold text-[#4caf50]">
+                          <span class="material-symbols-outlined text-sm align-middle">check_circle</span>
+                          Paid
+                        </span>
+                      } @else {
+                        <span class="text-xs font-semibold text-[#615e5c]">
+                          {{ getBillStatusLabel(bill) }}
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            } @else {
+              <tbody>
+                <tr>
+                  <td colspan="6" class="px-8 py-20 text-center">
+                    <div class="mb-4 text-2xl font-bold">No Obligations Found</div>
+                    <p class="mx-auto max-w-md text-sm text-[#534437]">Everything seems to be clear. Any upcoming payments will appear here automatically.</p>
+                  </td>
+                </tr>
+              </tbody>
+            }
+          </table>
+        </div>
+
+        @if (totalPages() > 1) {
+          <div class="flex items-center justify-between px-8 py-6 border-t border-[#d8c3b2]/20">
+            <span class="text-sm font-medium text-[#534437]">Page {{ currentPage() }} of {{ totalPages() }}</span>
+            <div class="flex gap-3">
+              <button (click)="prevPage()" [disabled]="currentPage() === 1" class="flex items-center gap-2 px-6 py-2 rounded-full border border-[#d8c3b2]/30 text-sm font-semibold text-[#534437] hover:bg-white/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                <span class="material-symbols-outlined text-lg">chevron_left</span>
+                Previous
+              </button>
+              <button (click)="nextPage()" [disabled]="currentPage() === totalPages()" class="flex items-center gap-2 px-6 py-2 rounded-full bg-[#8a5100] text-white text-sm font-semibold hover:bg-[#7a4600] disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                Next
+                <span class="material-symbols-outlined text-lg">chevron_right</span>
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- PAYMENT MODAL -->
+@if (showPaymentModal() && selectedBill()) {
+  <div class="fixed inset-0 bg-[#1b1c1c]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" (click)="closePayment()">
+    <div class="bg-[#F0EDEB] w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl border border-[#d8c3b2]/30" (click)="$event.stopPropagation()">
+      <!-- Progress Bar -->
+      <div class="h-2 bg-[#d8c3b2]/20">
+        <div class="h-full bg-[#8a5100] transition-all duration-500 rounded-r-full"
+             [style.width]="paymentStage() === 'initiated' ? '25%' : paymentStage() === 'processing' ? '60%' : '100%'">
+        </div>
+      </div>
+      
+      <div class="p-8">
+        <div class="flex items-center justify-between mb-8">
+          <h2 class="text-2xl font-black text-[#1b1c1c]">Complete Payment</h2>
+          <button (click)="closePayment()" class="p-2 hover:bg-[#d8c3b2]/20 rounded-full transition-colors">
+            <span class="material-symbols-outlined text-[#615e5c]">close</span>
+          </button>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="flex items-center justify-between mb-8 px-2">
+          <div class="flex flex-col items-center">
+            <div class="w-10 h-10 rounded-full bg-[#8a5100] text-white flex items-center justify-center font-bold">1</div>
+            <span class="text-xs font-bold text-[#8a5100] mt-2">Review</span>
+          </div>
+          <div class="flex-1 h-1 mx-2 rounded-full" [class.bg-[#8a5100]]="paymentStage() !== 'initiated'" [class.bg-[#d8c3b2]]="paymentStage() === 'initiated'"></div>
+          <div class="flex flex-col items-center">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold"
+                 [class.bg-[#8a5100]]="paymentStage() !== 'initiated'" [class.text-white]="paymentStage() !== 'initiated'"
+                 [class.bg-[#d8c3b2]]="paymentStage() === 'initiated'" [class.text-[#615e5c]]="paymentStage() === 'initiated'">2</div>
+            <span class="text-xs font-bold mt-2" [class.text-[#8a5100]]="paymentStage() !== 'initiated'" [class.text-[#615e5c]]="paymentStage() === 'initiated'">Confirm</span>
+          </div>
+        </div>
+
+        <div class="mb-8 bg-white rounded-[2rem] p-6 border border-[#d8c3b2]/20">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-widest text-[#615e5c] mb-1">Amount Due</p>
+              <p class="text-4xl font-black text-[#1b1c1c]">{{ getSelectedBillOutstanding() | currency:'INR' }}</p>
+            </div>
+            <span class="px-3 py-1 bg-[#8a5100]/10 text-[#8a5100] text-xs font-bold rounded-full">Due {{ selectedBill()!.dueDateUtc | date:'MMM dd' }}</span>
+          </div>
+          <div class="pt-4 border-t border-[#d8c3b2]/20">
+            <div class="flex justify-between text-sm">
+              <span class="text-[#615e5c]">Minimum Due</span>
+              <span class="font-bold text-[#1b1c1c]">{{ selectedBill()!.minDue | currency:'INR' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <p class="text-xs font-bold uppercase tracking-widest text-[#615e5c] mb-3">Payment Type</p>
+          <div class="flex gap-3">
+            <button 
+              (click)="paymentType.set('full')"
+              class="flex-1 p-5 rounded-2xl border-2 transition-all text-left"
+              [ngClass]="paymentType() === 'full' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50'"
+            >
+              <p class="font-bold text-[#1b1c1c] text-lg">Full Payment</p>
+              <p class="text-sm text-[#534437] mt-1">{{ getPaymentAmount(selectedBill(), 'full') | currency:'INR' }}</p>
+            </button>
+            <button 
+              (click)="paymentType.set('min')"
+              class="flex-1 p-5 rounded-2xl border-2 transition-all text-left"
+              [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50'"
+            >
+              <p class="font-bold text-[#1b1c1c] text-lg">Minimum Due</p>
+              <p class="text-sm text-[#534437] mt-1">{{ getPaymentAmount(selectedBill(), 'min') | currency:'INR' }}</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Rewards Redemption Toggle -->
+        @if (availablePoints() > 0) {
+          <div class="mb-6 rounded-2xl border-2 transition-all"
+               [ngClass]="useRewards() ? 'border-[#8a5100] bg-[#8a5100]/5' : 'border-[#d8c3b2]/30 bg-white'">
+            <div class="p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div class="w-12 h-12 rounded-full flex items-center justify-center"
+                       [ngClass]="useRewards() ? 'bg-[#8a5100]' : 'bg-[#f0a046]/20'">
+                    <span class="material-symbols-outlined text-xl"
+                          [ngClass]="useRewards() ? 'text-white' : 'text-[#8a5100]'">stars</span>
+                  </div>
+                  <div>
+                    <p class="font-bold text-lg text-[#1b1c1c]">Rewards Points</p>
+                    <p class="text-sm text-[#534437]">
+                      <span class="font-semibold">{{ availablePoints() | number:'1.0-0' }} points</span> 
+                      <span class="text-[#615e5c]">= {{ rewardValue() | currency:'INR' }}</span>
+                    </p>
+                  </div>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input type="checkbox" [checked]="useRewards()" (change)="toggleRewards()" class="peer sr-only">
+                  <div class="h-8 w-14 rounded-full bg-[#d8c3b2] transition-all after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-all after:content-[''] peer-checked:bg-[#8a5100] peer-checked:after:translate-x-6"></div>
+                </label>
+              </div>
+              
+              @if (useRewards()) {
+                <div class="mt-5 pt-5 border-t border-[#d8c3b2]/30">
+                  <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-[#f0edeb] rounded-xl p-4">
+                      <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Using</p>
+                      <p class="text-xl font-bold text-[#8a5100] mt-1">{{ maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
+                      <p class="text-sm text-[#534437]">-{{ maxRedeemablePoints() * pointsToRupeeRate | currency:'INR' }}</p>
+                    </div>
+                    <div class="bg-[#f0edeb] rounded-xl p-4">
+                      <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Remaining</p>
+                      <p class="text-xl font-bold text-[#1b1c1c] mt-1">{{ availablePoints() - maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
+                      <p class="text-sm text-[#534437]">={{ (availablePoints() - maxRedeemablePoints()) * pointsToRupeeRate | currency:'INR' }}</p>
+                    </div>
+                  </div>
+                  <div class="flex justify-between items-center p-4 bg-[#8a5100]/10 rounded-xl">
+                    <span class="font-semibold text-[#1b1c1c]">You Pay</span>
+                    <span class="text-2xl font-black text-[#8a5100]">
+                      @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) <= 0) {
+                        Fully Paid
+                      } @else {
+                        {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) | currency:'INR' }}
+                      }
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (errorMessage()) {
+          <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl">
+            <p class="text-sm text-red-600 font-medium">{{ errorMessage() }}</p>
+          </div>
+        }
+
+        <button 
+          (click)="initiatePayment()"
+          [disabled]="isProcessing()"
+          class="w-full py-5 bg-[#8a5100] text-white font-bold rounded-2xl shadow-xl hover:bg-[#7a4600] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg"
+        >
+          @if (isProcessing()) {
+            <span class="material-symbols-outlined animate-spin">sync</span>
+            Processing...
+          } @else {
+            <span class="material-symbols-outlined">payments</span>
+            @if (useRewards() && maxRedeemablePoints() > 0) {
+              @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) <= 0) {
+                Fully Paid
+              } @else {
+                Pay {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) | currency:'INR' }} (with {{ maxRedeemablePoints() }} pts)
+              }
+            } @else {
+              Pay {{ getPaymentAmount(selectedBill(), paymentType()) | currency:'INR' }}
+            }
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- OTP MODAL -->
+@if (showOtpModal()) {
+  <div class="fixed inset-0 bg-[#1b1c1c]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-[#F0EDEB] w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl border border-[#d8c3b2]/30" (click)="$event.stopPropagation()">
+      <!-- Progress Bar -->
+      <div class="h-2 bg-[#d8c3b2]/20">
+        <div class="h-full bg-[#8a5100] transition-all duration-500 rounded-r-full" style="width: 75%"></div>
+      </div>
+
+      <div class="p-8">
+        <!-- Step Indicator -->
+        <div class="flex items-center justify-between mb-8 px-2">
+          <div class="flex flex-col items-center">
+            <div class="w-10 h-10 rounded-full bg-[#8a5100] text-white flex items-center justify-center font-bold">1</div>
+            <span class="text-xs font-bold text-[#8a5100] mt-2">Initiated</span>
+          </div>
+          <div class="flex-1 h-1 mx-2 bg-[#8a5100] rounded-full"></div>
+          <div class="flex flex-col items-center">
+            <div class="w-10 h-10 rounded-full bg-[#8a5100] text-white flex items-center justify-center font-bold">2</div>
+            <span class="text-xs font-bold text-[#8a5100] mt-2">OTP Verify</span>
+          </div>
+          <div class="flex-1 h-1 mx-2 bg-[#d8c3b2] rounded-full"></div>
+          <div class="flex flex-col items-center">
+            <div class="w-10 h-10 rounded-full bg-[#d8c3b2] text-[#615e5c] flex items-center justify-center font-bold">3</div>
+            <span class="text-xs font-bold text-[#615e5c] mt-2">Complete</span>
+          </div>
+        </div>
+
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-[#8a5100]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span class="material-symbols-outlined text-4xl text-[#8a5100]">sms</span>
+          </div>
+          <h2 class="text-2xl font-black text-[#1b1c1c] mb-2">Verify Payment</h2>
+          <p class="text-[#534437]">Enter the 6-digit OTP sent to your registered mobile</p>
+        </div>
+
+        <input 
+          type="text" 
+          maxlength="6"
+          [(ngModel)]="otpCode"
+          class="w-full text-center text-4xl font-bold tracking-[0.5em] py-5 border-2 border-[#d8c3b2]/30 rounded-2xl focus:border-[#8a5100] focus:outline-none mb-4 bg-white"
+          placeholder="------"
+        />
+
+        @if (otpError()) {
+          <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+            <p class="text-sm text-red-600 font-medium">{{ otpError() }}</p>
+          </div>
+        }
+
+        <button 
+          (click)="verifyOtp()"
+          [disabled]="otpCode.length !== 6 || isVerifying()"
+          class="w-full py-5 bg-[#8a5100] text-white font-bold rounded-2xl shadow-xl hover:bg-[#7a4600] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg mb-4"
+        >
+          @if (isVerifying()) {
+            <span class="material-symbols-outlined animate-spin">sync</span>
+            Verifying...
+          } @else {
+            <span class="material-symbols-outlined">verified</span>
+            Confirm & Pay
+          }
+        </button>
+
+        <div class="text-center">
+          <p class="text-sm text-[#615e5c] mb-2">Didn't receive OTP?</p>
+          <button 
+            (click)="resendOtp()" 
+            [disabled]="!canResendOtp()"
+            class="text-[#8a5100] font-bold text-sm hover:underline disabled:text-[#d8c3b2] disabled:no-underline"
+          >
+            {{ canResendOtp() ? 'Resend OTP' : 'Resend in 30s' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- SUCCESS MODAL -->
+@if (showSuccessModal()) {
+  <div class="fixed inset-0 bg-[#1b1c1c]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-[#F0EDEB] w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl border border-[#d8c3b2]/30" (click)="$event.stopPropagation()">
+      <!-- Progress Bar -->
+      <div class="h-2 bg-[#d8c3b2]/20">
+        <div class="h-full bg-[#8a5100] transition-all duration-500 rounded-r-full" style="width: 100%"></div>
+      </div>
+
+      <div class="p-12 text-center">
+        <!-- Step Indicator -->
+        <div class="flex items-center justify-center gap-4 mb-8">
+          <div class="flex items-center">
+            <div class="w-8 h-8 rounded-full bg-[#8a5100] text-white flex items-center justify-center text-xs font-bold">1</div>
+            <span class="text-xs font-bold text-[#8a5100] ml-2">Initiated</span>
+          </div>
+          <span class="text-[#8a5100]">→</span>
+          <div class="flex items-center">
+            <div class="w-8 h-8 rounded-full bg-[#8a5100] text-white flex items-center justify-center text-xs font-bold">2</div>
+            <span class="text-xs font-bold text-[#8a5100] ml-2">Verified</span>
+          </div>
+          <span class="text-[#8a5100]">→</span>
+          <div class="flex items-center">
+            <div class="w-8 h-8 rounded-full bg-[#8a5100] text-white flex items-center justify-center text-xs font-bold">3</div>
+            <span class="text-xs font-bold text-[#8a5100] ml-2">Complete</span>
+          </div>
+        </div>
+
+        <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <span class="material-symbols-outlined text-5xl text-emerald-600">check_circle</span>
+        </div>
+        <h2 class="text-3xl font-black text-[#1b1c1c] mb-2">Payment Successful!</h2>
+        <p class="text-[#534437] mb-8">Your payment of {{ paidAmount() | currency:'INR' }} has been processed</p>
+        
+        <button 
+          (click)="closeSuccessModal()"
+          class="w-full py-5 bg-[#8a5100] text-white font-bold rounded-2xl shadow-xl hover:bg-[#7a4600] transition-all text-lg"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+}

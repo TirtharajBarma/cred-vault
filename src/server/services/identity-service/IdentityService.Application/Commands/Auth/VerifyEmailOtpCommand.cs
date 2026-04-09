@@ -1,20 +1,40 @@
 using IdentityService.Application.Abstractions.Persistence;
-using IdentityService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Identity.Responses;
 using IdentityService.Domain.Enums;
+using IdentityService.Application.Common;
+using Shared.Contracts.Configuration;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace IdentityService.Application.Commands.Auth;
 
-public record VerifyEmailOtpCommand(string Email, string Otp) : IRequest<OperationResult>;
+/// <summary>
+/// Command to verify user's email using one-time password (OTP).
+/// Used after registration to activate account.
+/// </summary>
+/// <param name="Email">User's registered email address</param>
+/// <param name="Otp">6-digit OTP code sent to user's email</param>
+public record VerifyEmailOtpCommand(string Email, string Otp) : IRequest<AuthResult>;
 
-public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository)
-    : IRequestHandler<VerifyEmailOtpCommand, OperationResult>
+/// <summary>
+/// Handler for VerifyEmailOtpCommand:
+/// 1. Validates email and OTP are provided
+/// 2. Looks up user by email
+/// 3. If user not found, returns error
+/// 4. If already verified, returns success (allows re-login)
+/// 5. Checks if OTP exists and hasn't expired (10-minute window)
+/// 6. Verifies OTP matches exactly
+/// 7. On success: marks email as verified, sets status to Active, clears OTP
+/// 8. Returns JWT access token for immediate login
+/// </summary>
+public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository, IOptions<JwtOptions> jwtOptions)
+    : IRequestHandler<VerifyEmailOtpCommand, AuthResult>
 {
-    public async Task<OperationResult> Handle(VerifyEmailOtpCommand request, CancellationToken cancellationToken)
+    public async Task<AuthResult> Handle(VerifyEmailOtpCommand request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Otp))
         {
-            return new OperationResult
+            return new AuthResult
             {
                 Success = false,
                 ErrorCode = ErrorCodes.ValidationError,
@@ -26,7 +46,7 @@ public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository)
         var user = await userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (user is null)
         {
-            return new OperationResult
+            return new AuthResult
             {
                 Success = false,
                 ErrorCode = ErrorCodes.UserNotFound,
@@ -36,16 +56,18 @@ public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository)
 
         if (user.IsEmailVerified)
         {
-            return new OperationResult
+            return new AuthResult
             {
                 Success = true,
-                Message = "Email is already verified."
+                Message = "Email is already verified.",
+                AccessToken = IdentityHelpers.GenerateAccessToken(user, jwtOptions.Value),
+                User = IdentityHelpers.ToUserSummary(user)
             };
         }
 
         if (string.IsNullOrWhiteSpace(user.EmailVerificationOtp) || user.EmailVerificationOtpExpiresAtUtc is null)
         {
-            return new OperationResult
+            return new AuthResult
             {
                 Success = false,
                 ErrorCode = ErrorCodes.InvalidOtp,
@@ -55,7 +77,7 @@ public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository)
 
         if (user.EmailVerificationOtpExpiresAtUtc <= DateTime.UtcNow)
         {
-            return new OperationResult
+            return new AuthResult
             {
                 Success = false,
                 ErrorCode = ErrorCodes.OtpExpired,
@@ -65,7 +87,7 @@ public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository)
 
         if (!string.Equals(user.EmailVerificationOtp, request.Otp.Trim(), StringComparison.Ordinal))
         {
-            return new OperationResult
+            return new AuthResult
             {
                 Success = false,
                 ErrorCode = ErrorCodes.InvalidOtp,
@@ -80,10 +102,15 @@ public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository)
         user.UpdatedAtUtc = DateTime.UtcNow;
         await userRepository.UpdateAsync(user, cancellationToken);
 
-        return new OperationResult
+        // Generate Access Token for direct login
+        var accessToken = IdentityHelpers.GenerateAccessToken(user, jwtOptions.Value);
+
+        return new AuthResult
         {
             Success = true,
-            Message = "Email verified successfully."
+            Message = "Email verified successfully.",
+            AccessToken = accessToken,
+            User = IdentityHelpers.ToUserSummary(user)
         };
     }
 }

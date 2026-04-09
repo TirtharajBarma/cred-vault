@@ -17,3 +17,9 @@ public interface IUserOtpGenerated
     string Purpose { get; } // "EmailVerification", "PasswordReset", etc.
     DateTime ExpiresAtUtc { get; }
 }
+
+public interface IUserDeleted
+{
+    Guid UserId { get; }
+    DateTime DeletedAtUtc { get; }
+}

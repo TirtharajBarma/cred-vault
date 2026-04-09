@@ -1,0 +1,30 @@
+.bills-page {
+  isolation: isolate;
+}
+
+.mist-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glow-cloud {
+  position: absolute;
+  filter: blur(150px);
+  border-radius: 9999px;
+}
+
+.glow-cloud-1 {
+  left: -10%;
+  top: -20%;
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(circle, rgba(255, 220, 189, 0.3) 0%, rgba(255, 220, 189, 0) 70%);
+}
+
+.glow-cloud-2 {
+  right: -10%;
+  top: 10%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, rgba(202, 198, 195, 0.3) 0%, rgba(202, 198, 195, 0) 70%);
+}

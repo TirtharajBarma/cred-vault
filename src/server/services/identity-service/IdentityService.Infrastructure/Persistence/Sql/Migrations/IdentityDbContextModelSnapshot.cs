@@ -52,7 +52,6 @@ namespace IdentityService.Infrastructure.Persistence.Sql.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 

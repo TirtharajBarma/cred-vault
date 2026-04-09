@@ -5,8 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-
-using Scalar.AspNetCore;
+using Microsoft.OpenApi;
 using Shared.Contracts.Configuration;
 using MassTransit;
 
@@ -42,23 +41,29 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddStandardCors(this IServiceCollection services)
-    {
-        services.AddCors(options =>
-        {
-            options.AddPolicy("AllowWebClients", policy =>
-            {
-                policy.AllowAnyOrigin()
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-            });
-        });
-        return services;
-    }
-
     public static IServiceCollection AddStandardApi(this IServiceCollection services)
     {
         services.AddOpenApi();
+        services.AddSwaggerGen(options =>
+        {
+            options.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "API",
+                Version = "v1"
+            });
+
+            var bearerSecurityScheme = new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
+                Description = "Enter JWT token.",
+                In = ParameterLocation.Header,
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT"
+            };
+
+            options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, bearerSecurityScheme);
+        });
         services.AddProblemDetails();
         return services;
     }
@@ -68,9 +73,10 @@ public static class ServiceCollectionExtensions
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
-            app.MapScalarApiReference(options =>
+            app.UseSwagger();
+            app.UseSwaggerUI(options =>
             {
-                options.Title = title;
+                options.SwaggerEndpoint("/swagger/v1/swagger.json", title);
             });
         }
         return app;

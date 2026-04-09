@@ -1,12 +1,29 @@
 using IdentityService.Application.Abstractions.Persistence;
-using IdentityService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs;
+using Shared.Contracts.DTOs.Identity.Responses;
 using IdentityService.Domain.Enums;
 using MediatR;
 
 namespace IdentityService.Application.Commands.Auth;
 
+/// <summary>
+/// Command to reset user's password using OTP verification.
+/// Called after ForgotPasswordCommand to complete the reset flow.
+/// </summary>
+/// <param name="Email">User's registered email</param>
+/// <param name="Otp">6-digit OTP from password reset email</param>
+/// <param name="NewPassword">New password to set (min 8 characters)</param>
 public record ResetPasswordCommand(string Email, string Otp, string NewPassword) : IRequest<OperationResult>;
 
+/// <summary>
+/// Handler for ResetPasswordCommand:
+/// 1. Validates email, OTP, and new password are provided
+/// 2. Looks up user by email
+/// 3. Checks if password reset was requested (OTP exists)
+/// 4. Verifies OTP hasn't expired (10-minute window)
+/// 5. Validates OTP matches exactly
+/// 6. On success: hashes new password with BCrypt, clears OTP fields, updates user
+/// </summary>
 public sealed class ResetPasswordCommandHandler(IUserRepository userRepository)
     : IRequestHandler<ResetPasswordCommand, OperationResult>
 {

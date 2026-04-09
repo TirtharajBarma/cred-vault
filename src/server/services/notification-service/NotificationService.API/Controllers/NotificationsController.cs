@@ -1,61 +1,54 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NotificationService.Infrastructure.Persistence;
+using MediatR;
+using NotificationService.Application.Queries.Notifications;
 using Shared.Contracts.Controllers;
-using Shared.Contracts.Models;
 
 namespace NotificationService.API.Controllers;
 
+/// <summary>
+/// Notification controller for viewing notification logs and audit trails.
+/// Provides admin access to notification history for debugging and compliance.
+/// </summary>
+/// <remarks>
+/// Admin endpoints (requires admin role):
+/// - GET /logs: View notification logs (sent emails, SMS, etc)
+/// - GET /audit: View audit logs of all notification operations
+/// </remarks>
 [Route("api/v1/notifications")]
 [Authorize]
-public class NotificationsController(NotificationDbContext dbContext) : BaseApiController
+public class NotificationsController(IMediator mediator) : BaseApiController
 {
+    /// <summary>
+    /// Admin: Get notification logs (emails sent, SMS, etc).
+    /// Supports filtering by email and pagination.
+    /// </summary>
+    /// <param name="email">Optional email filter</param>
+    /// <param name="page">Page number (default 1)</param>
+    /// <param name="pageSize">Items per page (default 10)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with paginated notification logs</returns>
     [HttpGet("logs")]
-    public async Task<IActionResult> GetNotificationLogs([FromQuery] string? email, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetNotificationLogs([FromQuery] string? email, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
     {
-        var query = dbContext.NotificationLogs.AsQueryable();
-
-        if (!string.IsNullOrEmpty(email))
-        {
-            query = query.Where(l => l.Recipient == email);
-        }
-
-        var total = await query.CountAsync();
-        var logs = await query
-            .OrderByDescending(l => l.CreatedAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        return CreateResponse(true, new { total, page, pageSize, logs }, "Notification logs fetched.");
+        var result = await mediator.Send(new GetNotificationLogsQuery(email, page, pageSize), cancellationToken);
+        return Ok(result);
     }
 
+    /// <summary>
+    /// Admin: Get audit logs for all notification operations.
+    /// Useful for debugging notification delivery issues.
+    /// </summary>
+    /// <param name="userId">Optional user ID filter</param>
+    /// <param name="traceId">Optional trace ID filter</param>
+    /// <param name="page">Page number (default 1)</param>
+    /// <param name="pageSize">Items per page (default 10)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with paginated audit logs</returns>
     [HttpGet("audit")]
-    public async Task<IActionResult> GetAuditLogs([FromQuery] string? traceId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetAuditLogs([FromQuery] string? userId, [FromQuery] string? traceId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
     {
-        var query = dbContext.AuditLogs.AsQueryable();
-
-        if (!string.IsNullOrEmpty(traceId))
-        {
-            query = query.Where(l => l.TraceId == traceId);
-        }
-
-        var total = await query.CountAsync();
-        var logs = await query
-            .OrderByDescending(l => l.CreatedAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        return CreateResponse(true, new { total, page, pageSize, logs }, "Audit logs fetched.");
-    }
-
-    [HttpGet("templates")]
-    [Authorize(Roles = "admin")]
-    public async Task<IActionResult> GetTemplates()
-    {
-        var templates = await dbContext.EmailTemplates.ToListAsync();
-        return CreateResponse(true, templates, "Email templates fetched.");
+        var result = await mediator.Send(new GetAuditLogsQuery(userId, traceId, page, pageSize), cancellationToken);
+        return Ok(result);
     }
 }

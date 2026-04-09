@@ -79,22 +79,40 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<CardIssuer?> GetIssuerByNetworkAsync(CardNetwork network, CancellationToken cancellationToken = default)
-    {
-        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.IsActive && x.Network == network, cancellationToken);
-    }
-
     public Task<CardIssuer?> GetIssuerByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.IsActive && x.Id == id, cancellationToken);
+        return dbContext.CardIssuers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
     public Task<List<CardIssuer>> ListIssuersAsync(CancellationToken cancellationToken = default)
     {
         return dbContext.CardIssuers
-            .Where(x => x.IsActive)
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<bool> HasDuplicateIssuerAsync(string normalizedName, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardIssuers
+            .AnyAsync(x => x.Name.ToLower() == normalizedName, cancellationToken);
+    }
+
+    public async Task AddIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default)
+    {
+        await dbContext.CardIssuers.AddAsync(issuer, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default)
+    {
+        dbContext.CardIssuers.Update(issuer);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteIssuerAsync(CardIssuer issuer, CancellationToken cancellationToken = default)
+    {
+        dbContext.CardIssuers.Remove(issuer);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public Task<bool> HasDuplicateCardAsync(Guid userId, CardNetwork network, string last4, CancellationToken cancellationToken = default)
@@ -125,6 +143,24 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<CardTransaction>> GetTransactionsByCardIdAsync(Guid cardId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardTransactions
+            .AsNoTracking()
+            .Where(x => x.CardId == cardId)
+            .OrderByDescending(x => x.DateUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<CardTransaction>> GetTransactionsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CardTransactions
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.DateUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<bool> HasDuplicateTransactionAsync(Guid cardId, TransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default)
     {
         var tolerance = TimeSpan.FromMinutes(1);
@@ -139,5 +175,16 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
                 && x.DateUtc >= minDate 
                 && x.DateUtc <= maxDate,
                 cancellationToken);
+    }
+
+    public Task<bool> HasCardsByIssuerAsync(Guid issuerId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CreditCards
+            .AnyAsync(x => x.IssuerId == issuerId && !x.IsDeleted, cancellationToken);
+    }
+
+    public async Task<List<CreditCard>> GetBlockedCardsAsync(CancellationToken cancellationToken = default)
+    {
+        return new List<CreditCard>();
     }
 }

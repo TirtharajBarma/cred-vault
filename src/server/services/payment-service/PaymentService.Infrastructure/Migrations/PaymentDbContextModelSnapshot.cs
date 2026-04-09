@@ -17,49 +17,10 @@ namespace PaymentService.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("PaymentService.Domain.Entities.FraudAlert", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AlertType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("PaymentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("RiskScore")
-                        .HasColumnType("decimal(5,2)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PaymentId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("FraudAlerts", (string)null);
-                });
 
             modelBuilder.Entity("PaymentService.Domain.Entities.Payment", b =>
                 {
@@ -79,15 +40,15 @@ namespace PaymentService.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("FailureReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
+                    b.Property<string>("OtpCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("OtpExpiresAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("PaymentType")
                         .HasColumnType("int");
@@ -110,7 +71,7 @@ namespace PaymentService.Infrastructure.Migrations
                     b.ToTable("Payments", (string)null);
                 });
 
-            modelBuilder.Entity("PaymentService.Domain.Entities.PaymentSagaState", b =>
+            modelBuilder.Entity("PaymentService.Domain.Entities.PaymentOrchestrationSagaState", b =>
                 {
                     b.Property<Guid>("CorrelationId")
                         .ValueGeneratedOnAdd()
@@ -122,8 +83,25 @@ namespace PaymentService.Infrastructure.Migrations
                     b.Property<Guid>("BillId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BillUpdateError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("BillUpdated")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("CardDeducted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CardDeductionError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<Guid>("CardId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("CompensationAttempts")
+                        .HasColumnType("int");
 
                     b.Property<string>("CompensationReason")
                         .HasMaxLength(500)
@@ -138,34 +116,41 @@ namespace PaymentService.Infrastructure.Migrations
                         .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("Email")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("FullName")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("OtpCode")
-                        .HasMaxLength(8)
-                        .HasColumnType("nvarchar(8)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("OtpExpiresAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("OtpVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PaymentError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<Guid>("PaymentId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("PaymentProcessed")
+                        .HasColumnType("bit");
 
                     b.Property<string>("PaymentType")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<decimal>("RewardPointsGranted")
+                    b.Property<decimal>("RewardsAmount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<string>("RiskDecision")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<decimal>("RiskScore")
-                        .HasColumnType("decimal(5,2)");
+                    b.Property<bool>("RewardsRedeemed")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
@@ -175,38 +160,7 @@ namespace PaymentService.Infrastructure.Migrations
 
                     b.HasKey("CorrelationId");
 
-                    b.ToTable("PaymentSagas", (string)null);
-                });
-
-            modelBuilder.Entity("PaymentService.Domain.Entities.RiskScore", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Decision")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("PaymentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("Score")
-                        .HasColumnType("decimal(5,2)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PaymentId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("RiskScores", (string)null);
+                    b.ToTable("PaymentOrchestrationSagas", (string)null);
                 });
 
             modelBuilder.Entity("PaymentService.Domain.Entities.Transaction", b =>
@@ -244,28 +198,6 @@ namespace PaymentService.Infrastructure.Migrations
                     b.ToTable("Transactions", (string)null);
                 });
 
-            modelBuilder.Entity("PaymentService.Domain.Entities.FraudAlert", b =>
-                {
-                    b.HasOne("PaymentService.Domain.Entities.Payment", "Payment")
-                        .WithOne("FraudAlert")
-                        .HasForeignKey("PaymentService.Domain.Entities.FraudAlert", "PaymentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Payment");
-                });
-
-            modelBuilder.Entity("PaymentService.Domain.Entities.RiskScore", b =>
-                {
-                    b.HasOne("PaymentService.Domain.Entities.Payment", "Payment")
-                        .WithOne("RiskScore")
-                        .HasForeignKey("PaymentService.Domain.Entities.RiskScore", "PaymentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Payment");
-                });
-
             modelBuilder.Entity("PaymentService.Domain.Entities.Transaction", b =>
                 {
                     b.HasOne("PaymentService.Domain.Entities.Payment", "Payment")
@@ -279,10 +211,6 @@ namespace PaymentService.Infrastructure.Migrations
 
             modelBuilder.Entity("PaymentService.Domain.Entities.Payment", b =>
                 {
-                    b.Navigation("FraudAlert");
-
-                    b.Navigation("RiskScore");
-
                     b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618

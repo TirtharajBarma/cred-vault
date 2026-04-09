@@ -95,7 +95,7 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.Property<decimal>("PointsBalance")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<Guid>("RewardTierId")
+                    b.Property<Guid?>("RewardTierId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("UpdatedAtUtc")
@@ -105,8 +105,6 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("RewardTierId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -157,7 +155,7 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("BillId")
+                    b.Property<Guid?>("BillId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -186,13 +184,152 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.ToTable("RewardTransactions", (string)null);
                 });
 
-            modelBuilder.Entity("BillingService.Domain.Entities.RewardAccount", b =>
+            modelBuilder.Entity("BillingService.Domain.Entities.Statement", b =>
                 {
-                    b.HasOne("BillingService.Domain.Entities.RewardTier", null)
-                        .WithMany()
-                        .HasForeignKey("RewardTierId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("AvailableCredit")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("BillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CardLast4")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("CardNetwork")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("ClosingBalance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("CreditLimit")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("DueDateUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("GeneratedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("InterestCharges")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("IssuerName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("MinimumDue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("OpeningBalance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("PenaltyCharges")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("PeriodEndUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodStartUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("StatementPeriod")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalPayments")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalPurchases")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalRefunds")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardId");
+
+                    b.HasIndex("PeriodEndUtc");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "Status");
+
+                    b.ToTable("Statements", (string)null);
+                });
+
+            modelBuilder.Entity("BillingService.Domain.Entities.StatementTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DateUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("SourceTransactionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StatementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DateUtc");
+
+                    b.HasIndex("StatementId");
+
+                    b.ToTable("StatementTransactions", (string)null);
                 });
 
             modelBuilder.Entity("BillingService.Domain.Entities.RewardTransaction", b =>
@@ -200,14 +337,30 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.HasOne("BillingService.Domain.Entities.Bill", null)
                         .WithMany()
                         .HasForeignKey("BillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("BillingService.Domain.Entities.RewardAccount", null)
                         .WithMany()
                         .HasForeignKey("RewardAccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("BillingService.Domain.Entities.StatementTransaction", b =>
+                {
+                    b.HasOne("BillingService.Domain.Entities.Statement", "Statement")
+                        .WithMany("Transactions")
+                        .HasForeignKey("StatementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_StatementTransactions_Statements_StatementId");
+
+                    b.Navigation("Statement");
+                });
+
+            modelBuilder.Entity("BillingService.Domain.Entities.Statement", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,89 +1,128 @@
 using MediatR;
 using NotificationService.Application.Interfaces;
 using NotificationService.Domain.Entities;
-using NotificationService.Application.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace NotificationService.Application.Commands;
 
-using Consumers;
-
-public class ProcessNotificationCommandHandler(
-    INotificationDbContext dbContext,
-    IEmailSender emailSender,
-    ILogger<ProcessNotificationCommandHandler> logger)
-    : IRequestHandler<ProcessNotificationCommand>
+public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmailSender email, ILogger<ProcessNotificationCommandHandler> logger) : IRequestHandler<ProcessNotificationCommand>
 {
-    public async Task Handle(ProcessNotificationCommand request, CancellationToken cancellationToken)
+    public async Task Handle(ProcessNotificationCommand request, CancellationToken ct)
     {
-        // 1. Audit the Business Event
-        var audit = new AuditLog
+        var traceId = request.MessageId ?? Guid.NewGuid().ToString();
+        var userId = ExtractUserId(request.Payload);
+
+        logger.LogInformation("Processing {EventType} for {Email}, UserId={UserId}, TraceId={TraceId}", 
+            request.EventType, request.Email, userId, traceId);
+
+        db.AddAuditLog(new AuditLog
         {
             Id = Guid.NewGuid(),
             EntityName = request.EventType,
-            EntityId = "Event",
-            Action = "Consumed",
-            UserId = request.Email, // Store email as UserId if real ID isn't available
-            Changes = JsonConvert.SerializeObject(request.Payload),
-            TraceId = request.TraceId,
+            EntityId = request.MessageId ?? "Event",
+            Action = "Received",
+            UserId = userId?.ToString() ?? request.Email ?? $"unknown-{request.EventType}",
+            Changes = JsonConvert.SerializeObject(new { request.Payload, MessageId = request.MessageId, ReceivedAt = DateTime.UtcNow }),
+            TraceId = traceId,
             CreatedAtUtc = DateTime.UtcNow
-        };
-        dbContext.AuditLogs.Add(audit);
+        });
 
-        // 2. Fetch Notification Template
-        var template = await dbContext.EmailTemplates
-            .FirstOrDefaultAsync(t => t.Name == request.EventType, cancellationToken);
-
-        if (template is null)
-        {
-            logger.LogWarning("No email template found for event type: {EventType}", request.EventType);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return;
-        }
-
-        // 3. Render Template
-        var subject = RenderTemplate(template.SubjectTemplate, request.FullName, request.Payload);
-        var body = RenderTemplate(template.BodyTemplate, request.FullName, request.Payload);
-
-        // 4. Send Email
-        var (success, error) = await emailSender.SendEmailAsync(request.Email, subject, body, cancellationToken);
-
-        // 5. Log Notification
-        var log = new NotificationLog
+        var notificationLog = new NotificationLog
         {
             Id = Guid.NewGuid(),
-            Recipient = request.Email,
-            Subject = subject,
-            Body = body,
-            Type = "Email",
-            IsSuccess = success,
-            ErrorMessage = error,
-            TraceId = request.TraceId,
+            UserId = userId,
+            Recipient = request.Email ?? "N/A",
+            Subject = request.EventType,
+            Body = JsonConvert.SerializeObject(request.Payload),
+            Type = "Event",
+            IsSuccess = false,
+            ErrorMessage = null,
+            TraceId = traceId,
             CreatedAtUtc = DateTime.UtcNow
         };
-        dbContext.NotificationLogs.Add(log);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private string RenderTemplate(string template, string fullName, object payload)
-    {
-        var result = template.Replace("{{FullName}}", fullName, StringComparison.OrdinalIgnoreCase);
-        
-        // Use reflection or JSON to replace other variables
-        var json = JsonConvert.SerializeObject(payload);
-        var dict = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-
-        if (dict != null)
+        if (!string.IsNullOrWhiteSpace(request.Email))
         {
-            foreach (var kvp in dict)
+            var (subject, body) = GenerateEmail(request.EventType, request.FullName, request.Payload);
+            var (success, error) = await email.SendEmailAsync(request.Email, subject, body, ct);
+
+            notificationLog.IsSuccess = success;
+            notificationLog.Subject = success ? subject : request.EventType;
+            notificationLog.Body = success ? body : JsonConvert.SerializeObject(request.Payload);
+            notificationLog.ErrorMessage = error;
+
+            db.AddAuditLog(new AuditLog
             {
-                result = result.Replace($"{{{{{kvp.Key}}}}}", kvp.Value?.ToString() ?? "", StringComparison.OrdinalIgnoreCase);
-            }
+                Id = Guid.NewGuid(),
+                EntityName = request.EventType,
+                EntityId = request.MessageId ?? "Event",
+                Action = success ? "EmailSent" : "EmailFailed",
+                UserId = userId?.ToString() ?? request.Email ?? "unknown",
+                Changes = JsonConvert.SerializeObject(new { Subject = subject, Success = success, Error = error }),
+                TraceId = traceId,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            logger.LogInformation("Email {Status} for {Email}: {Subject}", success ? "sent" : "failed", request.Email, subject);
+        }
+        else
+        {
+            notificationLog.ErrorMessage = "No email provided";
+            logger.LogWarning("No email for {EventType}", request.EventType);
+
+            db.AddAuditLog(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                EntityName = request.EventType,
+                EntityId = request.MessageId ?? "Event",
+                Action = "NoEmail",
+                UserId = userId?.ToString() ?? $"unknown-{request.EventType}",
+                Changes = JsonConvert.SerializeObject(new { Reason = "No email in event payload" }),
+                TraceId = traceId,
+                CreatedAtUtc = DateTime.UtcNow
+            });
         }
 
-        return result;
+        db.AddNotificationLog(notificationLog);
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Completed {EventType}, UserId={UserId}, TraceId={TraceId}", request.EventType, userId, traceId);
+    }
+
+    private static Guid? ExtractUserId(object payload)
+    {
+        try
+        {
+            var json = JsonConvert.SerializeObject(payload);
+            var obj = JObject.Parse(json);
+            var userIdToken = obj["UserId"] ?? obj["userId"];
+            if (userIdToken != null && Guid.TryParse(userIdToken.ToString(), out var userId))
+                return userId;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to extract UserId from payload: {ex.Message}");
+        }
+        return null;
+    }
+
+    private static (string Subject, string Body) GenerateEmail(string eventType, string? name, object payload)
+    {
+        var json = JsonConvert.SerializeObject(payload);
+        var data = JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+
+        return eventType switch
+        {
+            "UserRegistered" => ("Welcome to CredVault", $"<h2>Welcome {name ?? "User"}!</h2><p>Your account is ready.</p>"),
+            "UserOtpGenerated" => ("Your Verification Code", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Purpose: {data.GetValueOrDefault("Purpose", "N/A")}</p>"),
+            "CardAdded" => ("Card Added", $"<h2>New card ending in {data.GetValueOrDefault("CardNumberLast4", "****")}</h2>"),
+            "BillGenerated" => ("Bill Ready", $"<h2>Amount: ₹{data.GetValueOrDefault("Amount", "0")}</h2><p>Due: {data.GetValueOrDefault("DueDate", "N/A")}</p>"),
+            "PaymentOtpGenerated" => ("Payment Verification", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Amount: ₹{data.GetValueOrDefault("Amount", "0")}</p>"),
+            "PaymentCompleted" => ("Payment Successful", $"<h2>Payment of ₹{data.GetValueOrDefault("Amount", "0")} completed!</h2>"),
+            "PaymentFailed" => ("Payment Failed", $"<h2>Payment failed: {data.GetValueOrDefault("Reason", "Unknown")}</h2>"),
+            _ => (eventType, $"<h2>{eventType}</h2><p>Details: {json}</p>")
+        };
     }
 }

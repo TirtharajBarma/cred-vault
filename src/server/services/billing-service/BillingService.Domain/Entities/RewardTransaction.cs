@@ -5,7 +5,7 @@ public sealed class RewardTransaction
     public Guid Id { get; set; }
     public Guid RewardAccountId { get; set; }
 
-    public Guid BillId { get; set; }
+    public Guid? BillId { get; set; }
 
     public decimal Points { get; set; }
     public RewardTransactionType Type { get; set; }

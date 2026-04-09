@@ -1,124 +1,91 @@
 using MassTransit;
+using Microsoft.Extensions.Logging;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
 using Shared.Contracts.Events.Payment;
+using Shared.Contracts.Exceptions;
 
 namespace PaymentService.Infrastructure.Messaging.Consumers;
 
-// Handles IPaymentCompleted — marks payment Completed + inserts Transaction + persists RiskScore
-public class PaymentCompletedConsumer(
-    IPaymentRepository paymentRepository,
-    ITransactionRepository transactionRepository,
-    IRiskRepository riskRepository,
-    IUnitOfWork unitOfWork) : IConsumer<IPaymentCompleted>
+public class PaymentCompletedConsumer(IPaymentRepository payments, ITransactionRepository transactions, IUnitOfWork uow, ILogger<PaymentCompletedConsumer> logger) : IConsumer<IPaymentCompleted>
 {
     public async Task Consume(ConsumeContext<IPaymentCompleted> context)
     {
-        var payment = await paymentRepository.GetByIdAsync(context.Message.PaymentId);
-        if (payment is null) return;
+        var paymentId = context.Message.PaymentId;
+        logger.LogInformation("IPaymentCompleted received: PaymentId={PaymentId}", paymentId);
 
-        // Idempotency guard
-        if (payment.Status == PaymentStatus.Completed) return;
-
-        payment.Status = PaymentStatus.Completed;
-        payment.UpdatedAtUtc = DateTime.UtcNow;
-        await paymentRepository.UpdateAsync(payment);
-
-        await transactionRepository.AddAsync(new Transaction
+        try
         {
-            Id = Guid.NewGuid(),
-            PaymentId = payment.Id,
-            UserId = payment.UserId,
-            Amount = payment.Amount,
-            Type = TransactionType.Payment,
-            Description = "Payment completed successfully",
-            CreatedAtUtc = DateTime.UtcNow
-        });
-
-        // Persist RiskScore for approved payments (auto or OTP)
-        var existing = await riskRepository.GetByPaymentIdAsync(payment.Id);
-        if (existing is null)
-        {
-            var decision = Enum.TryParse<RiskDecision>(context.Message.RiskDecision, out var d)
-                ? d
-                : RiskDecision.AutoApproved;
-
-            await riskRepository.AddAsync(new RiskScore
+            var payment = await payments.GetByIdAsync(paymentId);
+            if (payment == null)
             {
-                Id = Guid.NewGuid(),
-                PaymentId = payment.Id,
-                UserId = payment.UserId,
-                Score = context.Message.RiskScore,
-                Decision = decision,
-                CreatedAtUtc = DateTime.UtcNow
-            });
-        }
+                logger.LogError("Payment {PaymentId} not found", paymentId);
+                throw new NotFoundException("Payment", paymentId);
+            }
 
-        await unitOfWork.SaveChangesAsync();
+            if (payment.Status == PaymentStatus.Completed)
+            {
+                logger.LogInformation("Payment {PaymentId} already completed (idempotency)", paymentId);
+                return;
+            }
+
+            payment.Status = PaymentStatus.Completed;
+            payment.UpdatedAtUtc = DateTime.UtcNow;
+            await payments.UpdateAsync(payment);
+
+            await transactions.AddAsync(new Transaction
+            {
+                Id = Guid.NewGuid(), PaymentId = payment.Id, UserId = payment.UserId,
+                Amount = payment.Amount, Type = TransactionType.Payment,
+                Description = "Payment completed", CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await uow.SaveChangesAsync();
+            logger.LogInformation("Payment {PaymentId} marked as completed", payment.Id);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to process IPaymentCompleted: PaymentId={PaymentId}", paymentId);
+            throw;
+        }
     }
 }
 
-// Handles IPaymentFailed — marks payment Failed
-public class PaymentFailedConsumer(
-    IPaymentRepository paymentRepository,
-    IUnitOfWork unitOfWork) : IConsumer<IPaymentFailed>
+public class PaymentFailedConsumer(IPaymentRepository payments, IUnitOfWork uow, ILogger<PaymentFailedConsumer> logger) : IConsumer<IPaymentFailed>
 {
     public async Task Consume(ConsumeContext<IPaymentFailed> context)
     {
-        var payment = await paymentRepository.GetByIdAsync(context.Message.PaymentId);
-        if (payment is null) return;
+        var paymentId = context.Message.PaymentId;
+        var reason = context.Message.Reason;
+        logger.LogWarning("IPaymentFailed received: PaymentId={PaymentId}, Reason={Reason}", paymentId, reason);
 
-        if (payment.Status is PaymentStatus.Failed or PaymentStatus.Reversed) return;
-
-        payment.Status = PaymentStatus.Failed;
-        payment.FailureReason = context.Message.Reason;
-        payment.UpdatedAtUtc = DateTime.UtcNow;
-
-        await paymentRepository.UpdateAsync(payment);
-        await unitOfWork.SaveChangesAsync();
-    }
-}
-
-// Handles IFraudDetected — inserts FraudAlert + RiskScore for blocked payments
-public class FraudDetectedConsumer(
-    IFraudRepository fraudRepository,
-    IRiskRepository riskRepository,
-    IUnitOfWork unitOfWork) : IConsumer<IFraudDetected>
-{
-    public async Task Consume(ConsumeContext<IFraudDetected> context)
-    {
-        // Idempotency — don't insert duplicates
-        var existingRisk = await riskRepository.GetByPaymentIdAsync(context.Message.PaymentId);
-        if (existingRisk is null)
+        try
         {
-            await riskRepository.AddAsync(new RiskScore
+            var payment = await payments.GetByIdAsync(paymentId);
+            if (payment == null)
             {
-                Id = Guid.NewGuid(),
-                PaymentId = context.Message.PaymentId,
-                UserId = context.Message.UserId,
-                Score = context.Message.RiskScore,
-                Decision = RiskDecision.Blocked,
-                CreatedAtUtc = DateTime.UtcNow
-            });
-        }
+                logger.LogError("Payment {PaymentId} not found for failure event", paymentId);
+                throw new InvalidOperationException($"Payment {paymentId} not found");
+            }
 
-        var existingAlert = await fraudRepository.GetByPaymentIdAsync(context.Message.PaymentId);
-        if (existingAlert is null)
+            if (payment.Status is PaymentStatus.Failed or PaymentStatus.Reversed)
+            {
+                logger.LogInformation("Payment {PaymentId} already in terminal state {Status}", paymentId, payment.Status);
+                return;
+            }
+
+            payment.Status = PaymentStatus.Failed;
+            payment.FailureReason = reason;
+            payment.UpdatedAtUtc = DateTime.UtcNow;
+            await payments.UpdateAsync(payment);
+            await uow.SaveChangesAsync();
+            logger.LogWarning("Payment {PaymentId} marked as failed: {Reason}", paymentId, reason);
+        }
+        catch (Exception ex)
         {
-            await fraudRepository.AddAsync(new FraudAlert
-            {
-                Id = Guid.NewGuid(),
-                PaymentId = context.Message.PaymentId,
-                UserId = context.Message.UserId,
-                RiskScore = context.Message.RiskScore,
-                AlertType = context.Message.AlertType,
-                Status = FraudAlertStatus.Open,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            });
+            logger.LogError(ex, "Failed to process IPaymentFailed: PaymentId={PaymentId}", paymentId);
+            throw;
         }
-
-        await unitOfWork.SaveChangesAsync();
     }
 }

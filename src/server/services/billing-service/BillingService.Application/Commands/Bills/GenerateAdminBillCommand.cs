@@ -7,133 +7,273 @@ using Shared.Contracts.Enums;
 using Shared.Contracts.Models;
 using Shared.Contracts.Events.Billing;
 using MassTransit;
+using Microsoft.Extensions.Logging;
 
 namespace BillingService.Application.Commands.Bills;
 
 public record GenerateAdminBillCommand(Guid AdminUserId, Guid UserId, Guid CardId, string Currency, string AuthorizationHeader) : IRequest<ApiResponse<Bill>>;
 
 public class GenerateAdminBillCommandHandler(
-    IBillRepository billRepository,
-    IHttpClientFactory httpClientFactory,
-    Microsoft.Extensions.Configuration.IConfiguration configuration,
-    IUnitOfWork unitOfWork,
-    IPublishEndpoint publishEndpoint)
+    IBillRepository bills,
+    IStatementRepository statements,
+    IHttpClientFactory http,
+    Microsoft.Extensions.Configuration.IConfiguration config,
+    IUnitOfWork uow,
+    IPublishEndpoint publisher,
+    ILogger<GenerateAdminBillCommandHandler> logger)
     : IRequestHandler<GenerateAdminBillCommand, ApiResponse<Bill>>
 {
-    private record CardDto(Guid Id, Guid UserId, string Network, Guid IssuerId, decimal CreditLimit, decimal OutstandingBalance);
-    private record UserDto(Guid Id, string Email, string FullName);
-
-    public async Task<ApiResponse<Bill>> Handle(GenerateAdminBillCommand request, CancellationToken cancellationToken)
+    public async Task<ApiResponse<Bill>> Handle(GenerateAdminBillCommand request, CancellationToken ct)
     {
+        logger.LogInformation("GenerateAdminBill requested: UserId={UserId}, CardId={CardId}", request.UserId, request.CardId);
+
         if (request.UserId == Guid.Empty || request.CardId == Guid.Empty)
         {
-            return new ApiResponse<Bill> { Success = false, Message = "UserId and CardId are required." };
+            logger.LogWarning("GenerateBill rejected: UserId or CardId is empty");
+            return new() { Success = false, Message = "UserId and CardId are required." };
         }
 
-        var (cardSuccess, card, cardError) = await FetchCardDetailsAsync(request.CardId, request.AuthorizationHeader, cancellationToken);
-
-        if (!cardSuccess || card is null)
+        var (ok, card, err) = await GetCardAsync(request.CardId, request.AuthorizationHeader, ct);
+        if (!ok || card == null)
         {
-            return new ApiResponse<Bill> { Success = false, Message = cardError ?? "Card not found." };
+            logger.LogWarning("Failed to fetch card {CardId}: {Error}", request.CardId, err);
+            return new() { Success = false, Message = "Card not found" };
+        }
+
+        if (card.UserId != request.UserId)
+        {
+            logger.LogWarning("IDOR attempt: Card {CardId} belongs to {ActualUserId}, not {RequestUserId}",
+                request.CardId, card.UserId, request.UserId);
+            return new() { Success = false, Message = "Card does not belong to user" };
         }
 
         if (!Enum.TryParse<CardNetwork>(card.Network, true, out var network) || network == CardNetwork.Unknown)
         {
-            return new ApiResponse<Bill> { Success = false, Message = "Card network is invalid." };
+            logger.LogWarning("Invalid card network for {CardId}: {Network}", request.CardId, card.Network);
+            return new() { Success = false, Message = "Invalid card network" };
         }
 
         if (card.OutstandingBalance <= 0)
         {
-            return new ApiResponse<Bill> { Success = false, Message = "Outstanding balance is 0. No bill to generate." };
+            logger.LogInformation("No balance to bill for CardId={CardId}", request.CardId);
+            return new() { Success = false, Message = "No balance to bill" };
+        }
+
+        if (await bills.HasPendingBillAsync(request.UserId, request.CardId, ct))
+        {
+            logger.LogWarning("Duplicate bill attempt: UserId={UserId}, CardId={CardId}", request.UserId, request.CardId);
+            return new() { Success = false, Message = "A pending bill already exists for this card" };
         }
 
         var minDue = Math.Max(Math.Round(card.OutstandingBalance * 0.10m, 2, MidpointRounding.AwayFromZero), 10.00m);
         var now = DateTime.UtcNow;
 
+        var (billingDate, dueDate) = BillingCycleCalculator.CalculateBillingAndDueDate(card.BillingCycleStartDay);
+
         var bill = new Bill
         {
+            Id = Guid.NewGuid(), UserId = request.UserId, CardId = request.CardId,
+            CardNetwork = network, IssuerId = card.IssuerId, Amount = card.OutstandingBalance,
+            MinDue = minDue, Currency = request.Currency, BillingDateUtc = billingDate,
+            DueDateUtc = dueDate, Status = BillStatus.Pending, CreatedAtUtc = now, UpdatedAtUtc = now
+        };
+
+        await bills.AddAsync(bill, ct);
+        await EnsureStatementForBillAsync(bill, card, request.AuthorizationHeader, now, ct);
+        await uow.SaveChangesAsync(ct);
+        logger.LogInformation("Bill created: {BillId}, Amount={Amount}, DueDate={DueDate}", bill.Id, bill.Amount, bill.DueDateUtc);
+
+        var (userOk, user, _) = await GetUserAsync(request.UserId, request.AuthorizationHeader, ct);
+        var userEmail = userOk && user != null ? user.Email : null;
+        var userName = userOk && user != null ? user.FullName : null;
+
+        if (string.IsNullOrWhiteSpace(userEmail))
+        {
+            logger.LogWarning("Could not fetch user email for {UserId}. Publishing event with fallback.", request.UserId);
+            userEmail = $"user-{request.UserId}@credvault.local";
+            userName = "User";
+        }
+
+        await publisher.Publish<IBillGenerated>(new { BillId = bill.Id, UserId = bill.UserId, Email = userEmail, FullName = userName, CardId = bill.CardId, Amount = bill.Amount, DueDate = bill.DueDateUtc, GeneratedAt = bill.CreatedAtUtc }, ct);
+        logger.LogInformation("Published IBillGenerated for {BillId}", bill.Id);
+
+        return new() { Success = true, Message = "Bill generated", Data = bill };
+    }
+
+    private async Task<(bool, CardDto?, string?)> GetCardAsync(Guid cardId, string auth, CancellationToken ct)
+    {
+        try
+        {
+            var client = http.CreateClient();
+            client.BaseAddress = new Uri(config["Services:CardService:BaseUrl"] ?? "http://localhost:5002/");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"api/v1/cards/admin/{cardId}");
+            if (!string.IsNullOrEmpty(auth)) req.Headers.Authorization = AuthenticationHeaderValue.Parse(auth);
+            var resp = await client.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Card service returned {Status} for {CardId}", resp.StatusCode, cardId);
+                return (false, null, $"Card service error: {resp.StatusCode}");
+            }
+            var content = await resp.Content.ReadAsStringAsync(ct);
+            var result = JsonSerializer.Deserialize<ApiResponse<CardDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (result?.Data == null)
+            {
+                logger.LogWarning("Card service returned null data for {CardId}", cardId);
+                return (false, null, "Card not found");
+            }
+            return (true, result.Data, null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception fetching card {CardId}", cardId);
+            return (false, null, "External service error");
+        }
+    }
+
+    private async Task<(bool, UserDto?, string?)> GetUserAsync(Guid userId, string auth, CancellationToken ct)
+    {
+        try
+        {
+            var client = http.CreateClient();
+            client.BaseAddress = new Uri(config["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"api/v1/identity/users/{userId}");
+            if (!string.IsNullOrEmpty(auth)) req.Headers.Authorization = AuthenticationHeaderValue.Parse(auth);
+            var resp = await client.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) return (false, null, $"User service error: {resp.StatusCode}");
+            var content = await resp.Content.ReadAsStringAsync(ct);
+            var result = JsonSerializer.Deserialize<UserResponseWrapper>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (result?.Data?.User is null)
+            {
+                return (false, null, "User service returned empty payload");
+            }
+            return (result.Success, result.Data.User, result.Message);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception fetching user {UserId}", userId);
+            return (false, null, "External service error");
+        }
+    }
+
+    private async Task<List<CardTransactionDto>> GetCardTransactionsAsync(Guid cardId, string auth, CancellationToken ct)
+    {
+        try
+        {
+            var client = http.CreateClient();
+            client.BaseAddress = new Uri(config["Services:CardService:BaseUrl"] ?? "http://localhost:5002/");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"api/v1/cards/admin/{cardId}/transactions");
+            if (!string.IsNullOrEmpty(auth)) req.Headers.Authorization = AuthenticationHeaderValue.Parse(auth);
+            var resp = await client.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Card admin transactions API returned {Status} for {CardId}", resp.StatusCode, cardId);
+                return [];
+            }
+
+            var content = await resp.Content.ReadAsStringAsync(ct);
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CardTransactionDto>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return result?.Data ?? [];
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception fetching admin card transactions for {CardId}", cardId);
+            return [];
+        }
+    }
+
+    private async Task EnsureStatementForBillAsync(Bill bill, CardDto card, string auth, DateTime now, CancellationToken ct)
+    {
+        var existing = await statements.GetByBillIdAsync(bill.Id, ct);
+        if (existing is not null)
+        {
+            return;
+        }
+
+        var statement = new Statement
+        {
             Id = Guid.NewGuid(),
-            UserId = request.UserId,
-            CardId = request.CardId,
-            CardNetwork = network,
-            IssuerId = card.IssuerId,
-            Amount = card.OutstandingBalance,
-            MinDue = minDue,
-            Currency = request.Currency,
-            BillingDateUtc = now,
-            DueDateUtc = now.AddDays(20),
-            Status = BillStatus.Pending,
+            UserId = bill.UserId,
+            CardId = bill.CardId,
+            BillId = bill.Id,
+            StatementPeriod = $"{bill.BillingDateUtc:MMM yyyy}",
+            PeriodStartUtc = bill.BillingDateUtc.Date,
+            PeriodEndUtc = bill.DueDateUtc.Date,
+            GeneratedAtUtc = now,
+            DueDateUtc = bill.DueDateUtc,
+            OpeningBalance = 0,
+            TotalPurchases = bill.Amount,
+            TotalPayments = 0,
+            TotalRefunds = 0,
+            PenaltyCharges = 0,
+            InterestCharges = 0,
+            ClosingBalance = bill.Amount,
+            MinimumDue = bill.MinDue,
+            AmountPaid = 0,
+            PaidAtUtc = null,
+            Status = StatementStatus.Generated,
+            CardLast4 = string.Empty,
+            CardNetwork = card.Network,
+            IssuerName = bill.IssuerId.ToString(),
+            CreditLimit = card.CreditLimit,
+            AvailableCredit = Math.Max(0, card.CreditLimit - card.OutstandingBalance),
+            Notes = "Auto-generated when bill is generated",
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
 
-        await billRepository.AddAsync(bill, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await statements.AddAsync(statement, ct);
 
-        // Fetch User Details for Notification
-        var (userSuccess, user, _) = await FetchUserDetailsAsync(request.UserId, request.AuthorizationHeader, cancellationToken);
+        var userBills = await bills.GetByUserIdAsync(bill.UserId, ct);
+        var previousBill = userBills
+            .Where(b => b.CardId == bill.CardId && b.Id != bill.Id)
+            .OrderByDescending(b => b.CreatedAtUtc)
+            .FirstOrDefault();
 
-        if (userSuccess && user is not null)
-        {
-            await publishEndpoint.Publish<IBillGenerated>(new
+        // Prefer transactions after the previous settled cycle to avoid leaking old items.
+        var lowerBoundUtc = previousBill?.PaidAtUtc ?? previousBill?.CreatedAtUtc ?? bill.BillingDateUtc;
+
+        var txns = await GetCardTransactionsAsync(bill.CardId, auth, ct);
+        var lines = txns
+            .Where(t => t.Type == 1 && t.DateUtc > lowerBoundUtc && t.DateUtc <= now)
+            .OrderBy(t => t.DateUtc)
+            .Select(t => new StatementTransaction
             {
-                BillId = bill.Id,
-                bill.UserId,
-                user.Email,
-                user.FullName,
-                bill.CardId,
-                bill.Amount,
-                DueDate = bill.DueDateUtc,
-                GeneratedAt = bill.CreatedAtUtc
-            }, cancellationToken);
+                Id = Guid.NewGuid(),
+                StatementId = statement.Id,
+                SourceTransactionId = t.Id,
+                Type = t.Type switch
+                {
+                    1 => "Purchase",
+                    2 => "Payment",
+                    3 => "Refund",
+                    _ => "Unknown"
+                },
+                Amount = t.Amount,
+                Description = t.Description,
+                DateUtc = t.DateUtc,
+                CreatedAtUtc = now
+            })
+            .ToList();
+
+        if (lines.Count > 0)
+        {
+            await statements.AddTransactionsAsync(lines, ct);
         }
-        
-        return new ApiResponse<Bill> { Success = true, Message = "Bill generated.", Data = bill };
     }
 
-    private async Task<(bool Success, CardDto? Card, string? Error)> FetchCardDetailsAsync(Guid cardId, string authHeader, CancellationToken ct)
+    private record CardDto(Guid Id, Guid UserId, string Network, Guid IssuerId, decimal CreditLimit, decimal OutstandingBalance, int BillingCycleStartDay);
+    private record UserDto(Guid Id, string Email, string FullName);
+    private record CardTransactionDto(Guid Id, int Type, decimal Amount, string Description, DateTime DateUtc);
+
+    private class UserResponseWrapper
     {
-        try
-        {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:CardService:BaseUrl"] ?? "http://localhost:5002/";
-            client.BaseAddress = new Uri(baseUrl);
-
-            var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/cards/admin/{cardId}");
-            if (!string.IsNullOrEmpty(authHeader))
-                request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
-
-            var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode) return (false, null, $"Failed to fetch card: {response.ReasonPhrase}");
-
-            var content = await response.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<ApiResponse<CardDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            
-            return (result?.Success ?? false, result?.Data, result?.Message);
-        }
-        catch (Exception ex) { return (false, null, ex.Message); }
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public UserPayload? Data { get; set; }
     }
 
-    private async Task<(bool Success, UserDto? User, string? Error)> FetchUserDetailsAsync(Guid userId, string authHeader, CancellationToken ct)
+    private class UserPayload
     {
-        try
-        {
-            var client = httpClientFactory.CreateClient();
-            var baseUrl = configuration["Services:IdentityService:BaseUrl"] ?? "http://localhost:5001/";
-            client.BaseAddress = new Uri(baseUrl);
-
-            var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/identity/users/{userId}");
-            if (!string.IsNullOrEmpty(authHeader))
-                request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
-
-            var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode) return (false, null, $"Failed to fetch user: {response.ReasonPhrase}");
-
-            var content = await response.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<ApiResponse<UserDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            
-            return (result?.Success ?? false, result?.Data, result?.Message);
-        }
-        catch (Exception ex) { return (false, null, ex.Message); }
+        public UserDto? User { get; set; }
     }
 }

@@ -31,9 +31,6 @@ namespace CardService.Infrastructure.Persistence.Sql.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -161,6 +158,17 @@ namespace CardService.Infrastructure.Persistence.Sql.Migrations
                     b.HasIndex("UserId", "IsDefault");
 
                     b.ToTable("CreditCards", (string)null);
+                });
+
+            modelBuilder.Entity("CardService.Domain.Entities.CardTransaction", b =>
+                {
+                    b.HasOne("CardService.Domain.Entities.CreditCard", "Card")
+                        .WithMany()
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Card");
                 });
 
             modelBuilder.Entity("CardService.Domain.Entities.CreditCard", b =>

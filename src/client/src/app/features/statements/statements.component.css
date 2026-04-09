@@ -1,0 +1,38 @@
+.statements-page {
+  isolation: isolate;
+}
+
+.mist-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glow-cloud {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(150px);
+}
+
+.glow-cloud-1 {
+  top: -20%;
+  left: -10%;
+  width: 60%;
+  height: 60%;
+  background: rgba(255, 220, 189, 0.3);
+}
+
+.glow-cloud-2 {
+  top: 10%;
+  right: -5%;
+  width: 50%;
+  height: 50%;
+  background: rgba(202, 198, 195, 0.3);
+}
+
+.statement-row {
+  box-shadow: 0 16px 60px -20px rgba(83, 68, 55, 0.08);
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}

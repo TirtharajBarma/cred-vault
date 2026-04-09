@@ -1,7 +1,8 @@
 using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Common;
-using CardService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Card.Responses;
 using MediatR;
+using Shared.Contracts.Exceptions;
 
 namespace CardService.Application.Queries.Cards;
 
@@ -16,7 +17,7 @@ public sealed class GetMyCardByIdQueryHandler(ICardRepository cardRepository)
 
         if (card is null)
         {
-            return new CardResult { Success = false, Message = "Card not found.", ErrorCode = "CardNotFound" };
+            throw new NotFoundException("Card", request.CardId);
         }
 
         return new CardResult { Success = true, Message = "Card fetched successfully.", Card = CardMapping.ToDto(card) };

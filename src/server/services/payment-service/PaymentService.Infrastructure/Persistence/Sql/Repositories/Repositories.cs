@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentService.Domain.Entities;
+using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
 
 namespace PaymentService.Infrastructure.Persistence.Sql.Repositories;
@@ -10,15 +11,13 @@ public sealed class PaymentRepository(PaymentDbContext dbContext) : IPaymentRepo
     {
         return await dbContext.Payments
             .Include(x => x.Transactions)
-            .Include(x => x.RiskScore)
-            .Include(x => x.FraudAlert)
             .FirstOrDefaultAsync(x => x.Id == id);
     }
 
     public async Task<IEnumerable<Payment>> GetByUserIdAsync(Guid userId)
     {
         return await dbContext.Payments
-            .Where(x => x.UserId == userId && !x.IsDeleted)
+            .Where(x => x.UserId == userId)
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync();
     }
@@ -32,6 +31,16 @@ public sealed class PaymentRepository(PaymentDbContext dbContext) : IPaymentRepo
     {
         dbContext.Payments.Update(payment);
         return Task.CompletedTask;
+    }
+
+    public async Task<IEnumerable<Payment>> GetStuckPaymentsAsync(Guid userId, Guid billId, CancellationToken ct = default)
+    {
+        return await dbContext.Payments
+            .Where(x => x.UserId == userId 
+                && x.BillId == billId 
+                && x.Status == PaymentStatus.Initiated 
+                && x.OtpExpiresAtUtc < DateTime.UtcNow)
+            .ToListAsync(ct);
     }
 }
 
@@ -48,31 +57,5 @@ public sealed class TransactionRepository(PaymentDbContext dbContext) : ITransac
     public async Task AddAsync(Transaction transaction)
     {
         await dbContext.Transactions.AddAsync(transaction);
-    }
-}
-
-public sealed class RiskRepository(PaymentDbContext dbContext) : IRiskRepository
-{
-    public async Task<RiskScore?> GetByPaymentIdAsync(Guid paymentId)
-    {
-        return await dbContext.RiskScores.FirstOrDefaultAsync(x => x.PaymentId == paymentId);
-    }
-
-    public async Task AddAsync(RiskScore riskScore)
-    {
-        await dbContext.RiskScores.AddAsync(riskScore);
-    }
-}
-
-public sealed class FraudRepository(PaymentDbContext dbContext) : IFraudRepository
-{
-    public async Task<FraudAlert?> GetByPaymentIdAsync(Guid paymentId)
-    {
-        return await dbContext.FraudAlerts.FirstOrDefaultAsync(x => x.PaymentId == paymentId);
-    }
-
-    public async Task AddAsync(FraudAlert fraudAlert)
-    {
-        await dbContext.FraudAlerts.AddAsync(fraudAlert);
     }
 }

@@ -1,0 +1,10 @@
+namespace Shared.Contracts.DTOs.Card.Responses;
+
+public sealed class CardIssuerDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int Network { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+}

@@ -1,0 +1,193 @@
+<div class="statements-page relative min-h-screen overflow-hidden bg-[#F0EDEB] text-[#1b1c1c]">
+  <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div class="glow-cloud glow-cloud-1"></div>
+    <div class="glow-cloud glow-cloud-2"></div>
+    <div class="absolute inset-0 bg-gradient-to-b from-[#dcd9d9]/20 to-[#fbf9f8]"></div>
+  </div>
+
+  <main class="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-32 md:px-8 md:pt-32">
+    <header class="mb-14 flex flex-col justify-between gap-8 md:mb-20 md:flex-row md:items-end">
+      <div class="max-w-2xl">
+        <span class="mb-4 block text-xs font-bold uppercase tracking-[0.05em] text-[#8a5100]">Archive</span>
+        <h1 class="mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-[3.5rem] text-[#1b1c1c]">
+          Financial <span class="text-[#8a5100] italic font-[Georgia,Times,serif] font-light">Statements</span>
+        </h1>
+        <p class="max-w-lg text-lg leading-relaxed text-[#534437]">
+          Access your comprehensive billing cycles and transaction records with refined transparency.
+        </p>
+      </div>
+      <div class="flex items-center gap-4">
+        <!-- Filter Dropdown -->
+        <div class="relative">
+          <button 
+            (click)="toggleFilterDropdown()"
+            class="mist-blur flex items-center gap-2 rounded-full bg-[#f6f3f2] px-6 py-3 font-medium text-[#615e5c] transition-all duration-300 hover:bg-[#eae8e7]"
+          >
+            <span class="material-symbols-outlined text-sm transition-transform hover:rotate-12">filter_list</span>
+            {{ getSelectedCardLabel() }}
+          </button>
+          @if (showFilterDropdown()) {
+            <div class="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-72 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden z-[60]">
+              <button 
+                (click)="selectCardFilter('all')"
+                class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
+                [class.bg-[#8a5100]/10]="selectedCardFilter() === 'all'"
+              >
+                <span class="material-symbols-outlined text-lg text-[#8a5100]">credit_card</span>
+                <div class="flex flex-col">
+                  <span class="font-bold text-[#1b1c1c]">All Cards</span>
+                  <span class="text-xs text-[#615e5c]">View all statements</span>
+                </div>
+              </button>
+              <div class="max-h-[304px] overflow-y-auto">
+                @for (card of cardOptions(); track card.id) {
+                  <button 
+                    (click)="selectCardFilter(card.id)"
+                    class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
+                    [class.bg-[#8a5100]/10]="selectedCardFilter() === card.id"
+                  >
+                    <div [class]="card.network === 'Mastercard' ? 'bg-[#eb001b]/10 text-[#eb001b]' : 'bg-[#1a1f71]/10 text-[#1a1f71]'"
+                         class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold">
+                      {{ card.network === 'Mastercard' ? 'M' : card.network === 'Visa' ? 'V' : 'C' }}
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="font-bold text-[#1b1c1c] truncate max-w-[150px]">{{ card.issuerName }} {{ card.network }}</span>
+                      <span class="text-xs text-[#615e5c]">•••• {{ card.last4 }}</span>
+                    </div>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+        <!-- Month Filter Dropdown -->
+        <div class="relative">
+          <button 
+            (click)="toggleMonthDropdown()"
+            class="mist-blur flex items-center gap-2 rounded-full bg-[#f6f3f2] px-6 py-3 font-medium text-[#615e5c] transition-all duration-300 hover:bg-[#eae8e7]"
+          >
+            <span class="material-symbols-outlined text-sm transition-transform hover:rotate-12">calendar_month</span>
+            {{ selectedMonthFilter() === 'all' ? 'All Months' : selectedMonthFilter() }}
+          </button>
+          @if (showMonthDropdown()) {
+            <div class="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-64 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden z-[60]">
+              <button 
+                (click)="selectMonthFilter('all')"
+                class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
+                [class.bg-[#8a5100]/10]="selectedMonthFilter() === 'all'"
+              >
+                <span class="material-symbols-outlined text-lg text-[#8a5100]">calendar_today</span>
+                <div class="flex flex-col">
+                  <span class="font-bold text-[#1b1c1c]">All Months</span>
+                </div>
+              </button>
+              <div class="max-h-[304px] overflow-y-auto">
+                @for (month of monthOptions(); track month) {
+                  <button 
+                    (click)="selectMonthFilter(month)"
+                    class="w-full px-6 py-4 text-left text-sm font-medium hover:bg-[#f6f3f2] transition-colors flex items-center gap-3"
+                    [class.bg-[#8a5100]/10]="selectedMonthFilter() === month"
+                  >
+                    <div class="flex flex-col ml-8">
+                      <span class="font-bold text-[#1b1c1c]">{{ month }}</span>
+                    </div>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+        <button (click)="exportAllToCSV()" class="rounded-full bg-[#8a5100] px-8 py-3 font-semibold text-white shadow-lg shadow-[#8a5100]/20 transition-all duration-300 hover:scale-[1.02]">
+          Export All
+        </button>
+      </div>
+    </header>
+
+    @if (isLoading()) {
+      <div class="grid grid-cols-1 gap-6">
+        @for (i of [1,2,3,4]; track i) {
+          <div class="skeleton h-36 rounded-3xl"></div>
+        }
+      </div>
+    } @else if (sortedStatements().length === 0) {
+      <div class="mist-blur flex flex-col items-center justify-center rounded-[3rem] border border-dashed border-[#d8c3b2]/40 bg-white/40 py-28 text-center">
+        <div class="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-[#f6f3f2]">
+          <span class="material-symbols-outlined text-5xl text-[#857465]/30">description</span>
+        </div>
+        <h3 class="mb-2 text-2xl font-bold">No Statements Available</h3>
+        <p class="max-w-sm text-[#534437]">Select a card above to generate your first consolidated billing statement.</p>
+      </div>
+    } @else {
+      <div class="grid grid-cols-1 gap-6">
+        @for (stmt of paginatedStatements(); track stmt.id; let i = $index) {
+          <article
+            (click)="viewStatement(stmt.id)"
+            class="statement-row mist-blur flex cursor-pointer flex-col gap-7 rounded-3xl border border-white/40 p-8 transition-all duration-300 md:grid md:grid-cols-[minmax(0,1fr)_220px_90px_170px] md:items-center md:gap-6"
+            [ngClass]="i === 0 ? 'bg-white/70 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)]' : 'bg-white/55 hover:bg-white/70'"
+          >
+            <div class="flex items-center gap-6">
+              <div
+                class="flex h-16 w-16 items-center justify-center rounded-2xl"
+                [ngClass]="i === 0 ? 'bg-[#ffdcbd]/40 text-[#8a5100]' : 'bg-[#e7e1df]/50 text-[#615e5c]'"
+              >
+                <span class="material-symbols-outlined text-3xl">{{ i === 0 ? 'description' : 'folder_zip' }}</span>
+              </div>
+              <div>
+                <h3 class="text-xl font-semibold">{{ stmt.statementPeriod }}</h3>
+                <div class="flex items-center gap-3 mt-1">
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-[#f6f3f2] rounded-full">
+                    <span class="material-symbols-outlined text-sm text-[#8a5100]">credit_card</span>
+                    <span class="text-sm font-bold text-[#1b1c1c]">{{ getCardDisplay(stmt.cardId) }}</span>
+                  </span>
+                  <span class="text-[#d8c3b2]">|</span>
+                  <span class="text-sm text-[#615e5c]">Due {{ (stmt.dueDateUtc || stmt.periodEndUtc) | date:'MMM dd' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex w-full flex-col items-start md:w-full md:items-end md:text-right">
+              <span class="text-sm font-medium text-[#534437]">Total Amount</span>
+              <span class="tabular-nums w-full text-left md:text-right" [ngClass]="i === 0 ? 'text-3xl font-bold' : 'text-2xl font-semibold'">{{ getDisplayAmount(stmt) | currency:'INR' }}</span>
+            </div>
+
+            <div class="flex items-center md:justify-center">
+              <span
+                class="rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest"
+                [ngClass]="getStatementBadgeClass(stmt)"
+              >
+                {{ getStatementBadgeLabel(stmt) }}
+              </span>
+            </div>
+
+            <div class="flex items-center md:justify-end">
+              <button
+                (click)="viewStatement(stmt.id); $event.stopPropagation()"
+                class="group flex items-center gap-3 rounded-full px-6 py-3 font-medium transition-all duration-300"
+                [ngClass]="i === 0 ? 'bg-[#1b1c1c] text-[#fbf9f8] hover:bg-[#8a5100]' : 'border border-[#d8c3b2]/30 text-[#1b1c1c] hover:bg-[#f6f3f2]'"
+              >
+                View Details
+                <span class="material-symbols-outlined text-lg transition-transform group-hover:translate-y-0.5">arrow_forward</span>
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+
+      @if (totalPages() > 1) {
+        <div class="mt-12 flex items-center justify-between pt-8 border-t border-[#d8c3b2]/20">
+          <span class="text-sm font-medium text-[#534437]">Page {{ currentPage() }} of {{ totalPages() }}</span>
+          <div class="flex gap-3">
+            <button (click)="prevPage()" [disabled]="currentPage() === 1" class="flex items-center gap-2 px-6 py-3 rounded-full border border-[#d8c3b2]/30 text-sm font-semibold text-[#534437] hover:bg-white/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+              <span class="material-symbols-outlined text-lg">chevron_left</span>
+              Previous
+            </button>
+            <button (click)="nextPage()" [disabled]="currentPage() === totalPages()" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[#8a5100] text-white text-sm font-semibold hover:bg-[#7a4600] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#8a5100]/20">
+              Next
+              <span class="material-symbols-outlined text-lg">chevron_right</span>
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </main>
+</div>

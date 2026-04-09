@@ -2,148 +2,160 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using PaymentService.Application.Commands.Payments;
 using PaymentService.Application.Queries.Payments;
 using PaymentService.Domain.Enums;
-using PaymentService.Infrastructure.Persistence.Sql;
 using Shared.Contracts.Controllers;
 using Shared.Contracts.Models;
+
 namespace PaymentService.API.Controllers;
 
+/// <summary>
+/// Payment controller handling payment operations for bill payments.
+/// Manages payment initiation, OTP verification, and payment status tracking.
+/// Uses two-factor authentication (OTP) for payment verification before processing.
+/// </summary>
+/// <remarks>
+/// User endpoints (requires authentication):
+/// - POST /initiate: Start a new payment (requires OTP to complete)
+/// - POST /{paymentId}/verify-otp: Verify OTP and process payment
+/// - POST /{paymentId}/resend-otp: Resend expired OTP
+/// - GET /: List all user's payments
+/// - GET /{paymentId}: Get payment details
+/// - GET /{paymentId}/transactions: Get transactions for a payment
+/// </remarks>
 [ApiController]
 [Route("api/v1/payments")]
 [Authorize]
-public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : BaseApiController
+public class PaymentsController(IMediator mediator) : BaseApiController
 {
+    /// <summary>
+    /// Initiate a new payment for a bill.
+    /// Creates a payment record and optionally applies rewards points.
+    /// Requires OTP verification to complete the transaction.
+    /// </summary>
+    /// <param name="request">InitiatePaymentRequest with CardId, BillId, Amount, PaymentType, RewardsPoints (optional)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with PaymentId, OTP requirement, and rewards info</returns>
     [HttpPost("initiate")]
     public async Task<IActionResult> Initiate([FromBody] InitiatePaymentRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         if (!Enum.TryParse<PaymentType>(request.PaymentType, ignoreCase: true, out var paymentType))
-            return BadRequest(Fail($"Invalid PaymentType. Valid values: {string.Join(", ", Enum.GetNames<PaymentType>())}"));
+            return BadRequest(BadRequestResponse($"Invalid PaymentType. Valid values: {string.Join(", ", Enum.GetNames<PaymentType>())}"));
 
         var authHeader = HttpContext.Request.Headers.Authorization.ToString();
-        var command = new InitiatePaymentCommand(userId.Value, request.CardId, request.BillId, request.Amount, paymentType, authHeader);
+        
+        decimal? rewardsAmount = null;
+        if (request.RewardsPoints.HasValue && request.RewardsPoints > 0)
+        {
+            rewardsAmount = request.RewardsPoints.Value * 0.25m; // 1 point = 25 paise (₹0.25)
+        }
+        
+        var command = new InitiatePaymentCommand(userId.Value, request.CardId, request.BillId, request.Amount, paymentType, authHeader, rewardsAmount);
         var result = await mediator.Send(command, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(Fail(result.Error ?? "Payment initiation failed."));
-
-        // In Development, return the OTP directly so you can test without email/SMS.
-        // There is an inherent race condition here: the HTTP request publishes 'PaymentInitiated' 
-        // to RabbitMQ and returns. MassTransit processes it asynchronously, meaning the Saga 
-        // might not have generated and saved the OTP into the database *yet* when this line runs.
-        // We poll briefly to wait for the saga to complete its first step.
-        string? devOtp = null;
-        if (result.OtpRequired && env.IsDevelopment())
-        {
-            var db = HttpContext.RequestServices.GetRequiredService<PaymentDbContext>();
-            for (var i = 0; i < 10; i++)
-            {
-                await Task.Delay(200);
-                var saga = await db.PaymentSagas
-                    .AsNoTracking()
-                    .Where(x => x.PaymentId == result.PaymentId && x.OtpCode != null)
-                    .Select(x => new { x.OtpCode })
-                    .FirstOrDefaultAsync();
-                if (saga?.OtpCode is not null)
-                {
-                    devOtp = saga.OtpCode;
-                    break;
-                }
-            }
-        }
+            return BadRequestResponse(result.Error ?? "Payment initiation failed.");
 
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
         {
             Success = true,
-            Message = result.OtpRequired
-                ? "Payment initiated. OTP required — call /verify-otp to complete."
-                : "Payment completed successfully.",
+            Message = result.RewardsApplied ? "Payment initiated with rewards applied. OTP required." : "Payment initiated. OTP required — call /verify-otp to complete.",
             Data = new
             {
-                PaymentId   = result.PaymentId,
+                PaymentId = result.PaymentId,
                 OtpRequired = result.OtpRequired,
-                Status      = result.OtpRequired ? "Pending OTP Verification" : "Completed",
-                // Only present in Development — remove in production
-                DevOtp      = devOtp
+                Status = "Pending OTP Verification",
+                RewardsApplied = result.RewardsApplied,
+                RewardsAmount = result.RewardsAmount,
+                FinalAmount = result.FinalAmount
             },
             TraceId = HttpContext.TraceIdentifier
         });
     }
 
+    /// <summary>
+    /// Verify OTP and complete the payment.
+    /// OTP is sent to user's registered email. Payment only processes after valid OTP.
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="request">VerifyOtpRequest with OtpCode</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with payment status</returns>
     [HttpPost("{paymentId:guid}/verify-otp")]
     public async Task<IActionResult> VerifyOtp(
         Guid paymentId,
         [FromBody] VerifyOtpRequest request,
-        [FromServices] PaymentDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        var saga = await dbContext.PaymentSagas
-            .FirstOrDefaultAsync(x => x.PaymentId == paymentId, cancellationToken);
+        var userId = GetUserIdFromToken();
+        if (userId is null)
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
-        if (saga is null)
-            return NotFound(Fail("Payment not found."));
+        var command = new VerifyOtpCommand(paymentId, userId.Value, request.OtpCode);
+        var result = await mediator.Send(command, cancellationToken);
 
-        if (saga.CurrentState != "RiskCheckPassed")
-            return BadRequest(Fail("Payment is not awaiting OTP verification."));
-
-        if (string.IsNullOrWhiteSpace(saga.OtpCode))
-            return BadRequest(Fail("No OTP was generated for this payment."));
-
-        if (saga.OtpExpiresAtUtc.HasValue && saga.OtpExpiresAtUtc.Value < DateTime.UtcNow)
-            return BadRequest(Fail("OTP has expired. Please initiate a new payment."));
-
-        if (!string.Equals(saga.OtpCode, request.OtpCode.Trim(), StringComparison.Ordinal))
-            return BadRequest(Fail("Invalid OTP."));
-
-        // Clear OTP after successful use (one-time use)
-        saga.OtpCode = null;
-        saga.OtpExpiresAtUtc = null;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var command = new VerifyPaymentOtpCommand(paymentId, request.OtpCode);
-        await mediator.Send(command, cancellationToken);
+        if (!result.Success)
+            return BadRequestResponse(result.Error ?? "OTP verification failed.");
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
             Message = "OTP verified. Payment is processing.",
+            Data = new { PaymentId = paymentId, Status = "Processing" },
             TraceId = HttpContext.TraceIdentifier
         });
     }
 
-    [HttpPost("{paymentId:guid}/reverse")]
-    public async Task<IActionResult> Reverse(Guid paymentId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Resend OTP for a pending payment.
+    /// Useful if original OTP expired (valid for 5 minutes).
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with new OTP expiration time</returns>
+    [HttpPost("{paymentId:guid}/resend-otp")]
+    public async Task<IActionResult> ResendOtp(Guid paymentId, CancellationToken cancellationToken)
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
-        var command = new ReversePaymentCommand(paymentId, userId.Value);
-        var result = await mediator.Send(command, cancellationToken);
+        var authHeader = HttpContext.Request.Headers.Authorization.ToString();
+        var result = await mediator.Send(new ResendOtpCommand(paymentId, userId.Value, authHeader), cancellationToken);
 
-        if (!result)
-            return NotFound(Fail("Payment not found or not authorized."));
+        if (!result.Success)
+            return BadRequestResponse(result.Error ?? "Failed to resend OTP.");
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
-            Message = "Payment reversed.",
+            Message = "OTP resent successfully.",
+            Data = new
+            {
+                PaymentId = paymentId,
+                OtpExpiresAtUtc = result.ExpiresAtUtc
+            },
             TraceId = HttpContext.TraceIdentifier
         });
     }
 
+    /// <summary>
+    /// List all payments for the authenticated user.
+    /// Returns payment history including status, amount, and date.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with list of payments</returns>
     [HttpGet]
     public async Task<IActionResult> GetMyPayments(CancellationToken cancellationToken)
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         var payments = await mediator.Send(new GetAllPaymentsQuery(userId.Value), cancellationToken);
 
@@ -156,17 +168,23 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         });
     }
 
+    /// <summary>
+    /// Get specific payment details by ID.
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with payment details</returns>
     [HttpGet("{paymentId:guid}")]
     public async Task<IActionResult> GetById(Guid paymentId, CancellationToken cancellationToken)
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         var payment = await mediator.Send(new GetPaymentByIdQuery(paymentId, userId.Value), cancellationToken);
 
         if (payment is null)
-            return NotFound(Fail("Payment not found."));
+            return NotFound(BadRequestResponse("Payment not found."));
 
         return Ok(new ApiResponse<object>
         {
@@ -177,12 +195,19 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
         });
     }
 
+    /// <summary>
+    /// Get all transactions related to a payment.
+    /// Includes payment attempts, reversals, etc.
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with list of payment transactions</returns>
     [HttpGet("{paymentId:guid}/transactions")]
     public async Task<IActionResult> GetTransactions(Guid paymentId, CancellationToken cancellationToken)
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
+            return Unauthorized(BadRequestResponse("User identity is missing from token."));
 
         var transactions = await mediator.Send(new GetPaymentTransactionsQuery(paymentId, userId.Value), cancellationToken);
 
@@ -194,28 +219,7 @@ public class PaymentsController(IMediator mediator, IWebHostEnvironment env) : B
             TraceId = HttpContext.TraceIdentifier
         });
     }
-
-    [HttpGet("{paymentId:guid}/risk")]
-    public async Task<IActionResult> GetRiskScore(Guid paymentId, CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null)
-            return Unauthorized(Fail("User identity is missing from token."));
-
-        var risk = await mediator.Send(new GetRiskScoreQuery(paymentId, userId.Value), cancellationToken);
-
-        if (risk is null)
-            return NotFound(Fail("Risk score not found."));
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Message = "Risk score fetched.",
-            Data = risk,
-            TraceId = HttpContext.TraceIdentifier
-        });
-    }
 }
 
-public record InitiatePaymentRequest(Guid CardId, Guid BillId, decimal Amount, string PaymentType);
+public record InitiatePaymentRequest(Guid CardId, Guid BillId, decimal Amount, string PaymentType, int? RewardsPoints = null);
 public record VerifyOtpRequest(string OtpCode);

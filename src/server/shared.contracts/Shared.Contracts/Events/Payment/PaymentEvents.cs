@@ -1,19 +1,5 @@
 namespace Shared.Contracts.Events.Payment;
 
-public interface IPaymentInitiated
-{
-    Guid PaymentId { get; }
-    Guid UserId { get; }
-    string Email { get; }
-    string FullName { get; }
-    Guid CardId { get; }
-    Guid BillId { get; }
-    decimal Amount { get; }
-    string PaymentType { get; }
-    DateTime CreatedAt { get; }
-    int RiskScore { get; }
-}
-
 public interface IPaymentCompleted
 {
     Guid PaymentId { get; }
@@ -23,8 +9,8 @@ public interface IPaymentCompleted
     Guid CardId { get; }
     Guid BillId { get; }
     decimal Amount { get; }
-    decimal RiskScore { get; }
-    string RiskDecision { get; }
+    decimal AmountPaid { get; }  // Actual amount paid (after rewards)
+    decimal RewardsRedeemed { get; }  // Rewards used in payment
     DateTime CompletedAt { get; }
 }
 
@@ -48,22 +34,6 @@ public interface IPaymentReversed
     decimal Amount { get; }
     decimal PointsDeducted { get; }
     DateTime ReversedAt { get; }
-}
-
-public interface IFraudDetected
-{
-    Guid PaymentId { get; }
-    Guid UserId { get; }
-    decimal RiskScore { get; }
-    string AlertType { get; }
-    DateTime DetectedAt { get; }
-}
-
-public interface IOTPVerified
-{
-    Guid PaymentId { get; }
-    string OtpCode { get; }
-    DateTime VerifiedAt { get; }
 }
 
 public interface IPaymentOtpGenerated

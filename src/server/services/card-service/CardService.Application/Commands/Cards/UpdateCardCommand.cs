@@ -1,7 +1,8 @@
 using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Common;
-using CardService.Application.DTOs.Responses;
+using Shared.Contracts.DTOs.Card.Responses;
 using MediatR;
+using Shared.Contracts.Exceptions;
 
 namespace CardService.Application.Commands.Cards;
 
@@ -19,7 +20,7 @@ public sealed class UpdateCardCommandHandler(ICardRepository cardRepository)
     public async Task<CardResult> Handle(UpdateCardCommand request, CancellationToken cancellationToken)
     {
         var card = await cardRepository.GetByUserAndIdAsync(request.UserId, request.CardId, cancellationToken);
-        if (card is null) return new CardResult { Success = false, Message = "Card not found." };
+        if (card is null) throw new NotFoundException("Card", request.CardId);
 
         card.CardholderName = request.CardholderName.Trim();
         card.ExpMonth = request.ExpMonth;

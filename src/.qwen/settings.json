@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm *)",
+      "Bash(dotnet *)",
+      "Bash(npx *)",
+      "Bash(lsof *)",
+      "Bash(python3 *)",
+      "Bash(echo *)",
+      "Bash(curl *)"
+    ]
+  },
+  "$version": 3
+}

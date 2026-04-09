@@ -1,0 +1,100 @@
+1. what what serilog register?
+What else gets logged:
+- Application startup/shutdown events
+- MassTransit message publishing/consuming (if using message queues)
+- Background services (hosted services)
+- Dependency injection resolution
+- Health check results
+- Security events (login attempts, token generation)
+- External API calls (HTTP client requests)
+
+
+
+CQRS
+COMMANDS (Write Operations)
+IdentityService
+server/services/identity-service/IdentityService.Application/Commands/Auth/
+├── ForgotPasswordCommand.cs
+├── GoogleLoginCommand.cs
+├── LoginCommand.cs
+├── RegisterCommand.cs
+├── ResendVerificationCommand.cs
+├── ResetPasswordCommand.cs
+└── VerifyEmailOtpCommand.cs
+server/services/identity-service/IdentityService.Application/Commands/Users/
+├── ChangeMyPasswordCommand.cs
+├── UpdateMeCommand.cs
+├── UpdateUserRoleCommand.cs
+└── UpdateUserStatusCommand.cs
+CardService
+server/services/card-service/CardService.Application/Commands/Cards/
+├── CreateCardCommand.cs
+├── DeleteCardCommand.cs
+├── UpdateCardByAdminCommand.cs
+└── UpdateCardCommand.cs
+server/services/card-service/CardService.Application/Commands/Issuers/
+├── CreateIssuerCommand.cs
+├── DeleteIssuerCommand.cs
+└── UpdateIssuerCommand.cs
+server/services/card-service/CardService.Application/Commands/Transactions/
+└── AddCardTransactionCommand.cs
+BillingService
+server/services/billing-service/BillingService.Application/Commands/Bills/
+├── CheckOverdueBillsCommand.cs
+├── GenerateAdminBillCommand.cs
+├── MarkBillPaidCommand.cs
+└── RevertBillPaidCommand.cs
+server/services/billing-service/BillingService.Application/Commands/Rewards/
+├── CreateRewardTierCommand.cs
+├── DeleteRewardTierCommand.cs
+├── RedeemRewardsCommand.cs
+└── UpdateRewardTierCommand.cs
+server/services/billing-service/BillingService.Application/Commands/Statements/
+└── GenerateStatementCommand.cs
+PaymentService
+server/services/payment-service/PaymentService.Application/Commands/Payments/
+├── InitiatePaymentCommand.cs
+├── ResendOtpCommand.cs
+└── VerifyOtpCommand.cs
+NotificationService
+server/services/notification-service/NotificationService.Application/Commands/
+├── ProcessNotificationCommand.cs
+└── ProcessNotificationCommandHandler.cs
+---
+QUERIES (Read Operations)
+IdentityService
+server/services/identity-service/IdentityService.Application/Queries/Users/
+├── GetMeQuery.cs
+├── GetUserByIdQuery.cs
+├── GetUserStatsQuery.cs
+└── ListAllUsersQuery.cs
+CardService
+server/services/card-service/CardService.Application/Queries/Cards/
+├── AdminGetCardByIdQuery.cs
+├── AdminGetCardTransactionsQuery.cs
+├── GetCardsByUserIdQuery.cs
+├── GetIssuerByIdQuery.cs
+├── GetMyCardByIdQuery.cs
+├── ListIssuersQuery.cs
+└── ListMyCardsQuery.cs
+server/services/card-service/CardService.Application/Queries/Transactions/
+├── ListCardTransactionsQuery.cs
+└── ListUserTransactionsQuery.cs
+BillingService
+server/services/billing-service/BillingService.Application/Queries/Bills/
+├── GetMyBillByIdQuery.cs
+├── GetMyBillsQuery.cs
+└── HasPendingBillQuery.cs
+server/services/billing-service/BillingService.Application/Queries/Rewards/
+├── GetRewardTransactionsQuery.cs
+├── ListRewardTiersQuery.cs
+└── RewardAccountQueries.cs
+server/services/billing-service/BillingService.Application/Queries/Statements/
+└── GetStatementsQuery.cs
+PaymentService
+server/services/payment-service/PaymentService.Application/Queries/Payments/
+└── PaymentsQueries.cs
+NotificationService
+server/services/notification-service/NotificationService.Application/Queries/Notifications/
+├── GetAuditLogsQuery.cs
+└── GetNotificationLogsQuery.cs

@@ -1,0 +1,222 @@
+<!-- Premium Pill Navbar -->
+<nav class="fixed top-5 left-1/2 -translate-x-1/2 w-[95%] max-w-7xl rounded-full bg-[#fbf9f8]/80 backdrop-blur-xl shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] flex justify-between items-center px-8 py-3 z-50 transition-all duration-300 print:hidden">
+  
+  <!-- Brand & Mobile Toggle -->
+  <div class="flex items-center gap-2 md:gap-3">
+    <!-- Hamburger (Mobile Only) -->
+    <button (click)="toggleMobileMenu()" 
+            class="md:hidden p-1 -ml-1 text-[#1b1c1c] hover:bg-black/5 rounded-lg flex items-center justify-center transition-colors">
+      <span class="material-symbols-outlined">{{ isMobileMenuOpen() ? 'close' : 'menu' }}</span>
+    </button>
+    <div class="flex items-center gap-2 cursor-pointer group" routerLink="/dashboard">
+      <span class="text-xl md:text-2xl font-bold tracking-tighter text-[#1b1c1c] font-headline">CredVault</span>
+    </div>
+  </div>
+
+  <!-- Center Side: Desktop Tabs (Hidden on mobile) -->
+  <div class="hidden md:flex items-center gap-2">
+    @if (user()?.role !== 'admin') {
+      <a routerLink="/dashboard" routerLinkActive="active-nav-item" [routerLinkActiveOptions]="{exact: true}" 
+         class="nav-link">Dashboard</a>
+      <a routerLink="/bills" routerLinkActive="active-nav-item" 
+         class="nav-link">Bills</a>
+      <a routerLink="/statements" routerLinkActive="active-nav-item" 
+         class="nav-link">Statements</a>
+      <a routerLink="/rewards" routerLinkActive="active-nav-item" 
+         class="nav-link">Rewards</a>
+    } @else {
+      <a routerLink="/admin/dashboard" routerLinkActive="active-nav-item" 
+         class="nav-link flex items-center gap-2 text-[#8a5100]">
+        <span class="material-symbols-outlined text-sm">shield_person</span>
+        Admin Console
+      </a>
+    }
+  </div>
+
+  <!-- Right Side: Tools & Profile -->
+  <div class="relative flex items-center gap-4">
+    <!-- Notifications -->
+    <button (click)="toggleNotifications()" class="relative p-2 text-[#8a5100] hover:scale-95 duration-200 ease-out">
+      <span class="material-symbols-outlined">notifications</span>
+      @if (notifications().length > 0) {
+        <span class="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-[#8a5100] px-1 text-center text-[10px] font-black text-white leading-4">
+          {{ notifications().length > 99 ? '99+' : notifications().length }}
+        </span>
+      }
+    </button>
+
+    @if (isNotificationsOpen()) {
+      <div class="absolute right-12 top-full mt-4 w-[22rem] rounded-3xl border border-[#d9cec2] bg-white p-2 shadow-[0_26px_70px_-20px_rgba(0,0,0,0.30)] z-50">
+        <div class="mb-2 rounded-2xl bg-[#f2ede8] px-4 py-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-[#1b1c1c]">Notifications</h3>
+            <span class="text-xs font-bold text-[#615e5c]">{{ notifications().length }} items</span>
+          </div>
+        </div>
+
+        <div class="max-h-80 space-y-2 overflow-y-auto px-1 pb-1">
+          @if (isNotificationsLoading()) {
+            @for (i of [1,2,3]; track i) {
+              <div class="animate-pulse rounded-2xl border border-[#d8c3b2]/20 p-3">
+                <div class="mb-2 h-3 w-40 rounded bg-[#ece5de]"></div>
+                <div class="h-2 w-24 rounded bg-[#ece5de]"></div>
+              </div>
+            }
+          } @else if (notifications().length === 0) {
+            <div class="rounded-2xl border border-[#d8c3b2]/30 bg-[#f8f3ee] px-4 py-8 text-center">
+              <span class="material-symbols-outlined mb-2 text-3xl text-[#615e5c]">notifications_none</span>
+              <p class="text-sm font-bold text-[#1b1c1c]">No notifications yet</p>
+              <p class="mt-1 text-xs text-[#615e5c]">Updates about bills and payments will appear here.</p>
+            </div>
+          } @else {
+            @for (group of groupedNotifications(); track group.label) {
+              <div class="pt-1">
+                <p class="px-2 pb-2 text-[10px] font-black uppercase tracking-widest text-[#8a5100]/70">{{ group.label }}</p>
+                <div class="space-y-2">
+                  @for (notif of group.items; track notif.id) {
+                    <div class="rounded-2xl border border-[#d8c3b2]/30 bg-[#fcfaf8] px-3 py-3">
+                      <div class="mb-2 flex items-start gap-3">
+                        <div [class]="'mt-0.5 flex h-8 w-8 items-center justify-center rounded-full ' + getNotificationTone(notif.type, notif.isSuccess)">
+                          <span class="material-symbols-outlined text-base">{{ getNotificationIcon(notif.type) }}</span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="mb-1 flex items-center justify-between gap-2">
+                            <span class="inline-flex rounded-full bg-[#efe8e1] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#615e5c]">{{ getNotificationTypeLabel(notif.type) }}</span>
+                            <span class="text-[10px] font-semibold text-[#615e5c]">{{ notif.createdAtUtc | date:'h:mm a':'Asia/Kolkata' }}</span>
+                          </div>
+                          <p class="truncate text-sm font-bold text-[#1b1c1c]">{{ notif.subject }}</p>
+                          @if (notif.errorMessage) {
+                            <p class="mt-1 text-xs font-semibold text-red-600">{{ notif.errorMessage }}</p>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+    
+    <!-- Profile Avatar -->
+    <div class="relative">
+      <button (click)="toggleProfile()" 
+              class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/20 hover:ring-2 hover:ring-[#8a5100]/20 transition-all">
+        @if (user()) {
+          <img class="w-full h-full object-cover" 
+               [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=e5e1da&color=181611'" 
+               alt="User Profile">
+        } @else {
+          <span class="text-xs font-bold text-[#615e5c]">??</span>
+        }
+      </button>
+      
+      <!-- Dropdown Menu -->
+      @if (isProfileOpen()) {
+        <div class="absolute right-0 top-full mt-4 w-72 bg-white rounded-3xl p-2 animate-scale-in z-50 overflow-hidden shadow-2xl border border-[#dfd4c8]">
+          <!-- User Info Header -->
+          <div class="px-5 py-5 bg-[#f2ede8] rounded-2xl mb-2">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-full bg-white border-2 border-[#eebd2b]/20 shadow-sm flex items-center justify-center overflow-hidden">
+                 <img class="w-full h-full object-cover" 
+                      [src]="'https://ui-avatars.com/api/?name=' + user()?.fullName + '&background=fdfbf7&color=181611'" 
+                      alt="User Profile Large">
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-black text-[#1b1c1c] truncate">{{ user()?.fullName }}</p>
+                <p class="text-xs font-medium text-[#615e5c] truncate tracking-tight lowercase mt-0.5">{{ user()?.email }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Menu Sections -->
+          <div class="space-y-1">
+            @if (user()?.role === 'admin') {
+              <button routerLink="/admin/dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#8a5100] hover:bg-[#8a5100]/5 rounded-xl transition-all">
+                <span class="material-symbols-outlined text-lg">admin_panel_settings</span>
+                Admin Control Center
+              </button>
+            }
+            <button routerLink="/profile" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
+              <span class="material-symbols-outlined text-lg">person_outline</span>
+              Account Settings
+            </button>
+            <button routerLink="/statements" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
+              <span class="material-symbols-outlined text-lg">receipt_long</span>
+              Statements
+            </button>
+            <button routerLink="/rewards" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
+              <span class="material-symbols-outlined text-lg">stars</span>
+              Rewards
+            </button>
+            <div class="h-px bg-[#d8c3b2]/20 my-2 mx-4"></div>
+            <button (click)="logout()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#ba1a1a] hover:bg-red-50 rounded-xl transition-all group">
+              <span class="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">logout</span>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</nav>
+
+<!-- Mobile Menu Fullscreen Overlay -->
+@if (isMobileMenuOpen()) {
+  <div class="fixed inset-0 z-[100] md:hidden bg-[#fbf9f8] flex flex-col animate-fade-in">
+    <!-- Header -->
+    <div class="px-8 pt-8 pb-4 flex justify-between items-center z-10">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl font-bold tracking-tighter text-[#1b1c1c] font-headline">CredVault</span>
+        <span class="px-2 py-0.5 rounded-full bg-[#8a5100]/10 text-[#8a5100] text-[10px] font-black uppercase tracking-widest">Menu</span>
+      </div>
+      <button (click)="toggleMobileMenu()" class="w-10 h-10 bg-black/5 text-[#1b1c1c] rounded-full flex justify-center items-center hover:bg-black/10 transition-colors">
+        <span class="material-symbols-outlined font-black">close</span>
+      </button>
+    </div>
+
+    <!-- Links -->
+    <div class="flex-1 overflow-y-auto px-8 py-10 flex flex-col justify-center">
+      <nav class="flex flex-col gap-8">
+        @if (user()?.role !== 'admin') {
+          <a routerLink="/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
+            Dashboard
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
+          </a>
+          <a routerLink="/bills" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
+            Bills
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
+          </a>
+          <a routerLink="/statements" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
+            Statements
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
+          </a>
+          <a routerLink="/rewards" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#1b1c1c] hover:text-[#8a5100] transition-colors tracking-tight">
+            Rewards
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
+          </a>
+        } @else {
+          <a routerLink="/admin/dashboard" (click)="toggleMobileMenu()" routerLinkActive="!text-[#8a5100]" [routerLinkActiveOptions]="{exact: true}"
+             class="group flex items-center justify-between text-4xl font-black text-[#8a5100] hover:text-[#8a5100]/80 transition-colors tracking-tight">
+            Admin Console
+            <span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transform duration-300">arrow_forward</span>
+          </a>
+        }
+      </nav>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-8 pb-12 pt-6">
+      <button (click)="logout(); toggleMobileMenu()" class="flex items-center gap-3 text-xl font-black text-[#ba1a1a] hover:opacity-80 transition-opacity">
+        <span class="material-symbols-outlined text-2xl">logout</span>
+        Sign Out Securely
+      </button>
+    </div>
+  </div>
+}

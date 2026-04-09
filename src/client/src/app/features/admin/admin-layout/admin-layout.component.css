@@ -1,0 +1,29 @@
+:host {
+  display: block;
+  height: 100vh;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+aside {
+  box-shadow: 20px 0 80px -20px rgba(24, 22, 17, 0.4);
+}
+
+header {
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.02);
+}
+
+.perspective {
+  perspective: 1000px;
+}
+
+.rotate-y-12 {
+  transform: rotateY(12deg);
+}

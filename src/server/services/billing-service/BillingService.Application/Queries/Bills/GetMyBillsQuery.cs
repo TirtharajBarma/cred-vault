@@ -1,3 +1,4 @@
+using BillingService.Application.Common;
 using BillingService.Application.Abstractions.Persistence;
 using BillingService.Domain.Entities;
 using MediatR;
@@ -13,6 +14,12 @@ public class GetMyBillsQueryHandler(IBillRepository billRepository)
     public async Task<ApiResponse<List<Bill>>> Handle(GetMyBillsQuery request, CancellationToken cancellationToken)
     {
         var bills = await billRepository.GetByUserIdAsync(request.UserId, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        foreach (var bill in bills)
+        {
+            bill.Status = BillingStatusReconciliation.ResolveBillStatus(bill, now);
+        }
 
         return new ApiResponse<List<Bill>>
         {

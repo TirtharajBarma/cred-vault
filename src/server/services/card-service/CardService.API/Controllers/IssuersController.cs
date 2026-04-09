@@ -1,43 +1,56 @@
-using CardService.Application.DTOs.Requests;
-using CardService.Application.DTOs.Responses;
-using CardService.Domain.Entities;
-using Shared.Contracts.Enums;
-using CardService.Infrastructure.Persistence.Sql;
+using Shared.Contracts.DTOs.Card.Requests;
+using Shared.Contracts.DTOs.Card.Responses;
+using CardService.Application.Commands.Issuers;
+using CardService.Application.Queries.Cards;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Shared.Contracts.Models;
+using CardService.Application.Abstractions.Persistence;
 
 namespace CardService.API.Controllers;
 
 [ApiController]
 [Route("api/v1/issuers")]
 [Authorize]
-public class IssuersController : ControllerBase
+public class IssuersController(IMediator mediator) : ControllerBase
 {
-    [HttpGet]
-    public async Task<IActionResult> ListIssuers([FromServices] CardDbContext dbContext, CancellationToken cancellationToken)
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetIssuer(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
-        var issuers = await dbContext.CardIssuers
-            .AsNoTracking()
-            .OrderBy(x => x.Network)
-            .ThenBy(x => x.Name)
-            .Select(x => new CardIssuerDto
+        var result = await mediator.Send(new GetIssuerByIdQuery(id), cancellationToken);
+
+        if (result.Id == Guid.Empty)
+        {
+            return NotFound(new ApiResponse<object>
             {
-                Id = x.Id,
-                Name = x.Name,
-                Network = x.Network.ToString(),
-                IsActive = x.IsActive,
-                CreatedAtUtc = x.CreatedAtUtc,
-                UpdatedAtUtc = x.UpdatedAtUtc
-            })
-            .ToListAsync(cancellationToken);
+                Success = false,
+                Message = "Issuer not found",
+                TraceId = HttpContext.TraceIdentifier
+            });
+        }
+
+        return Ok(new ApiResponse<CardIssuerDto>
+        {
+            Success = true,
+            Message = "Issuer retrieved successfully",
+            Data = result,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ListIssuers(CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new ListIssuersQuery(), cancellationToken);
 
         return Ok(new ApiResponse<List<CardIssuerDto>>
         {
-            Success = true,
-            Message = "Issuers fetched successfully.",
-            Data = issuers,
+            Success = result.Success,
+            Message = result.Message,
+            Data = result.Issuers,
             TraceId = HttpContext.TraceIdentifier
         });
     }
@@ -45,82 +58,77 @@ public class IssuersController : ControllerBase
     [HttpPost]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> CreateIssuer(
-        [FromServices] CardDbContext dbContext,
         [FromBody] CreateIssuerRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Network))
+        var result = await mediator.Send(
+            new CreateIssuerCommand(request.Name, request.Network),
+            cancellationToken);
+
+        if (!result.Success)
         {
             return BadRequest(new ApiResponse<object>
             {
                 Success = false,
-                Message = "Name and Network are required.",
+                Message = result.Message,
                 TraceId = HttpContext.TraceIdentifier
             });
         }
 
-        if (!TryParseNetwork(request.Network, out var network) || network == CardNetwork.Unknown)
-        {
-            return BadRequest(new ApiResponse<object>
-            {
-                Success = false,
-                Message = "Network must be Visa or Mastercard.",
-                TraceId = HttpContext.TraceIdentifier
-            });
-        }
-
-        var normalizedName = request.Name.Trim().ToLower();
-        var exists = await dbContext.CardIssuers.AnyAsync(x => x.Name.ToLower() == normalizedName, cancellationToken);
-        if (exists)
-        {
-            return BadRequest(new ApiResponse<object>
-            {
-                Success = false,
-                Message = "An issuer with this name already exists.",
-                TraceId = HttpContext.TraceIdentifier
-            });
-        }
-
-        var now = DateTime.UtcNow;
-
-        var issuer = new CardIssuer
-        {
-            Id = Guid.NewGuid(),
-            Name = request.Name.Trim(),
-            Network = network,
-            IsActive = request.IsActive,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now
-        };
-
-        dbContext.CardIssuers.Add(issuer);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
+        var issuer = result.Issuers.First();
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<CardIssuerDto>
         {
             Success = true,
-            Message = "Issuer created successfully.",
-            Data = new CardIssuerDto
-            {
-                Id = issuer.Id,
-                Name = issuer.Name,
-                Network = issuer.Network.ToString(),
-                IsActive = issuer.IsActive,
-                CreatedAtUtc = issuer.CreatedAtUtc,
-                UpdatedAtUtc = issuer.UpdatedAtUtc
-            },
+            Message = result.Message,
+            Data = issuer,
             TraceId = HttpContext.TraceIdentifier
         });
     }
 
-    private static bool TryParseNetwork(string input, out CardNetwork network)
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> UpdateIssuer(
+        [FromRoute] Guid id,
+        [FromBody] CreateIssuerRequest request,
+        CancellationToken cancellationToken)
     {
-        if (int.TryParse(input, out var networkInt) && Enum.IsDefined(typeof(CardNetwork), networkInt))
+        var result = await mediator.Send(
+            new UpdateIssuerCommand(id, request.Name, request.Network),
+            cancellationToken);
+
+        if (!result.Success)
         {
-            network = (CardNetwork)networkInt;
-            return true;
+            return BadRequest(new ApiResponse<object>
+            {
+                Success = false,
+                Message = result.Message,
+                TraceId = HttpContext.TraceIdentifier
+            });
         }
 
-        return Enum.TryParse(input, ignoreCase: true, out network);
+        var issuer = result.Issuers.First();
+        return Ok(new ApiResponse<CardIssuerDto>
+        {
+            Success = true,
+            Message = result.Message,
+            Data = issuer,
+            TraceId = HttpContext.TraceIdentifier
+        });
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> DeleteIssuer(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var deleteResult = await mediator.Send(new DeleteIssuerCommand(id), cancellationToken);
+
+        return StatusCode(deleteResult.Success ? 200 : 400, new ApiResponse<object>
+        {
+            Success = deleteResult.Success,
+            Message = deleteResult.Message,
+            TraceId = HttpContext.TraceIdentifier
+        });
     }
 }

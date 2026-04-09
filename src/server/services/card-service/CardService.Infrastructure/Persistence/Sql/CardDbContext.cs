@@ -1,5 +1,4 @@
 using CardService.Domain.Entities;
-using Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CardService.Infrastructure.Persistence.Sql;
@@ -18,7 +17,6 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
             entity.Property(x => x.Network).IsRequired().HasConversion<int>();
-            entity.Property(x => x.IsActive).IsRequired();
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
             entity.HasIndex(x => x.Network);
@@ -57,6 +55,10 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
         {
             entity.ToTable("CardTransactions");
             entity.HasKey(x => x.Id);
+            entity.HasOne(x => x.Card)
+                .WithMany()
+                .HasForeignKey(x => x.CardId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.CardId).IsRequired();
             entity.Property(x => x.UserId).IsRequired();
             entity.Property(x => x.Type).IsRequired().HasConversion<int>();
@@ -66,6 +68,7 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.HasIndex(x => x.CardId);
             entity.HasIndex(x => x.UserId);
             entity.HasIndex(x => x.DateUtc);
+            entity.HasQueryFilter(x => !x.Card!.IsDeleted);
         });
     }
 }
