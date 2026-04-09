@@ -9,8 +9,22 @@ using Shared.Contracts.Events.Identity;
 
 namespace IdentityService.Application.Commands.Auth;
 
+/// <summary>
+/// Command to request password reset for a user.
+/// Generates OTP and sends to user's registered email.
+/// </summary>
+/// <param name="Email">User's registered email address</param>
 public record ForgotPasswordCommand(string Email) : IRequest<OperationResult>;
 
+/// <summary>
+/// Handler for ForgotPasswordCommand:
+/// 1. Validates email is provided
+/// 2. Looks up user by email - if not found, returns success (prevents email enumeration)
+/// 3. Generates 6-digit OTP valid for 10 minutes
+/// 4. Stores OTP in user's PasswordResetOtp field
+/// 5. Publishes IUserOtpGenerated event (NotificationService sends email)
+/// 6. Returns generic message "If exists, OTP sent" for security
+/// </summary>
 public sealed class ForgotPasswordCommandHandler(IUserRepository users, IPublishEndpoint publisher, ILogger<ForgotPasswordCommandHandler> logger) : IRequestHandler<ForgotPasswordCommand, OperationResult>
 {
     public async Task<OperationResult> Handle(ForgotPasswordCommand request, CancellationToken ct)

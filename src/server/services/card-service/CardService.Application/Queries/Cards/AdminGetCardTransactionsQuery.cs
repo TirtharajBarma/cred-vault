@@ -1,6 +1,7 @@
 using MediatR;
 using CardService.Application.Abstractions.Persistence;
 using Shared.Contracts.Models;
+using Shared.Contracts.Exceptions;
 
 namespace CardService.Application.Queries.Cards;
 
@@ -14,7 +15,7 @@ public class AdminGetCardTransactionsQueryHandler(
         var card = await cardRepository.GetByIdAsync(request.CardId, cancellationToken);
         if (card is null)
         {
-            return new ApiResponse<object> { Success = false, Message = "Card not found." };
+            throw new NotFoundException("Card", request.CardId);
         }
 
         var txns = await cardRepository.GetTransactionsByCardIdAsync(request.CardId, cancellationToken);

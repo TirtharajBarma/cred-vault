@@ -4,6 +4,7 @@ using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
 using Shared.Contracts.Events.Payment;
+using Shared.Contracts.Exceptions;
 
 namespace PaymentService.Infrastructure.Messaging.Consumers;
 
@@ -20,7 +21,7 @@ public class PaymentCompletedConsumer(IPaymentRepository payments, ITransactionR
             if (payment == null)
             {
                 logger.LogError("Payment {PaymentId} not found", paymentId);
-                throw new InvalidOperationException($"Payment {paymentId} not found");
+                throw new NotFoundException("Payment", paymentId);
             }
 
             if (payment.Status == PaymentStatus.Completed)

@@ -8,8 +8,25 @@ using Microsoft.Extensions.Options;
 
 namespace IdentityService.Application.Commands.Auth;
 
+/// <summary>
+/// Command to verify user's email using one-time password (OTP).
+/// Used after registration to activate account.
+/// </summary>
+/// <param name="Email">User's registered email address</param>
+/// <param name="Otp">6-digit OTP code sent to user's email</param>
 public record VerifyEmailOtpCommand(string Email, string Otp) : IRequest<AuthResult>;
 
+/// <summary>
+/// Handler for VerifyEmailOtpCommand:
+/// 1. Validates email and OTP are provided
+/// 2. Looks up user by email
+/// 3. If user not found, returns error
+/// 4. If already verified, returns success (allows re-login)
+/// 5. Checks if OTP exists and hasn't expired (10-minute window)
+/// 6. Verifies OTP matches exactly
+/// 7. On success: marks email as verified, sets status to Active, clears OTP
+/// 8. Returns JWT access token for immediate login
+/// </summary>
 public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository, IOptions<JwtOptions> jwtOptions)
     : IRequestHandler<VerifyEmailOtpCommand, AuthResult>
 {

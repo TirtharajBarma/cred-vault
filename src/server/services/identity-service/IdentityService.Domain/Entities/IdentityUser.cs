@@ -2,6 +2,22 @@ namespace IdentityService.Domain.Entities;
 
 using IdentityService.Domain.Enums;
 
+/// <summary>
+/// User entity representing a registered user in the system.
+/// Stores authentication data (email, password hash), verification status, role, and account status.
+/// Used across IdentityService for all user-related operations.
+/// </summary>
+/// <remarks>
+/// Key properties:
+/// - Id: Unique GUID identifier
+/// - Email: User's email (unique, normalized to lowercase)
+/// - PasswordHash: BCrypt hashed password (nullable for Google SSO users)
+/// - IsEmailVerified: Boolean flag for email verification
+/// - EmailVerificationOtp: OTP code for email verification
+/// - PasswordResetOtp: OTP code for password reset
+/// - Status: Account status (Active, Suspended, Blocked, PendingVerification)
+/// - Role: User role (User or Admin)
+/// </remarks>
 public sealed class IdentityUser
 {
 	public Guid Id { get; set; }

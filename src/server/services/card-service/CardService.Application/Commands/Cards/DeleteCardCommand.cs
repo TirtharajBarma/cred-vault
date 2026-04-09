@@ -3,6 +3,7 @@ using Shared.Contracts.DTOs;
 using MediatR;
 using CardService.Application.Interfaces;
 using Microsoft.Extensions.Logging;
+using Shared.Contracts.Exceptions;
 
 namespace CardService.Application.Commands.Cards;
 
@@ -20,28 +21,18 @@ public sealed class DeleteCardCommandHandler(
 
         if (card is null)
         {
-            return new OperationResult { Success = false, Message = "Card not found.", ErrorCode = "CardNotFound" };
+            throw new NotFoundException("Card", request.CardId);
         }
 
         if (card.OutstandingBalance > 0)
         {
-            return new OperationResult 
-            { 
-                Success = false, 
-                Message = "Cannot delete card with outstanding balance. Pay your bill first.", 
-                ErrorCode = "CardHasBalance" 
-            };
+            throw new ForbiddenException("Cannot delete card with outstanding balance. Pay your bill first.");
         }
 
         var hasPendingBill = await billingServiceClient.HasPendingBillAsync(request.CardId, cancellationToken);
         if (hasPendingBill)
         {
-            return new OperationResult 
-            { 
-                Success = false, 
-                Message = "Cannot delete card with a pending or overdue bill. Please pay or wait for the bill to be cleared.", 
-                ErrorCode = "CardHasPendingBill" 
-            };
+            throw new ForbiddenException("Cannot delete card with a pending or overdue bill. Please pay or wait for the bill to be cleared.");
         }
 
         await cardRepository.DeleteAsync(card, cancellationToken);

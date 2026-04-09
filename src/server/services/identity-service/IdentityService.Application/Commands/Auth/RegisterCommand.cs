@@ -12,8 +12,26 @@ using Shared.Contracts.Events.Identity;
 
 namespace IdentityService.Application.Commands.Auth;
 
+/// <summary>
+/// Command to register a new user account.
+/// Validates input, checks for duplicate email, creates user with OTP for email verification.
+/// Publishes events for OTP generation and user registration for other services to consume.
+/// </summary>
+/// <param name="Email">User's email address (will be normalized to lowercase)</param>
+/// <param name="Password">User's password (must be at least 8 characters)</param>
+/// <param name="FullName">User's full name</param>
 public record RegisterCommand(string Email, string Password, string FullName) : IRequest<AuthResult>;
 
+/// <summary>
+/// Handler for RegisterCommand.
+/// 1. Validates all fields are provided and password meets minimum length
+/// 2. Checks if email already exists in the database
+/// 3. Generates OTP code for email verification (valid for 10 minutes)
+/// 4. Creates new user with PendingVerification status
+/// 5. Publishes IUserOtpGenerated event (NotificationService consumes this to send email)
+/// 6. Publishes IUserRegistered event (other services can react to new user creation)
+/// 7. Returns AuthResult with access token for immediate login
+/// </summary>
 public sealed class RegisterCommandHandler(IUserRepository users, IPublishEndpoint publisher, IOptions<JwtOptions> jwt, ILogger<RegisterCommandHandler> logger) : IRequestHandler<RegisterCommand, AuthResult>
 {
     public async Task<AuthResult> Handle(RegisterCommand request, CancellationToken ct)

@@ -4,6 +4,7 @@ using Shared.Contracts.Enums;
 using Shared.Contracts.Models;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Shared.Contracts.Exceptions;
 
 namespace CardService.Application.Commands.Transactions;
 
@@ -35,12 +36,12 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
 
         if (card is null)
         {
-            return new ApiResponse<CardTransaction> { Success = false, Message = "Card not found." };
+            throw new NotFoundException("Card", request.CardId);
         }
 
         if (request.Amount <= 0)
         {
-            return new ApiResponse<CardTransaction> { Success = false, Message = "Amount must be greater than 0." };
+            throw new ValidationException("Amount must be greater than 0.");
         }
 
         var dateUtc = request.DateUtc ?? DateTime.UtcNow;
@@ -48,14 +49,14 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
             request.CardId, request.Type, request.Amount, request.Description ?? string.Empty, dateUtc, cancellationToken);
         if (isDuplicate)
         {
-            return new ApiResponse<CardTransaction> { Success = false, Message = "A duplicate transaction already exists." };
+            throw new ConflictException("A duplicate transaction already exists.");
         }
 
         if (request.Type == TransactionType.Purchase)
         {
             if (card.OutstandingBalance + request.Amount > card.CreditLimit)
             {
-                return new ApiResponse<CardTransaction> { Success = false, Message = "Transaction declined: Insufficient credit limit." };
+                throw new ForbiddenException("Transaction declined: Insufficient credit limit.");
             }
 
             card.OutstandingBalance += request.Amount;

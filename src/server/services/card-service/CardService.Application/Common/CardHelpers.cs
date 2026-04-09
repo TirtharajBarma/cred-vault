@@ -3,8 +3,18 @@ using Shared.Contracts.Enums;
 
 namespace CardService.Application.Common;
 
+/// <summary>
+/// Static helper class containing utility methods for credit card operations.
+/// Provides card number validation, network detection, and masking.
+/// </summary>
 public static class CardHelpers
 {
+    /// <summary>
+    /// Extracts only digits from a string (removes spaces, dashes, etc).
+    /// Used to clean card numbers before processing.
+    /// </summary>
+    /// <param name="value">Raw card number string</param>
+    /// <returns>String containing only digits</returns>
     public static string DigitsOnly(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -16,6 +26,14 @@ public static class CardHelpers
         return new string(chars);
     }
 
+    /// <summary>
+    /// Detects card network (Visa/Mastercard) from card number digits.
+    /// Uses IIN (Issuer Identification Number) ranges:
+    /// - Visa: starts with 4, length 13, 16, or 19
+    /// - Mastercard: first 2 digits 51-55 OR first 4 digits 2221-2720
+    /// </summary>
+    /// <param name="digits">Card number digits only</param>
+    /// <returns>CardNetwork enum (Visa, Mastercard, or Unknown)</returns>
     public static CardNetwork DetectNetwork(string digits)
     {
         if (string.IsNullOrWhiteSpace(digits) || digits.Any(ch => ch < '0' || ch > '9'))
@@ -44,6 +62,12 @@ public static class CardHelpers
         return CardNetwork.Unknown;
     }
 
+    /// <summary>
+    /// Masks card number showing only last 4 digits.
+    /// Format: "**** **** **** 1234"
+    /// </summary>
+    /// <param name="digits">Card number digits</param>
+    /// <returns>Masked string</returns>
     public static string MaskCardNumber(string digits)
     {
         if (string.IsNullOrWhiteSpace(digits))
@@ -55,6 +79,11 @@ public static class CardHelpers
         return $"**** **** **** {last4}";
     }
 
+    /// <summary>
+    /// Validates billing cycle start day is between 1 and 31.
+    /// </summary>
+    /// <param name="day">Day of month</param>
+    /// <returns>True if valid (1-31)</returns>
     public static bool IsValidBillingCycleStartDay(int day)
     {
         return day is >= 1 and <= 31;

@@ -12,8 +12,22 @@ using Shared.Contracts.DTOs.Identity.Responses;
 
 namespace IdentityService.Application.Commands.Auth;
 
+/// <summary>
+/// Command to authenticate or register user via Google OAuth (Single Sign-On).
+/// Validates Google ID token, auto-registers new users if not exists, returns JWT on success.
+/// </summary>
+/// <param name="IdToken">Google OAuth ID token from Google Sign-In</param>
 public sealed record GoogleLoginCommand(string IdToken) : IRequest<AuthResult>;
 
+/// <summary>
+/// Handler for GoogleLoginCommand:
+/// 1. Validates IdToken is provided
+/// 2. Validates Google token using Google Json Web Signature library with configured ClientId
+/// 3. Extracts email from Google's payload (email already verified by Google)
+/// 4. Looks up user by email - if not found, auto-creates with Active status (Google verified email)
+/// 5. If user found but blocked, returns error
+/// 6. Generates JWT access token and returns user summary
+/// </summary>
 public sealed class GoogleLoginCommandHandler(
     IUserRepository userRepository,
     IOptions<JwtOptions> jwtOptions,

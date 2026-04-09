@@ -8,8 +8,27 @@ using Microsoft.Extensions.Options;
 
 namespace IdentityService.Application.Commands.Auth;
 
+/// <summary>
+/// Command to authenticate user with email and password credentials.
+/// Validates credentials against database and returns JWT access token on success.
+/// Implements timing attack prevention by always performing password hash verification.
+/// </summary>
+/// <param name="Email">User's registered email address</param>
+/// <param name="Password">User's password</param>
 public sealed record LoginCommand(string Email, string Password) : IRequest<AuthResult>;
 
+/// <summary>
+/// Handler for LoginCommand:
+/// 1. Validates email and password are provided
+/// 2. Normalizes email to lowercase for lookup
+/// 3. Fetches user by email from repository
+/// 4. If user not found: uses dummy hash to prevent timing attacks (same response time as valid user)
+/// 5. If found but no password: returns invalid credentials (handles Google SSO users without password)
+/// 6. Verifies password using BCrypt against stored hash
+/// 7. Checks user status is Active (not blocked/suspended/pending verification)
+/// 8. Generates JWT access token with user claims (sub: userId, role, email)
+/// 9. Returns AuthResult with token and user summary
+/// </summary>
 public sealed class LoginCommandHandler(IUserRepository userRepository, IOptions<JwtOptions> jwtOptions)
     : IRequestHandler<LoginCommand, AuthResult>
 {

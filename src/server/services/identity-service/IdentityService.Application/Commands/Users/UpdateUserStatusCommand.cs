@@ -2,6 +2,7 @@ using IdentityService.Application.Abstractions.Persistence;
 using Shared.Contracts.DTOs;
 using IdentityService.Domain.Enums;
 using MediatR;
+using Shared.Contracts.Exceptions;
 
 namespace IdentityService.Application.Commands.Users;
 
@@ -13,7 +14,7 @@ public sealed class UpdateUserStatusCommandHandler(IUserRepository userRepositor
     public async Task<OperationResult> Handle(UpdateUserStatusCommand request, CancellationToken cancellationToken)
     {
         var user = await userRepository.GetByIdAsync(request.UserId, cancellationToken);
-        if (user is null) return new OperationResult { Success = false, Message = "User not found." };
+        if (user is null) throw new NotFoundException("User", request.UserId);
 
         if (request.Status == UserStatus.Active && !user.IsEmailVerified)
         {

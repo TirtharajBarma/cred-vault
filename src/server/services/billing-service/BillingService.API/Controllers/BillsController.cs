@@ -10,11 +10,35 @@ using Shared.Contracts.Models;
 
 namespace BillingService.API.Controllers;
 
+/// <summary>
+/// Billing controller handling bill-related operations for credit card bills.
+/// Manages bill generation, listing, viewing, and admin functions like generating bills for users.
+/// Uses JWT authentication - regular users see their own bills, admins can view any user's bills.
+/// </summary>
+/// <remarks>
+/// User endpoints (requires authentication):
+/// - GET /: List all bills for current user
+/// - GET /{billId}: Get specific bill details
+///
+/// Admin endpoints (requires admin role):
+/// - POST /admin/generate-bill: Generate a bill for a user (creates billing cycle)
+/// - POST /admin/check-overdue: Check and update status of overdue bills
+///
+/// Public endpoints:
+/// - GET /has-pending/{cardId}: Check if card has pending bill (used by CardService)
+/// </remarks>
 [ApiController]
 [Route("api/v1/billing/bills")]
 [Authorize]
 public class BillsController(IMediator mediator) : BaseApiController
 {
+    /// <summary>
+    /// List all bills for the authenticated user (or specified user if admin).
+    /// Admin can pass userId query parameter to view other user's bills.
+    /// </summary>
+    /// <param name="userId">Optional user ID (admin only - to view other user's bills)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with list of bills</returns>
     [HttpGet]
     public async Task<IActionResult> ListMyBills(
         [FromQuery] Guid? userId,
@@ -29,6 +53,13 @@ public class BillsController(IMediator mediator) : BaseApiController
         return CreateResponse(result.Success, result.Data, result.Message);
     }
 
+    /// <summary>
+    /// Get specific bill details by ID.
+    /// User can only view their own bills.
+    /// </summary>
+    /// <param name="billId">Bill's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with bill details</returns>
     [HttpGet("{billId:guid}")]
     public async Task<IActionResult> GetMyBillById(Guid billId, CancellationToken cancellationToken)
     {
@@ -47,6 +78,13 @@ public class BillsController(IMediator mediator) : BaseApiController
         public string Currency { get; set; } = "INR";
     }
 
+    /// <summary>
+    /// Admin: Generate a billing cycle bill for a user.
+    /// Creates a new bill based on card's outstanding balance and billing cycle.
+    /// </summary>
+    /// <param name="request">GenerateBillRequest with UserId, CardId, Currency</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with generated bill</returns>
     [HttpPost("admin/generate-bill")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> GenerateBill(
@@ -72,6 +110,12 @@ public class BillsController(IMediator mediator) : BaseApiController
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    /// <summary>
+    /// Admin: Check for overdue bills and update their status.
+    /// Scheduled task that runs to mark pending bills as overdue if past due date.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with count of updated bills</returns>
     [HttpPost("admin/check-overdue")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> CheckOverdueBills(CancellationToken cancellationToken)
@@ -80,6 +124,13 @@ public class BillsController(IMediator mediator) : BaseApiController
         return Ok(result);
     }
 
+    /// <summary>
+    /// Check if a card has any pending or overdue bill.
+    /// Used by CardService to determine if card can be deleted.
+    /// </summary>
+    /// <param name="cardId">Card's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Boolean indicating if card has pending bill</returns>
     [HttpGet("has-pending/{cardId:guid}")]
     [AllowAnonymous]
     public async Task<IActionResult> HasPendingBill(Guid cardId, CancellationToken cancellationToken)

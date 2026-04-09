@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserRole } from '../../../core/models/auth.models';
 import { CommonModule } from '@angular/common';
+import { environment } from '../../../../environments/environment';
 
 // Google Identity Services types
 declare const google: {
@@ -26,8 +27,6 @@ declare const google: {
   };
 };
 
-const GOOGLE_CLIENT_ID = '450643445715-v7ae2hgkm4mi76j9pualqv7cecnru1c9.apps.googleusercontent.com';
-
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -48,6 +47,8 @@ export class LoginComponent implements AfterViewInit {
   isGoogleLoading = signal(false);
   errorMessage = signal<string | null>(null);
   showPassword = signal(false);
+  readonly hasGoogleClientId = !!environment.googleClientId;
+  private readonly googleClientId = environment.googleClientId;
   private readonly emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
   constructor() {
@@ -62,11 +63,15 @@ export class LoginComponent implements AfterViewInit {
   }
 
   private initGoogleButton(): void {
+    if (!this.googleClientId) {
+      return;
+    }
+
     // Wait for the GSI library to be ready (it's loaded async in index.html)
     const tryInit = () => {
       if (typeof google !== 'undefined' && google.accounts?.id) {
         google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
+          client_id: this.googleClientId,
           callback: (response) => {
             // Run inside Angular's zone so signals/change detection work
             this.zone.run(() => this.handleGoogleCredential(response.credential));

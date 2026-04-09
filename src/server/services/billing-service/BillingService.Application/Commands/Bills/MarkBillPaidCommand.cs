@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Shared.Contracts.Enums;
 using Shared.Contracts.Models;
+using Shared.Contracts.Exceptions;
 
 namespace BillingService.Application.Commands.Bills;
 
@@ -27,7 +28,7 @@ public class MarkBillPaidCommandHandler(
         if (bill is null)
         {
             logger.LogWarning("Bill not found: BillId={BillId} UserId={UserId}", request.BillId, request.UserId);
-            return new ApiResponse<Bill> { Success = false, Message = "Bill not found." };
+            throw new NotFoundException("Bill", request.BillId);
         }
 
         if (bill.Status == BillStatus.Paid)
@@ -44,7 +45,7 @@ public class MarkBillPaidCommandHandler(
 
         if (request.Amount <= 0)
         {
-            return new ApiResponse<Bill> { Success = false, Message = "Payment amount must be greater than zero." };
+            throw new ValidationException("Payment amount must be greater than zero.");
         }
 
         var existingPaid = bill.AmountPaid ?? 0;

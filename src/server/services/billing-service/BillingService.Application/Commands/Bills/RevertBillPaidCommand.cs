@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Shared.Contracts.Enums;
 using Shared.Contracts.Models;
+using Shared.Contracts.Exceptions;
 
 namespace BillingService.Application.Commands.Bills;
 
@@ -26,7 +27,7 @@ public class RevertBillPaidCommandHandler(
         if (bill is null)
         {
             logger.LogWarning("Bill not found: BillId={BillId} UserId={UserId}", request.BillId, request.UserId);
-            return new ApiResponse<bool> { Success = false, Message = "Bill not found.", Data = false };
+            throw new NotFoundException("Bill", request.BillId);
         }
 
         if (bill.Status == BillStatus.Pending || bill.Status == BillStatus.Cancelled)

@@ -9,8 +9,23 @@ using Shared.Contracts.Events.Identity;
 
 namespace IdentityService.Application.Commands.Auth;
 
+/// <summary>
+/// Command to resend email verification OTP to user's email.
+/// Used when user didn't receive original verification email or OTP expired.
+/// </summary>
+/// <param name="Email">User's registered email address</param>
 public record ResendVerificationCommand(string Email) : IRequest<OperationResult>;
 
+/// <summary>
+/// Handler for ResendVerificationCommand:
+/// 1. Validates email is provided
+/// 2. Looks up user by email
+/// 3. If user not found, returns error (unlike forgot-password, this reveals user exists)
+/// 4. If email already verified, returns success (no need to resend)
+/// 5. Generates new 6-digit OTP valid for 10 minutes
+/// 6. Updates user's EmailVerificationOtp field
+/// 7. Publishes IUserOtpGenerated event (NotificationService sends email)
+/// </summary>
 public sealed class ResendVerificationCommandHandler(IUserRepository users, IPublishEndpoint publisher, ILogger<ResendVerificationCommandHandler> logger) : IRequestHandler<ResendVerificationCommand, OperationResult>
 {
     public async Task<OperationResult> Handle(ResendVerificationCommand request, CancellationToken ct)

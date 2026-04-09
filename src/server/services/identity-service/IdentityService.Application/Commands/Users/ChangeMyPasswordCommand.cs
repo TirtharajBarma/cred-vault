@@ -6,8 +6,22 @@ using MediatR;
 
 namespace IdentityService.Application.Commands.Users;
 
+/// <summary>
+/// Command for authenticated user to change their own password.
+/// Requires current password for verification before setting new password.
+/// </summary>
+/// <param name="UserId">Current user's ID (from JWT token)</param>
+/// <param name="CurrentPassword">User's current password for verification</param>
+/// <param name="NewPassword">New password to set (min 8 characters)</param>
 public sealed record ChangeMyPasswordCommand(Guid UserId, string CurrentPassword, string NewPassword) : IRequest<OperationResult>;
 
+/// <summary>
+/// Handler for ChangeMyPasswordCommand:
+/// 1. Fetches user by ID
+/// 2. Verifies current password matches stored hash (using BCrypt)
+/// 3. If invalid, returns error
+/// 4. On success: hashes new password with BCrypt, updates user record
+/// </summary>
 public sealed class ChangeMyPasswordCommandHandler(IUserRepository userRepository)
     : IRequestHandler<ChangeMyPasswordCommand, OperationResult>
 {

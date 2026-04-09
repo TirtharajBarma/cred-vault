@@ -10,11 +10,33 @@ using Shared.Contracts.Models;
 
 namespace PaymentService.API.Controllers;
 
+/// <summary>
+/// Payment controller handling payment operations for bill payments.
+/// Manages payment initiation, OTP verification, and payment status tracking.
+/// Uses two-factor authentication (OTP) for payment verification before processing.
+/// </summary>
+/// <remarks>
+/// User endpoints (requires authentication):
+/// - POST /initiate: Start a new payment (requires OTP to complete)
+/// - POST /{paymentId}/verify-otp: Verify OTP and process payment
+/// - POST /{paymentId}/resend-otp: Resend expired OTP
+/// - GET /: List all user's payments
+/// - GET /{paymentId}: Get payment details
+/// - GET /{paymentId}/transactions: Get transactions for a payment
+/// </remarks>
 [ApiController]
 [Route("api/v1/payments")]
 [Authorize]
 public class PaymentsController(IMediator mediator) : BaseApiController
 {
+    /// <summary>
+    /// Initiate a new payment for a bill.
+    /// Creates a payment record and optionally applies rewards points.
+    /// Requires OTP verification to complete the transaction.
+    /// </summary>
+    /// <param name="request">InitiatePaymentRequest with CardId, BillId, Amount, PaymentType, RewardsPoints (optional)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with PaymentId, OTP requirement, and rewards info</returns>
     [HttpPost("initiate")]
     public async Task<IActionResult> Initiate([FromBody] InitiatePaymentRequest request, CancellationToken cancellationToken)
     {
@@ -56,6 +78,14 @@ public class PaymentsController(IMediator mediator) : BaseApiController
         });
     }
 
+    /// <summary>
+    /// Verify OTP and complete the payment.
+    /// OTP is sent to user's registered email. Payment only processes after valid OTP.
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="request">VerifyOtpRequest with OtpCode</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with payment status</returns>
     [HttpPost("{paymentId:guid}/verify-otp")]
     public async Task<IActionResult> VerifyOtp(
         Guid paymentId,
@@ -81,6 +111,13 @@ public class PaymentsController(IMediator mediator) : BaseApiController
         });
     }
 
+    /// <summary>
+    /// Resend OTP for a pending payment.
+    /// Useful if original OTP expired (valid for 5 minutes).
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with new OTP expiration time</returns>
     [HttpPost("{paymentId:guid}/resend-otp")]
     public async Task<IActionResult> ResendOtp(Guid paymentId, CancellationToken cancellationToken)
     {
@@ -107,6 +144,12 @@ public class PaymentsController(IMediator mediator) : BaseApiController
         });
     }
 
+    /// <summary>
+    /// List all payments for the authenticated user.
+    /// Returns payment history including status, amount, and date.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with list of payments</returns>
     [HttpGet]
     public async Task<IActionResult> GetMyPayments(CancellationToken cancellationToken)
     {
@@ -125,6 +168,12 @@ public class PaymentsController(IMediator mediator) : BaseApiController
         });
     }
 
+    /// <summary>
+    /// Get specific payment details by ID.
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with payment details</returns>
     [HttpGet("{paymentId:guid}")]
     public async Task<IActionResult> GetById(Guid paymentId, CancellationToken cancellationToken)
     {
@@ -146,6 +195,13 @@ public class PaymentsController(IMediator mediator) : BaseApiController
         });
     }
 
+    /// <summary>
+    /// Get all transactions related to a payment.
+    /// Includes payment attempts, reversals, etc.
+    /// </summary>
+    /// <param name="paymentId">Payment's unique GUID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>ApiResponse with list of payment transactions</returns>
     [HttpGet("{paymentId:guid}/transactions")]
     public async Task<IActionResult> GetTransactions(Guid paymentId, CancellationToken cancellationToken)
     {

@@ -3,6 +3,7 @@ import { runtimeEnv } from './environment.generated';
 export interface EnvironmentConfig {
   production: boolean;
   apiGatewayUrl: string;
+  googleClientId: string;
   pointsToRupeeRate: number;
 }
 
@@ -12,9 +13,13 @@ const hasPlaceholderGateway = configuredApiGatewayUrl.includes('your-gateway-dom
 const effectiveApiGatewayUrl = !configuredApiGatewayUrl || hasPlaceholderGateway
   ? fallbackApiGatewayUrl
   : configuredApiGatewayUrl;
+const configuredGoogleClientId = (runtimeEnv.googleClientId || '').trim();
+const hasPlaceholderGoogleClientId = configuredGoogleClientId.includes('your-google-client-id');
+const effectiveGoogleClientId = hasPlaceholderGoogleClientId ? '' : configuredGoogleClientId;
 
 export const environment: EnvironmentConfig = {
   production: false,
   apiGatewayUrl: effectiveApiGatewayUrl,
+  googleClientId: effectiveGoogleClientId,
   pointsToRupeeRate: 0.25
 };

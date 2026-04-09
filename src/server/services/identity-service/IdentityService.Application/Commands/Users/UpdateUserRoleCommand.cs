@@ -2,6 +2,7 @@ using IdentityService.Application.Abstractions.Persistence;
 using IdentityService.Domain.Enums;
 using MediatR;
 using Shared.Contracts.DTOs;
+using Shared.Contracts.Exceptions;
 
 namespace IdentityService.Application.Commands.Users;
 
@@ -16,7 +17,7 @@ public sealed class UpdateUserRoleCommandHandler(IUserRepository userRepository)
         
         if (user == null)
         {
-            return new OperationResult { Success = false, Message = "User not found.", ErrorCode = "UserNotFound" };
+            throw new NotFoundException("User", request.UserId);
         }
 
         user.Role = request.Role;

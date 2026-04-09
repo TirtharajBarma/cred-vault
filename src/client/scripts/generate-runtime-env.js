@@ -35,15 +35,22 @@ const modeEnv = mode === 'production'
 const fromFiles = modeEnv.API_GATEWAY_URL || commonEnv.API_GATEWAY_URL || '';
 const fromProcess = (process.env.API_GATEWAY_URL || '').trim();
 const isPlaceholder = fromProcess.includes('your-gateway-domain.com');
+const fromFilesGoogleClientId = modeEnv.GOOGLE_CLIENT_ID || commonEnv.GOOGLE_CLIENT_ID || '';
+const fromProcessGoogleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+const isPlaceholderGoogleClientId = fromProcessGoogleClientId.includes('your-google-client-id');
 
 // For local development, favor checked-in env files unless an explicit non-placeholder override is provided.
 const apiGatewayUrl = fromProcess && !isPlaceholder ? fromProcess : fromFiles || fromProcess || '';
+const googleClientId = fromProcessGoogleClientId && !isPlaceholderGoogleClientId
+  ? fromProcessGoogleClientId
+  : fromFilesGoogleClientId || fromProcessGoogleClientId || '';
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
 const output = [
   'export const runtimeEnv = {',
-  `  apiGatewayUrl: ${JSON.stringify(apiGatewayUrl)}`,
+  `  apiGatewayUrl: ${JSON.stringify(apiGatewayUrl)},`,
+  `  googleClientId: ${JSON.stringify(googleClientId)}`,
   '} as const;',
   ''
 ].join('\n');

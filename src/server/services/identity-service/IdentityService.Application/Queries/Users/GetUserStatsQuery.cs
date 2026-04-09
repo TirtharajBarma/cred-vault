@@ -5,8 +5,18 @@ using Shared.Contracts.DTOs;
 
 namespace IdentityService.Application.Queries.Users;
 
+/// <summary>
+/// Query to get user statistics (counts by status).
+/// Used by admin dashboard to display user metrics.
+/// </summary>
 public sealed record GetUserStatsQuery : IRequest<OperationResult>;
 
+/// <summary>
+/// Handler for GetUserStatsQuery:
+/// 1. Calls repository GetCountByStatusAsync to get user counts grouped by status
+/// 2. Calculates total users from sum of all status counts
+/// 3. Returns breakdown: totalUsers, activeUsers, pendingUsers, suspendedUsers, blockedUsers
+/// </summary>
 public sealed class GetUserStatsQueryHandler(IUserRepository userRepository)
     : IRequestHandler<GetUserStatsQuery, OperationResult>
 {
