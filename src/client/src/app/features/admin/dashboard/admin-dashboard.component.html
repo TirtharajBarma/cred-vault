@@ -114,7 +114,7 @@
                 <div class="flex-1 min-w-0">
                   <h4 class="font-bold text-charcoal text-sm truncate">{{ log.entityName || 'System Event' }}</h4>
                   <p class="text-[9px] font-bold text-misty-gray uppercase tracking-wider mt-0.5">
-                    {{ log.createdAtUtc | date:'MMM dd, HH:mm':'Asia/Kolkata' }} IST • {{ log.action || 'N/A' }}
+                    {{ log.createdAtUtc | istDate:'MMM dd, HH:mm' }} IST • {{ log.action || 'N/A' }}
                   </p>
                 </div>
                 <span [class]="log.isSuccess === false ? 'bg-red-500/10 text-red-600 border-red-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'" 

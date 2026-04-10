@@ -9,11 +9,13 @@ import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { RouterLink } from '@angular/router';
+import { IstDatePipe } from '../../shared/pipes/ist-date.pipe';
+import { formatIstDate, getUtcTimestamp } from '../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, IstDatePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -179,10 +181,7 @@ export class DashboardComponent implements OnInit {
   }
 
   private getMonthYear(dateUtc: string): string {
-    return new Intl.DateTimeFormat('en-IN', {
-      month: 'short',
-      year: 'numeric'
-    }).format(new Date(dateUtc));
+    return formatIstDate(dateUtc, 'MMM yyyy', '-');
   }
 
   getCardGradient(index: number): string {
@@ -214,7 +213,7 @@ export class DashboardComponent implements OnInit {
 
   paginatedTransactions() {
     const sorted = [...this.transactions()].sort(
-      (a, b) => new Date(b.dateUtc).getTime() - new Date(a.dateUtc).getTime()
+      (a, b) => getUtcTimestamp(b.dateUtc) - getUtcTimestamp(a.dateUtc)
     );
     const start = (this.transactionPage() - 1) * this.itemsPerPage;
     return sorted.slice(start, start + this.itemsPerPage);

@@ -23,6 +23,23 @@ export class BillGenerationComponent implements OnInit {
   isLoadingCards = signal(false);
   selectedUserName = signal<string>('');
   selectedCardDetails = signal<any>(null);
+  userSearchTerm = signal('');
+  isUserDropdownOpen = signal(false);
+
+  filteredUsers = computed(() => {
+    const query = this.userSearchTerm().trim().toLowerCase();
+    const allUsers = this.users();
+
+    if (!query) {
+      return allUsers;
+    }
+
+    return allUsers.filter((user) => {
+      const fullName = (user.fullName || '').toLowerCase();
+      const email = (user.email || '').toLowerCase();
+      return fullName.includes(query) || email.includes(query);
+    });
+  });
 
   billForm = this.fb.group({
     userId: ['', [Validators.required]],
@@ -52,30 +69,71 @@ export class BillGenerationComponent implements OnInit {
     });
   }
 
-  onUserChange(event: Event) {
-    const userId = (event.target as HTMLSelectElement).value;
+  private loadCardsForUser(userId: string) {
+    this.isLoadingCards.set(true);
+    this.adminService.getCardsByUser(userId).subscribe({
+      next: (res: any) => {
+        const data = res.data?.data || res.data || [];
+        this.cards.set(data);
+        this.isLoadingCards.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load cards:', err);
+        this.isLoadingCards.set(false);
+      }
+    });
+  }
+
+  private resetSelectedUserState() {
     this.billForm.get('cardId')?.setValue('');
+    this.billForm.get('userId')?.setValue('');
     this.cards.set([]);
     this.selectedUserName.set('');
     this.selectedCardDetails.set(null);
-    
-    if (userId) {
-      const user = this.users().find(u => u.id === userId);
-      this.selectedUserName.set(user?.fullName || '');
-      
-      this.isLoadingCards.set(true);
-      this.adminService.getCardsByUser(userId).subscribe({
-        next: (res: any) => {
-          const data = res.data?.data || res.data || [];
-          this.cards.set(data);
-          this.isLoadingCards.set(false);
-        },
-        error: (err) => {
-          console.error('Failed to load cards:', err);
-          this.isLoadingCards.set(false);
-        }
-      });
+  }
+
+  getUserLabel(user: any): string {
+    return `${user.fullName} (${user.email})`;
+  }
+
+  onUserSearchInput(event: Event) {
+    const value = (event.target as HTMLInputElement).value;
+    this.userSearchTerm.set(value);
+    this.isUserDropdownOpen.set(true);
+
+    if (this.billForm.get('userId')?.value) {
+      this.resetSelectedUserState();
     }
+  }
+
+  onUserInputFocus() {
+    if (!this.isLoadingUsers()) {
+      this.isUserDropdownOpen.set(true);
+    }
+  }
+
+  onUserInputBlur() {
+    setTimeout(() => {
+      this.isUserDropdownOpen.set(false);
+    }, 120);
+  }
+
+  selectUser(user: any) {
+    const userId = String(user.id);
+    this.userSearchTerm.set(this.getUserLabel(user));
+    this.selectedUserName.set(user.fullName || '');
+    this.billForm.get('userId')?.setValue(userId);
+    this.billForm.get('cardId')?.setValue('');
+    this.cards.set([]);
+    this.selectedCardDetails.set(null);
+    this.isUserDropdownOpen.set(false);
+    this.loadCardsForUser(userId);
+  }
+
+  clearUserSelection() {
+    this.userSearchTerm.set('');
+    this.isUserDropdownOpen.set(false);
+    this.resetSelectedUserState();
   }
 
   onCardChange(event: Event) {
@@ -109,6 +167,8 @@ export class BillGenerationComponent implements OnInit {
           this.cards.set([]);
           this.selectedUserName.set('');
           this.selectedCardDetails.set(null);
+          this.userSearchTerm.set('');
+          this.isUserDropdownOpen.set(false);
         } else {
           this.errorMessage.set(res.message || 'Billing protocol failed');
         }
@@ -150,5 +210,20 @@ export class BillGenerationComponent implements OnInit {
     const card = this.selectedCardDetails();
     if (!card) return 0;
     return (card.creditLimit || 0) - (card.outstandingBalance || 0);
+  }
+
+  getSelectedCurrencyCode(): string {
+    return this.selectedCardDetails()?.currency || this.billForm.get('currency')?.value || 'INR';
+  }
+
+  formatAmount(amount: number | null | undefined, currencyCode?: string): string {
+    const safeAmount = Number(amount || 0);
+    const safeCurrency = currencyCode || this.getSelectedCurrencyCode();
+
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: safeCurrency,
+      maximumFractionDigits: 0
+    }).format(safeAmount);
   }
 }

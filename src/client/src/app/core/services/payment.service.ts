@@ -55,6 +55,10 @@ export class PaymentService {
     return this.http.post<ApiResponse<any>>(`${this.baseUrl}/${paymentId}/resend-otp`, {});
   }
 
+  getPaymentById(paymentId: string): Observable<ApiResponse<Payment>> {
+    return this.http.get<ApiResponse<Payment>>(`${this.baseUrl}/${paymentId}`);
+  }
+
   getMyPayments(): Observable<ApiResponse<Payment[]>> {
     return this.http.get<ApiResponse<Payment[]>>(this.baseUrl);
   }

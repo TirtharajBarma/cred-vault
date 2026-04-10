@@ -5,14 +5,14 @@
 
 ## Service Ports
 
-| Service | Port | Database |
-|---------|------|----------|
-| Identity | 5001 | credvault_identity |
-| Card | 5002 | credvault_cards |
-| Billing | 5003 | credvault_billing |
-| Payment | 5004 | credvault_payments |
-| Notification | 5005 | Per-service |
-| API Gateway | 5006 | - |
+| Service        | Port | Database             |
+|----------------|------|----------------------|
+| Identity       | 5001 | credvault_identity   |
+| Card           | 5002 | credvault_cards      |
+| Billing        | 5003 | credvault_billing    |
+| Payment        | 5004 | credvault_payments   |
+| Notification   | 5005 | Per-service          |
+| API Gateway    | 5006 | -                    |
 
 ---
 
@@ -194,7 +194,7 @@ Compensated ✗
 │  Service    │      │   Service   │      │  Service    │
 └──────┬──────┘      └──────┬──────┘      └──────┬──────┘
        │                    │                    │
-       │ IUserDeleted ──────┼───────────────────┤──→ Delete user's cards
+       │ IUserDeleted ──────┼──────────────────-─┤──→ Delete user's cards
        │                    │                    │
        │                    │                    │
        ▼                    ▼                    ▼
@@ -307,16 +307,16 @@ Reversed = 4
 
 ## Key Files to Know
 
-| Service | File | Purpose |
-|---------|------|---------|
-| All | `BaseApiController.cs` | Common controller features |
-| All | `ApiResponse.cs` | Standard response format |
-| All | `ExceptionHandlingMiddleware.cs` | Global error handling |
-| All | `*DbContext.cs` | Database schema |
-| All | `Program.cs` | DI configuration |
-| Card | `CardHelpers.cs` | Luhn algorithm, masking |
-| Payment | `PaymentOrchestrationSaga.cs` | Payment state machine |
-| Gateway | `ocelot.json` | Request routing |
+| Service  | File                              | Purpose                         |
+|----------|-----------------------------------|---------------------------------|
+| All      | BaseApiController.cs              | Common controller features      |
+| All      | ApiResponse.cs                    | Standard response format        |
+| All      | ExceptionHandlingMiddleware.cs    | Global error handling           |
+| All      | *DbContext.cs                     | Database schema                 |
+| All      | Program.cs                        | DI configuration                |
+| Card     | CardHelpers.cs                    | Luhn algorithm, masking         |
+| Payment  | PaymentOrchestrationSaga.cs       | Payment state machine           |
+| Gateway  | ocelot.json                       | Request routing                 |
 
 ---
 

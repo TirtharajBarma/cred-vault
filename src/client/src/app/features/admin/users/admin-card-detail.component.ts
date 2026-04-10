@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
+import { formatIstDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-admin-card-detail',
@@ -319,14 +320,6 @@ export class AdminCardDetailComponent implements OnInit {
 
   formatDate(dateStr: string): string {
     if (!dateStr) return '-';
-    return `${new Intl.DateTimeFormat('en-IN', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata'
-    }).format(new Date(dateStr))} IST`;
+    return `${formatIstDate(dateStr, 'MMM d, y, hh:mm a', '-')} IST`;
   }
 }

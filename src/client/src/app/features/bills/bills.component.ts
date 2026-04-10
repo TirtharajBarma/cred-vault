@@ -7,6 +7,8 @@ import { DashboardService } from '../../core/services/dashboard.service';
 import { PaymentService } from '../../core/services/payment.service';
 import { RewardsService, StatementService, Statement } from '../../core/services/rewards.service';
 import { CreditCard } from '../../core/models/card.models';
+import { IstDatePipe } from '../../shared/pipes/ist-date.pipe';
+import { DateInput, getIstEpochDay, getUtcTimestamp, parseUtcDate } from '../../core/utils/date-time.util';
 
 type MilestoneDisplay = {
   date: Date;
@@ -19,7 +21,7 @@ import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-bills',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, IstDatePipe],
   templateUrl: './bills.component.html',
   styleUrls: ['./bills.component.css']
 })
@@ -59,7 +61,9 @@ export class BillsComponent implements OnInit {
   availablePoints = signal(0);
   readonly pointsToRupeeRate = environment.pointsToRupeeRate;
   
-  rewardValue = computed(() => Math.floor(this.availablePoints()) * this.pointsToRupeeRate);
+  availableRedeemablePoints = computed(() => Math.floor(this.availablePoints()));
+  
+  rewardValue = computed(() => this.availableRedeemablePoints() * this.pointsToRupeeRate);
   
   usablePointsValue = computed(() => {
     const bill = this.selectedBill();
@@ -71,9 +75,9 @@ export class BillsComponent implements OnInit {
   maxRedeemablePoints = computed(() => {
     const bill = this.selectedBill();
     if (!bill) return 0;
-    const outstanding = this.getBillOutstandingAmount(bill);
-    const maxPointsByAmount = Math.floor(outstanding / this.pointsToRupeeRate);
-    return Math.min(Math.floor(this.availablePoints()), maxPointsByAmount);
+    const selectedPaymentAmount = this.getPaymentAmount(bill, this.paymentType());
+    const maxPointsByAmount = Math.floor(selectedPaymentAmount / this.pointsToRupeeRate);
+    return Math.min(this.availableRedeemablePoints(), maxPointsByAmount);
   });
 
   resendOtp(): void {
@@ -93,14 +97,14 @@ export class BillsComponent implements OnInit {
     const unpaidBills = allBills
       .filter(b => [BillStatus.Pending, BillStatus.Overdue, BillStatus.PartiallyPaid].includes(b.status))
       .filter(b => !!b.dueDateUtc)
-      .sort((a, b) => new Date(a.dueDateUtc).getTime() - new Date(b.dueDateUtc).getTime());
+      .sort((a, b) => getUtcTimestamp(a.dueDateUtc) - getUtcTimestamp(b.dueDateUtc));
 
     // Priority 1: Always show nearest unpaid due date first.
     if (unpaidBills.length > 0) {
       const nextDueBill = unpaidBills[0];
 
       return {
-        date: new Date(nextDueBill.dueDateUtc),
+        date: parseUtcDate(nextDueBill.dueDateUtc),
         cardLabel: this.getPayeeInfo(nextDueBill).name,
         mode: 'due_date_queue'
       };
@@ -130,11 +134,11 @@ export class BillsComponent implements OnInit {
     // Safety fallback: if cards unavailable but bills exist, show latest statement generation date.
     const latestStatement = allBills
       .filter(b => !!b.billingDateUtc)
-      .sort((a, b) => new Date(b.billingDateUtc).getTime() - new Date(a.billingDateUtc).getTime())[0];
+      .sort((a, b) => getUtcTimestamp(b.billingDateUtc) - getUtcTimestamp(a.billingDateUtc))[0];
 
     if (latestStatement) {
       return {
-        date: new Date(latestStatement.billingDateUtc),
+        date: parseUtcDate(latestStatement.billingDateUtc),
         cardLabel: this.getPayeeInfo(latestStatement).name,
         mode: 'latest_statement_date'
       };
@@ -164,8 +168,8 @@ export class BillsComponent implements OnInit {
         if (aPaidTime !== bPaidTime) return bPaidTime - aPaidTime;
       }
 
-      const aDate = new Date(a.billingDateUtc).getTime();
-      const bDate = new Date(b.billingDateUtc).getTime();
+      const aDate = getUtcTimestamp(a.billingDateUtc);
+      const bDate = getUtcTimestamp(b.billingDateUtc);
 
       if (aDate !== bDate) return bDate - aDate;
 
@@ -233,7 +237,7 @@ export class BillsComponent implements OnInit {
     return `DUE IN ${days} DAYS`;
   }
 
-  getCountdownLabel(date: string): string {
+  getCountdownLabel(date: DateInput): string {
     const days = this.getDayDiff(date);
     if (days < 0) return `overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`;
     if (days === 0) return 'today';
@@ -246,14 +250,14 @@ export class BillsComponent implements OnInit {
     if (!milestone) return 'No billing milestones yet';
 
     if (milestone.mode === 'due_date_queue') {
-      return this.getCountdownLabel(milestone.date.toISOString());
+      return this.getCountdownLabel(milestone.date);
     }
 
     if (milestone.mode === 'latest_statement_date') {
       return 'latest generated statement date';
     }
 
-    return this.getCountdownLabel(milestone.date.toISOString());
+    return this.getCountdownLabel(milestone.date);
   }
 
   getUpcomingMilestoneSupportText(): string {
@@ -305,13 +309,12 @@ export class BillsComponent implements OnInit {
     return this.getEffectiveBillStatus(bill) === BillStatus.Paid ? 'PAID' : this.getDaysRemaining(bill.dueDateUtc);
   }
 
-  private getDayDiff(dateIso: string): number {
-    const target = new Date(dateIso);
-    const today = new Date();
-    const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate());
-    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const diffMs = targetDate.getTime() - todayDate.getTime();
-    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+  private getDayDiff(dateInput: DateInput): number {
+    const target = getIstEpochDay(dateInput);
+    const today = getIstEpochDay(new Date());
+
+    if (Number.isNaN(target) || Number.isNaN(today)) return 0;
+    return target - today;
   }
 
   private getBillingCycleDay(card: CreditCard): number {
@@ -348,8 +351,8 @@ export class BillsComponent implements OnInit {
     const candidates = [bill.paidAtUtc, bill.updatedAtUtc, bill.createdAtUtc, bill.billingDateUtc];
     for (const value of candidates) {
       if (!value) continue;
-      const timestamp = new Date(value).getTime();
-      if (!Number.isNaN(timestamp)) return timestamp;
+      const timestamp = getUtcTimestamp(value);
+      if (timestamp > 0) return timestamp;
     }
     return 0;
   }
@@ -388,7 +391,7 @@ export class BillsComponent implements OnInit {
     if (outstanding <= 0) return BillStatus.Paid;
 
     const paidAmount = this.getBillAmountPaid(bill);
-    const dueDate = new Date(bill.dueDateUtc);
+    const dueDate = parseUtcDate(bill.dueDateUtc);
     const now = new Date();
 
     if (dueDate.getTime() < now.getTime()) return BillStatus.Overdue;

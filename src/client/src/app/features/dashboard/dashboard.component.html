@@ -203,7 +203,7 @@
                   {{ getTransactionCardMeta(tx) }}
                 </p>
                 <p class="text-xs font-semibold text-[#615e5c] mt-1">
-                  {{ tx.dateUtc | date:'EEEE, hh:mm a' }}
+                  {{ tx.dateUtc | istDate:'EEEE, hh:mm a' }}
                 </p>
               </div>
               <!-- Amount -->

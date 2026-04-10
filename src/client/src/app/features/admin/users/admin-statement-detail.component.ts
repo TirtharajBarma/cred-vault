@@ -2,6 +2,7 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
+import { formatIstDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-admin-statement-detail',
@@ -404,25 +405,10 @@ export class AdminStatementDetailComponent implements OnInit {
 
   formatDateTime(dateStr: string, includeTime = true): string {
     if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    const options: Intl.DateTimeFormatOptions = includeTime
-      ? {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-          timeZone: 'Asia/Kolkata'
-        }
-      : {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          timeZone: 'Asia/Kolkata'
-        };
+    const formatted = includeTime
+      ? formatIstDate(dateStr, 'MMM d, y, hh:mm a', '-')
+      : formatIstDate(dateStr, 'MMM d, y', '-');
 
-    const formatted = new Intl.DateTimeFormat('en-IN', options).format(date);
     return includeTime ? `${formatted} IST` : formatted;
   }
 

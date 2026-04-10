@@ -36,7 +36,7 @@
       <article class="mist-blur relative overflow-hidden rounded-[2rem] border-l-4 border-[#8a5100]/20 bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] transition-all hover:-translate-y-1 md:p-8">
         <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Upcoming Milestone</label>
         <div class="mb-3 text-4xl font-extrabold tracking-tight tabular-nums">
-          {{ getMilestoneDate() ? (getMilestoneDate()! | date:'MMM dd, yyyy') : 'No Date' }}
+          {{ getMilestoneDate() ? (getMilestoneDate()! | istDate:'MMM dd, yyyy') : 'No Date' }}
         </div>
         @if (getMilestoneDate()) {
           <div class="space-y-2">
@@ -132,7 +132,7 @@
                     </td>
 
                     <td class="px-8 py-6">
-                      <div class="text-sm font-medium">{{ bill.dueDateUtc | date:'MMM dd, yyyy' }}</div>
+                      <div class="text-sm font-medium">{{ bill.dueDateUtc | istDate:'MMM dd, yyyy' }}</div>
                       <div
                         class="text-[0.65rem] font-bold uppercase"
                         [ngClass]="{ 'text-[#ba1a1a]': isBillPayable(bill), 'text-[#615e5c]': !isBillPayable(bill) }"
@@ -257,7 +257,7 @@
               <p class="text-xs font-bold uppercase tracking-widest text-[#615e5c] mb-1">Amount Due</p>
               <p class="text-4xl font-black text-[#1b1c1c]">{{ getSelectedBillOutstanding() | currency:'INR' }}</p>
             </div>
-            <span class="px-3 py-1 bg-[#8a5100]/10 text-[#8a5100] text-xs font-bold rounded-full">Due {{ selectedBill()!.dueDateUtc | date:'MMM dd' }}</span>
+            <span class="px-3 py-1 bg-[#8a5100]/10 text-[#8a5100] text-xs font-bold rounded-full">Due {{ selectedBill()!.dueDateUtc | istDate:'MMM dd' }}</span>
           </div>
           <div class="pt-4 border-t border-[#d8c3b2]/20">
             <div class="flex justify-between text-sm">
@@ -304,9 +304,10 @@
                   <div>
                     <p class="font-bold text-lg text-[#1b1c1c]">Rewards Points</p>
                     <p class="text-sm text-[#534437]">
-                      <span class="font-semibold">{{ availablePoints() | number:'1.0-0' }} points</span> 
+                      <span class="font-semibold">{{ availableRedeemablePoints() | number:'1.0-0' }} points</span> 
                       <span class="text-[#615e5c]">= {{ rewardValue() | currency:'INR' }}</span>
                     </p>
+                    <p class="text-[11px] text-[#8b8681]">Account balance: {{ availablePoints() | number:'1.2-2' }} pts</p>
                   </div>
                 </div>
                 <label class="relative inline-flex cursor-pointer items-center">
@@ -325,8 +326,8 @@
                     </div>
                     <div class="bg-[#f0edeb] rounded-xl p-4">
                       <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Remaining</p>
-                      <p class="text-xl font-bold text-[#1b1c1c] mt-1">{{ availablePoints() - maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
-                      <p class="text-sm text-[#534437]">={{ (availablePoints() - maxRedeemablePoints()) * pointsToRupeeRate | currency:'INR' }}</p>
+                      <p class="text-xl font-bold text-[#1b1c1c] mt-1">{{ availableRedeemablePoints() - maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
+                      <p class="text-sm text-[#534437]">={{ (availableRedeemablePoints() - maxRedeemablePoints()) * pointsToRupeeRate | currency:'INR' }}</p>
                     </div>
                   </div>
                   <div class="flex justify-between items-center p-4 bg-[#8a5100]/10 rounded-xl">

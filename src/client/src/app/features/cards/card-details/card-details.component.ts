@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -10,15 +10,17 @@ import { CreditCard, CardTransaction } from '../../../core/models/card.models';
 import { ApiResponse } from '../../../core/models/auth.models';
 import { environment } from '../../../../environments/environment';
 import { finalize } from 'rxjs';
+import { IstDatePipe } from '../../../shared/pipes/ist-date.pipe';
+import { formatIstDate, getUtcTimestamp, parseUtcDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-card-details',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, IstDatePipe],
   templateUrl: './card-details.component.html',
   styleUrl: './card-details.component.css'
 })
-export class CardDetailsComponent implements OnInit {
+export class CardDetailsComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private dashboardService = inject(DashboardService);
   private rewardsService = inject(RewardsService);
@@ -55,16 +57,22 @@ export class CardDetailsComponent implements OnInit {
   useRewards = signal(false);
   readonly pointsToRupeeRate = environment.pointsToRupeeRate;
 
-  availablePoints = computed(() => Math.floor(this.rewards()));
-  rewardValue = computed(() => this.availablePoints() * this.pointsToRupeeRate);
+  private paymentStatusPollTimer: ReturnType<typeof setInterval> | null = null;
+  private paymentStatusPollAttempts = 0;
+  private readonly maxPaymentStatusPollAttempts = 20;
+  private readonly paymentStatusPollIntervalMs = 2000;
+
+  availableRedeemablePoints = computed(() => Math.floor(this.availablePoints()));
+  availablePoints = computed(() => this.rewards());
+  rewardValue = computed(() => this.availableRedeemablePoints() * this.pointsToRupeeRate);
 
   maxRedeemablePoints = computed(() => {
     const bill = this.currentBill();
     if (!bill) return 0;
 
-    const outstanding = this.getBillOutstandingAmount(bill);
-    const maxPointsByAmount = Math.floor(outstanding / this.pointsToRupeeRate);
-    return Math.min(this.availablePoints(), maxPointsByAmount);
+    const selectedPaymentAmount = this.getPaymentAmount(bill, this.paymentType());
+    const maxPointsByAmount = Math.floor(selectedPaymentAmount / this.pointsToRupeeRate);
+    return Math.min(this.availableRedeemablePoints(), maxPointsByAmount);
   });
 
   // Pagination
@@ -118,7 +126,8 @@ export class CardDetailsComponent implements OnInit {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const monthTxs = txs.filter(t => {
-      const d = new Date(t.dateUtc);
+      const d = parseUtcDate(t.dateUtc);
+      if (Number.isNaN(d.getTime())) return false;
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
@@ -165,7 +174,7 @@ export class CardDetailsComponent implements OnInit {
 
   sortedTransactions = computed(() => {
     return [...this.transactions()].sort(
-      (a, b) => new Date(b.dateUtc).getTime() - new Date(a.dateUtc).getTime()
+      (a, b) => getUtcTimestamp(b.dateUtc) - getUtcTimestamp(a.dateUtc)
     );
   });
 
@@ -181,6 +190,10 @@ export class CardDetailsComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.stopPaymentStatusPolling();
   }
 
   loadBillForCard(cardId: string): void {
@@ -339,10 +352,7 @@ export class CardDetailsComponent implements OnInit {
   }
 
   private getMonthYear(dateUtc: string): string {
-    return new Intl.DateTimeFormat('en-IN', {
-      month: 'short',
-      year: 'numeric'
-    }).format(new Date(dateUtc));
+    return formatIstDate(dateUtc, 'MMM yyyy', '-');
   }
 
   page() { return this.currentPage(); }
@@ -499,11 +509,10 @@ export class CardDetailsComponent implements OnInit {
           const bill = this.currentBill();
           this.paidAmount.set(this.getPaymentAmount(bill, this.paymentType()));
 
-          const cardId = this.card()?.id;
-          if (cardId) {
-            this.loadCardDetails(cardId);
-            this.loadBillForCard(cardId);
-            this.loadRewards();
+          if (paymentId) {
+            this.startPaymentStatusPolling(paymentId);
+          } else {
+            this.refreshCardAndBillData();
           }
         } else {
           this.otpError.set(res.message || 'Invalid OTP');
@@ -518,7 +527,68 @@ export class CardDetailsComponent implements OnInit {
 
   closeSuccessModal(): void {
     this.showSuccessModal.set(false);
+    this.refreshCardAndBillData();
     this.resetPaymentState();
+  }
+
+  private refreshCardAndBillData(): void {
+    const cardId = this.card()?.id;
+    if (!cardId) return;
+
+    this.loadCardDetails(cardId);
+    this.loadBillForCard(cardId);
+    this.loadRewards();
+  }
+
+  private startPaymentStatusPolling(paymentId: string): void {
+    this.stopPaymentStatusPolling();
+    this.paymentStatusPollAttempts = 0;
+
+    const pollStatus = () => {
+      this.paymentService.getPaymentById(paymentId).subscribe({
+        next: (res: ApiResponse<any>) => {
+          const status = String(res.data?.status || '').toLowerCase();
+
+          if (status === 'completed') {
+            this.paymentStage.set('completed');
+            this.refreshCardAndBillData();
+            this.stopPaymentStatusPolling();
+            return;
+          }
+
+          if (status === 'failed' || status === 'reversed' || status === 'cancelled') {
+            this.stopPaymentStatusPolling();
+            this.showSuccessModal.set(false);
+            this.paymentError.set('Payment could not be completed. Please try again.');
+            this.refreshCardAndBillData();
+            return;
+          }
+
+          this.paymentStatusPollAttempts += 1;
+          if (this.paymentStatusPollAttempts >= this.maxPaymentStatusPollAttempts) {
+            this.refreshCardAndBillData();
+            this.stopPaymentStatusPolling();
+          }
+        },
+        error: () => {
+          this.paymentStatusPollAttempts += 1;
+          if (this.paymentStatusPollAttempts >= this.maxPaymentStatusPollAttempts) {
+            this.refreshCardAndBillData();
+            this.stopPaymentStatusPolling();
+          }
+        }
+      });
+    };
+
+    pollStatus();
+    this.paymentStatusPollTimer = setInterval(pollStatus, this.paymentStatusPollIntervalMs);
+  }
+
+  private stopPaymentStatusPolling(): void {
+    if (!this.paymentStatusPollTimer) return;
+
+    clearInterval(this.paymentStatusPollTimer);
+    this.paymentStatusPollTimer = null;
   }
 
   private resetPaymentState(): void {

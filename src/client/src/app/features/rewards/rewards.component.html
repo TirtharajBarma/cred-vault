@@ -205,7 +205,7 @@
               } @else if (transactions().length > 0) {
                 @for (tx of paginatedTransactions(); track tx.id) {
                   <tr class="hover:bg-surface-container-low/30 transition-colors">
-                    <td class="px-8 py-6 text-sm font-medium text-secondary">{{ tx.createdAtUtc | date:'MMM dd, yyyy' }}</td>
+                    <td class="px-8 py-6 text-sm font-medium text-secondary">{{ tx.createdAtUtc | istDate:'MMM dd, yyyy' }}</td>
                     <td class="px-8 py-6 text-sm font-bold text-on-surface">{{ getRewardActivityLabel(tx) }}</td>
                     <td class="px-8 py-6">
                       @let typeInfo = getTransactionTypeLabel(tx);

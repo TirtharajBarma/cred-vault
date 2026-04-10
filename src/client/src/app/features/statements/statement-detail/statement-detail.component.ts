@@ -5,6 +5,7 @@ import { StatementService, StatementDetail } from '../../../core/services/reward
 import { DashboardService } from '../../../core/services/dashboard.service';
 import { CreditCard } from '../../../core/models/card.models';
 import { StatementAnalyticsComponent } from '../analytics/analytics.component';
+import { formatIstDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-statement-detail',
@@ -94,24 +95,10 @@ export class StatementDetailComponent implements OnInit {
   formatDate(date: string | null, includeTime = false): string {
     if (!date) return 'N/A';
 
-    const options: Intl.DateTimeFormatOptions = includeTime
-      ? {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-          timeZone: 'Asia/Kolkata'
-        }
-      : {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          timeZone: 'Asia/Kolkata'
-        };
+    const formatted = includeTime
+      ? formatIstDate(date, 'MMM d, y, hh:mm a', 'N/A')
+      : formatIstDate(date, 'MMM d, y', 'N/A');
 
-    const formatted = new Intl.DateTimeFormat('en-IN', options).format(new Date(date));
     return includeTime ? `${formatted} IST` : formatted;
   }
 

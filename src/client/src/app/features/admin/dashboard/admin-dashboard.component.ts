@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 import { forkJoin } from 'rxjs';
+import { IstDatePipe } from '../../../shared/pipes/ist-date.pipe';
+import { formatIstDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, IstDatePipe],
   templateUrl: './admin-dashboard.component.html'
 })
 export class AdminDashboardComponent implements OnInit {
@@ -91,11 +93,7 @@ export class AdminDashboardComponent implements OnInit {
 
   formatTime(date: Date | null): string {
     if (!date) return '';
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Kolkata'
-    });
+    return formatIstDate(date, 'hh:mm a', '');
   }
 
   getStatusColor(status: string): string {

@@ -143,7 +143,7 @@ public class InitiatePaymentCommandHandler(
         // Pass rewards info to SAGA - it will redeem AFTER successful payment
         await publishEndpoint.Publish<IStartPaymentOrchestration>(new
         {
-            CorrelationId = payment.Id,
+            CorrelationId = payment.Id,     // ← You generate it when payment starts
             PaymentId = payment.Id,
             UserId = payment.UserId,
             Email = user?.Email ?? string.Empty,

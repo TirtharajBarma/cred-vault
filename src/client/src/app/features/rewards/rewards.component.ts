@@ -5,11 +5,13 @@ import { RewardsService, RewardAccount, RewardTransaction, RewardTier } from '..
 import { DashboardService } from '../../core/services/dashboard.service';
 import { AdminService } from '../../core/services/admin.service';
 import { BillingService } from '../../core/services/billing.service';
+import { IstDatePipe } from '../../shared/pipes/ist-date.pipe';
+import { getUtcTimestamp } from '../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-rewards',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IstDatePipe],
   templateUrl: './rewards.component.html',
   styleUrls: ['./rewards.component.css']
 })
@@ -135,7 +137,7 @@ export class RewardsComponent implements OnInit {
 
   sortedTransactions() {
     return [...this.transactions()].sort(
-      (a, b) => new Date(b.createdAtUtc).getTime() - new Date(a.createdAtUtc).getTime()
+      (a, b) => getUtcTimestamp(b.createdAtUtc) - getUtcTimestamp(a.createdAtUtc)
     );
   }
 

@@ -67,10 +67,10 @@
 
           <!-- Date Range -->
           <div class="text-xs text-misty-gray mb-4">
-            <span class="font-bold">From:</span> {{ tier.effectiveFromUtc | date:'MMM dd, yyyy' }}
+            <span class="font-bold">From:</span> {{ tier.effectiveFromUtc | istDate:'MMM dd, yyyy' }}
             @if (tier.effectiveToUtc) {
               <span class="mx-2">→</span>
-              <span class="font-bold">To:</span> {{ tier.effectiveToUtc | date:'MMM dd, yyyy' }}
+              <span class="font-bold">To:</span> {{ tier.effectiveToUtc | istDate:'MMM dd, yyyy' }}
             } @else {
               <span class="mx-2">→</span>
               <span class="font-bold text-emerald-600">Ongoing</span>

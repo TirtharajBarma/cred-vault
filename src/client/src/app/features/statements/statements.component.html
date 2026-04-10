@@ -140,7 +140,7 @@
                     <span class="text-sm font-bold text-[#1b1c1c]">{{ getCardDisplay(stmt.cardId) }}</span>
                   </span>
                   <span class="text-[#d8c3b2]">|</span>
-                  <span class="text-sm text-[#615e5c]">Due {{ (stmt.dueDateUtc || stmt.periodEndUtc) | date:'MMM dd' }}</span>
+                  <span class="text-sm text-[#615e5c]">Due {{ (stmt.dueDateUtc || stmt.periodEndUtc) | istDate:'MMM dd' }}</span>
                 </div>
               </div>
             </div>

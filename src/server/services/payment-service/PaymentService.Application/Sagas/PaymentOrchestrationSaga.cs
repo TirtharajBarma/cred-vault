@@ -186,7 +186,10 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
             When(RewardRedemptionSucceeded)
                 .Then(ctx =>
                 {
-                    ctx.Saga.RewardsRedeemed = true;
+                    var redeemedAmount = Math.Max(0m, Math.Min(ctx.Message.AmountRedeemed, ctx.Saga.Amount));
+
+                    ctx.Saga.RewardsAmount = redeemedAmount;
+                    ctx.Saga.RewardsRedeemed = redeemedAmount > 0;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .TransitionTo(AwaitingCardDeduction)
@@ -196,7 +199,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.PaymentId,
                     ctx.Saga.UserId,
                     ctx.Saga.CardId,
-                    Amount = ctx.Saga.Amount,
+                    Amount = Math.Max(0m, ctx.Saga.Amount - ctx.Saga.RewardsAmount),
                     RequestedAt = DateTime.UtcNow
                 })),
             When(RewardRedemptionFailed)
@@ -236,7 +239,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.CardId,
                     ctx.Saga.BillId,
                     ctx.Saga.Amount,
-                    AmountPaid = ctx.Saga.Amount - ctx.Saga.RewardsAmount,  // Actual amount charged
+                    AmountPaid = Math.Max(0m, ctx.Saga.Amount - ctx.Saga.RewardsAmount),
                     RewardsRedeemed = ctx.Saga.RewardsAmount,
                     CompletedAt = DateTime.UtcNow
                 })),
