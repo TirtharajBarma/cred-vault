@@ -30,6 +30,10 @@ export class DashboardService {
     return this.http.get<ApiResponse<CardTransaction[]>>(`${this.baseUrl}/${cardId}/transactions`);
   }
 
+  getFullCardNumber(cardId: string): Observable<ApiResponse<{ cardNumber: string }>> {
+    return this.http.get<ApiResponse<{ cardNumber: string }>>(`${this.baseUrl}/${cardId}/full-number`);
+  }
+
   addCard(request: CreateCardRequest): Observable<ApiResponse<CreditCard>> {
     return this.http.post<ApiResponse<CreditCard>>(this.baseUrl, request);
   }

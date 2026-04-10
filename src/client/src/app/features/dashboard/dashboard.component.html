@@ -243,77 +243,167 @@
 
 <!-- Add Card Modal -->
 @if (showAddCardModal()) {
-  <div class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-charcoal/60 backdrop-blur-xl animate-in fade-in duration-300">
-    <div class="bg-mist-cream w-full max-w-xl rounded-[3rem] p-10 relative overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.3)] border border-white">
-      <!-- Modal Accent Glow -->
-      <div class="absolute top-0 right-0 w-48 h-48 bg-primary/10 blur-[80px]"></div>
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-5 md:p-6 bg-charcoal/60 backdrop-blur-xl animate-in fade-in duration-300">
+    <div class="relative w-full max-w-2xl overflow-hidden rounded-[2.5rem] border border-white bg-mist-cream p-7 md:p-9 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.3)]">
+      <div class="absolute top-0 right-0 h-52 w-52 bg-primary/10 blur-[80px]"></div>
+      <div class="absolute bottom-0 left-0 h-36 w-36 bg-[#8a5100]/10 blur-[70px]"></div>
 
-      <div class="flex justify-between items-start mb-10 relative z-10">
+      <div class="relative z-10 mb-7 flex items-start justify-between gap-4">
         <div>
-          <h2 class="text-3xl font-black tracking-tight text-charcoal mb-2">Connect New Card</h2>
-          <p class="text-misty-gray font-medium">Add your premium credit or virtual cards</p>
+          <p class="mb-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#8a5100]">New Card</p>
+          <h2 class="mb-2 text-[2.1rem] leading-[1.05] font-black tracking-tight text-charcoal">Connect Your Card</h2>
+          <p class="text-sm font-medium text-[#7a7470]">Complete two simple steps: enter details, then review and save.</p>
         </div>
-        <button (click)="toggleAddCardModal()" class="p-3 hover:bg-mist-ivory rounded-2xl transition-colors">
-          <span class="material-symbols-outlined text-charcoal/40">close</span>
+        <button (click)="toggleAddCardModal()" class="rounded-2xl p-3 text-charcoal/35 transition-colors hover:bg-mist-ivory hover:text-charcoal/65">
+          <span class="material-symbols-outlined">close</span>
         </button>
       </div>
 
+      <div class="relative z-10 mb-6 rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-md">
+        <div class="mb-3 flex items-center justify-between">
+          <p class="text-[11px] font-black uppercase tracking-[0.2em] text-[#8a5100]">Step {{ addCardStep() }} of 2</p>
+          <p class="text-xs font-semibold text-[#615e5c]">{{ addCardStep() === 1 ? 'Enter Details' : 'Review & Save' }}</p>
+        </div>
+        <div class="mb-4 h-2 overflow-hidden rounded-full bg-[#ebe7e3]">
+          <div class="h-full rounded-full bg-gradient-to-r from-[#8a5100] to-[#c07a1d] transition-all duration-300" [style.width]="getAddCardProgressWidth()"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div [class]="'rounded-xl px-3 py-2 text-center text-[11px] font-bold uppercase tracking-[0.14em] transition-all ' + (addCardStep() === 1 ? 'bg-[#8a5100] text-white shadow-lg shadow-[#8a5100]/15' : 'bg-[#f3e8d9] text-[#8a5100]')">Details</div>
+          <div [class]="'rounded-xl px-3 py-2 text-center text-[11px] font-bold uppercase tracking-[0.14em] transition-all ' + (addCardStep() === 2 ? 'bg-[#8a5100] text-white shadow-lg shadow-[#8a5100]/15' : 'bg-white text-[#736d68]')">Review</div>
+        </div>
+      </div>
+
       @if (errorMessage()) {
-        <div class="mb-8 p-4 bg-white/40 backdrop-blur-md border border-red-200/50 rounded-2xl flex items-center gap-4 animate-in slide-in-from-top-2 duration-300">
-          <div class="w-8 h-8 bg-red-500/10 rounded-xl flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-red-500 text-lg font-bold">warning_amber</span>
+        <div class="relative z-10 mb-6 flex items-center gap-4 rounded-2xl border border-red-200/60 bg-white/50 p-4 backdrop-blur-md animate-in slide-in-from-top-2 duration-300">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-red-500/10">
+            <span class="material-symbols-outlined text-lg font-bold text-red-500">warning_amber</span>
           </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-[12px] font-black text-red-900/80 uppercase tracking-widest mb-0.5">Validation Error</p>
-            <p class="text-[13px] font-bold text-red-700/70 truncate">{{ errorMessage() }}</p>
+          <div class="min-w-0 flex-1">
+            <p class="mb-0.5 text-[12px] font-black uppercase tracking-widest text-red-900/80">Validation Error</p>
+            <p class="truncate text-[13px] font-bold text-red-700/75">{{ errorMessage() }}</p>
           </div>
         </div>
       }
 
-      <div class="mb-4 text-[10px] font-mono text-charcoal/20 opacity-0 hover:opacity-100 transition-opacity">
-        Debug Session ID: {{ user()?.id }}
-      </div>
-
-      <form [formGroup]="addCardForm" (ngSubmit)="onSubmitCard()" class="space-y-8 relative z-10">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="space-y-2">
-            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Cardholder Name</label>
-            <input type="text" formControlName="cardholderName" class="premium-input px-6 h-14" placeholder="ALEXANDER VANCE">
-          </div>
-          <div class="space-y-2">
-            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Card Number</label>
-            <input type="text" formControlName="cardNumber" class="premium-input px-6 h-14" placeholder="•••• •••• •••• 1234">
-          </div>
-          <div class="space-y-2">
-            <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Card Issuer</label>
-            <select formControlName="issuerId" class="premium-input px-6 h-14 appearance-none">
-              <option value="" disabled>Select Network</option>
-              @for (issuer of issuers(); track issuer.id) {
-                <option [value]="issuer.id">{{ getIssuerLabel(issuer) }}</option>
-              }
-            </select>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
+      <form [formGroup]="addCardForm" (ngSubmit)="onSubmitCard()" class="relative z-10 space-y-6">
+        @if (addCardStep() === 1) {
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div class="space-y-2">
+              <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">Cardholder Name</label>
+              <input type="text" formControlName="cardholderName" class="premium-input h-14 px-6" placeholder="ALEXANDER VANCE">
+            </div>
+            <div class="space-y-2">
+              <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">Card Number</label>
+              <input type="text" formControlName="cardNumber" class="premium-input h-14 px-6" placeholder="1234 5678 9012 3456" inputmode="numeric" maxlength="19" autocomplete="off">
+            </div>
+            <div class="space-y-2">
+              <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">Card Issuer</label>
+              <select formControlName="issuerId" class="premium-input h-14 appearance-none px-6">
+                <option value="" disabled>Select Network</option>
+                @for (issuer of issuers(); track issuer.id) {
+                  <option [value]="issuer.id">{{ getIssuerLabel(issuer) }}</option>
+                }
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
               <div class="space-y-2">
-                <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">MM</label>
-                <input type="number" formControlName="expMonth" class="premium-input px-4 h-14">
+                <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">MM</label>
+                <input type="number" formControlName="expMonth" class="premium-input h-14 px-4" min="1" max="12">
               </div>
               <div class="space-y-2">
-                <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">YYYY</label>
-                <input type="number" formControlName="expYear" class="premium-input px-4 h-14">
+                <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">YYYY</label>
+                <input type="number" formControlName="expYear" class="premium-input h-14 px-4" [min]="2024" [max]="2099">
               </div>
+            </div>
           </div>
-        </div>
 
-        <button type="submit" [disabled]="addCardForm.invalid || isSubmitting()" class="premium-button shadow-2xl shadow-primary/30 h-16 text-lg mt-4">
-          @if (isSubmitting()) {
-            <span class="animate-spin material-symbols-outlined">refresh</span>
-            Authenticating...
+          <label class="flex cursor-pointer items-center gap-3 rounded-2xl border border-[#dfd6cc] bg-white/55 px-4 py-3">
+            <input type="checkbox" formControlName="isDefault" class="size-4 accent-[#8a5100]">
+            <span class="text-sm font-semibold text-[#2f2f2f]">Set as my default card</span>
+          </label>
+        } @else {
+          <div class="space-y-5">
+            <div class="rounded-2xl border border-[#e1d8cf] bg-white/60 px-5 py-4">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#8a5100]">Final Review</p>
+              <h3 class="mt-1 text-xl font-black tracking-tight text-[#1b1c1c]">Confirm card details before saving</h3>
+              <p class="mt-1 text-sm font-medium text-[#716a64]">After saving, only the masked number appears in your dashboard.</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div class="relative overflow-hidden rounded-[2rem] p-6 text-white shadow-[0_20px_50px_-15px_rgba(31,27,19,0.55)]" style="background: linear-gradient(135deg, #1f1b13 0%, #4b4022 100%);">
+                <div class="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl"></div>
+                <div class="relative z-10">
+                  <div class="mb-7 flex items-center justify-between">
+                    <p class="text-[10px] font-black uppercase tracking-[0.22em] text-white/65">Card Preview</p>
+                    <span class="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em]">{{ addCardForm.value.expMonth | number:'2.0' }}/{{ addCardForm.value.expYear }}</span>
+                  </div>
+                  <p class="mb-2 text-3xl font-display tracking-[0.2em]">{{ getMaskedCardNumberForReview() }}</p>
+                  <p class="mb-8 text-xs font-semibold tracking-[0.08em] text-white/70">{{ getReviewIssuerLabel() }}</p>
+                  <div class="flex items-end justify-between gap-4">
+                    <div>
+                      <p class="mb-1 text-[10px] uppercase tracking-widest text-white/55">Card Holder</p>
+                      <p class="text-sm font-black uppercase">{{ addCardForm.value.cardholderName || '-' }}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="mb-1 text-[10px] uppercase tracking-widest text-white/55">Default</p>
+                      <p class="text-sm font-black">{{ addCardForm.value.isDefault ? 'Yes' : 'No' }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-[2rem] border border-[#e1d9d0] bg-white/70 p-6">
+                <p class="mb-4 text-[11px] font-black uppercase tracking-[0.2em] text-[#8a5100]">Review Details</p>
+                <div class="divide-y divide-[#ece3d9] rounded-2xl border border-[#eee4da] bg-[#fcfaf8]">
+                  <div class="flex items-start justify-between gap-4 px-4 py-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8a817b]">Cardholder</p>
+                    <p class="text-right text-[15px] font-black text-[#1b1c1c]">{{ addCardForm.value.cardholderName }}</p>
+                  </div>
+                  <div class="flex items-start justify-between gap-4 px-4 py-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8a817b]">Card Number</p>
+                    <p class="text-right text-[15px] font-black text-[#1b1c1c] tracking-[0.05em]">{{ formatCardNumberForReview() }}</p>
+                  </div>
+                  <div class="flex items-start justify-between gap-4 px-4 py-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8a817b]">Issuer</p>
+                    <p class="text-right text-[15px] font-black text-[#1b1c1c]">{{ getReviewIssuerLabel() }}</p>
+                  </div>
+                  <div class="flex items-start justify-between gap-4 px-4 py-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8a817b]">Expiry</p>
+                    <p class="text-right text-[15px] font-black text-[#1b1c1c]">{{ addCardForm.value.expMonth | number:'2.0' }}/{{ addCardForm.value.expYear }}</p>
+                  </div>
+                </div>
+                <div class="mt-4 rounded-2xl border border-[#eadfce] bg-[#f7f1e9] px-4 py-3">
+                  <p class="text-xs font-semibold text-[#6a645f]">Looks good. Click Save Card to securely connect this card.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <div class="flex items-center justify-between gap-3 pt-2">
+          @if (addCardStep() === 1) {
+            <button type="button" (click)="toggleAddCardModal()" class="h-14 rounded-2xl border border-[#ddd4ca] bg-white/70 px-6 text-base font-bold text-[#615e5c] transition-colors hover:bg-white">Cancel</button>
           } @else {
-            <span class="material-symbols-outlined font-black">verified</span>
-            Securely Connect Card
+            <button type="button" (click)="goToCardDetailsStep()" class="h-14 rounded-2xl border border-[#ddd4ca] bg-white/70 px-6 text-base font-bold text-[#615e5c] transition-colors hover:bg-white">Back</button>
           }
-        </button>
+
+          @if (addCardStep() === 1) {
+            <button type="button" (click)="goToReviewStep()" class="premium-button h-14 px-8 text-base shadow-xl shadow-[#8a5100]/20">
+              <span class="material-symbols-outlined">east</span>
+              Review Details
+            </button>
+          } @else {
+            <button type="submit" [disabled]="isSubmitting()" class="premium-button h-14 px-8 text-base shadow-2xl shadow-[#8a5100]/25">
+              @if (isSubmitting()) {
+                <span class="animate-spin material-symbols-outlined">refresh</span>
+                Saving Card...
+              } @else {
+                <span class="material-symbols-outlined">verified</span>
+                Save Card
+              }
+            </button>
+          }
+        </div>
       </form>
     </div>
   </div>

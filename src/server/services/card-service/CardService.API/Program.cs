@@ -47,6 +47,7 @@ try
     });
     builder.Services.AddStandardAuth(builder.Configuration);
     builder.Services.AddHttpClient();
+    builder.Services.AddDataProtection();
 
     builder.Services.AddMediatR(cfg => 
     {

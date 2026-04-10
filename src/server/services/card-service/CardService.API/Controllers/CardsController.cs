@@ -7,7 +7,9 @@ using Shared.Contracts.DTOs.Card.Requests;
 using Shared.Contracts.DTOs.Card.Responses;
 using CardService.Application.Queries.Cards;
 using CardService.Application.Queries.Transactions;
+using CardService.Application.Abstractions.Persistence;
 using MediatR;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -38,8 +40,10 @@ namespace CardService.API.Controllers;
 /// </remarks>
 [Route("api/v1/cards")]
 [Authorize]
-public class CardsController(IMediator mediator) : BaseApiController
+public class CardsController(IMediator mediator, ICardRepository cardRepository, IDataProtectionProvider dataProtectionProvider) : BaseApiController
 {
+    private readonly IDataProtector cardNumberProtector = dataProtectionProvider.CreateProtector("CardService.CardNumber.v1");
+
     /// <summary>
     /// Add a new credit card for the authenticated user.
     /// Validates card number, expiry, and issuer exists.
@@ -54,6 +58,14 @@ public class CardsController(IMediator mediator) : BaseApiController
         var userId = GetUserIdFromToken();
         if (userId is null) return UnauthorizedResponse();
 
+        var digits = CardHelpers.DigitsOnly(request.CardNumber);
+        if (string.IsNullOrWhiteSpace(digits))
+        {
+            return BadRequestResponse("Card number is required");
+        }
+
+        var encryptedCardNumber = cardNumberProtector.Protect(digits);
+
         var result = await mediator.Send(
             new CreateCardCommand(
                 userId.Value,
@@ -62,7 +74,8 @@ public class CardsController(IMediator mediator) : BaseApiController
                 request.ExpYear,
                 request.CardNumber,
                 request.IssuerId,
-                request.IsDefault),
+                request.IsDefault,
+                encryptedCardNumber),
             cancellationToken);
 
         return CreateResponse(result.Success, result.Card, result.Message, result.ErrorCode, StatusCodes.Status201Created);
@@ -176,6 +189,41 @@ public class CardsController(IMediator mediator) : BaseApiController
 
         var result = await mediator.Send(new GetMyCardByIdQuery(userId.Value, cardId), cancellationToken);
         return CreateResponse(result.Success, result.Card, result.Message, result.ErrorCode);
+    }
+
+    [HttpGet("{cardId:guid}/full-number")]
+    public async Task<IActionResult> GetMyCardFullNumber(Guid cardId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId is null) return UnauthorizedResponse();
+
+        var card = await cardRepository.GetByUserAndIdAsync(userId.Value, cardId, cancellationToken);
+        if (card is null)
+        {
+            return NotFoundResponse("Card not found");
+        }
+
+        if (string.IsNullOrWhiteSpace(card.EncryptedCardNumber))
+        {
+            return BadRequestResponse("Full card number is not available for this card");
+        }
+
+        string number;
+        try
+        {
+            number = cardNumberProtector.Unprotect(card.EncryptedCardNumber);
+        }
+        catch
+        {
+            return BadRequestResponse("Could not reveal card number");
+        }
+
+        if (number.Length < 13 || number.Length > 19 || number.Any(ch => ch < '0' || ch > '9'))
+        {
+            return BadRequestResponse("Stored card number is invalid");
+        }
+
+        return CreateResponse(true, new { cardNumber = number }, "Card number revealed");
     }
 
     /// <summary>

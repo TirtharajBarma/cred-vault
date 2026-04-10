@@ -33,6 +33,7 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.Property(x => x.CardholderName).IsRequired().HasMaxLength(256);
             entity.Property(x => x.Last4).IsRequired().HasMaxLength(4);
             entity.Property(x => x.MaskedNumber).IsRequired().HasMaxLength(32);
+            entity.Property(x => x.EncryptedCardNumber).HasMaxLength(512);
             entity.Property(x => x.ExpMonth).IsRequired();
             entity.Property(x => x.ExpYear).IsRequired();
             entity.Property(x => x.CreditLimit).IsRequired().HasColumnType("decimal(18,2)");

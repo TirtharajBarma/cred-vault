@@ -35,6 +35,21 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
   rewards = signal<number>(0);
   isLoading = signal(true);
   error = signal<string | null>(null);
+  isFullCardNumberVisible = signal(false);
+  isRevealingCardNumber = signal(false);
+  fullCardNumber = signal<string | null>(null);
+  revealCardNumberError = signal<string | null>(null);
+
+  displayCardNumber = computed(() => {
+    const c = this.card();
+    if (!c) return '';
+
+    if (this.isFullCardNumberVisible() && this.fullCardNumber()) {
+      return this.formatCardNumber(this.fullCardNumber()!);
+    }
+
+    return `•••• •••• •••• ${c.last4}`;
+  });
 
   // Bill-related signals
   currentBill = signal<Bill | null>(null);
@@ -182,6 +197,7 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     this.route.paramMap.subscribe(params => {
       const cardId = params.get('id');
       if (cardId) {
+        this.clearCardNumberRevealState();
         this.loadCardDetails(cardId);
         this.loadRewards();
         this.loadBillForCard(cardId);
@@ -194,6 +210,7 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPaymentStatusPolling();
+    this.clearCardNumberRevealState();
   }
 
   loadBillForCard(cardId: string): void {
@@ -303,6 +320,59 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     if (network === 'Visa') return '/assets/visa.png';
     if (network === 'Mastercard') return '/assets/mastercard.png';
     return null;
+  }
+
+  toggleCardNumberVisibility(): void {
+    const card = this.card();
+    if (!card || this.isRevealingCardNumber()) {
+      return;
+    }
+
+    if (this.isFullCardNumberVisible()) {
+      this.clearCardNumberRevealState();
+      return;
+    }
+
+    this.isRevealingCardNumber.set(true);
+    this.revealCardNumberError.set(null);
+
+    this.dashboardService.getFullCardNumber(card.id).pipe(
+      finalize(() => this.isRevealingCardNumber.set(false))
+    ).subscribe({
+      next: (res) => {
+        if (res.success && res.data?.cardNumber) {
+          this.fullCardNumber.set(res.data.cardNumber);
+          this.isFullCardNumberVisible.set(true);
+          return;
+        }
+
+        const message = (res.message || '').toLowerCase();
+        if (message.includes('not available')) {
+          this.revealCardNumberError.set('Full number is unavailable for this older card. Re-add card to enable reveal.');
+        } else {
+          this.revealCardNumberError.set('Could not reveal card number right now. Please try again.');
+        }
+
+        setTimeout(() => this.revealCardNumberError.set(null), 3500);
+      },
+      error: () => {
+        this.revealCardNumberError.set('Could not reveal card number right now. Please try again.');
+        setTimeout(() => this.revealCardNumberError.set(null), 3500);
+      }
+    });
+  }
+
+  private clearCardNumberRevealState(): void {
+    this.isFullCardNumberVisible.set(false);
+    this.fullCardNumber.set(null);
+    this.revealCardNumberError.set(null);
+    this.isRevealingCardNumber.set(false);
+  }
+
+  private formatCardNumber(value: string): string {
+    const digits = (value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.match(/.{1,4}/g)?.join(' ') || digits;
   }
 
   getTransactionIcon(type: number): string {

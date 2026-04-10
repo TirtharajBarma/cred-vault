@@ -36,6 +36,7 @@ export class DashboardComponent implements OnInit {
   itemsPerPage = 7;
   
   showAddCardModal = signal(false);
+  addCardStep = signal<1 | 2>(1);
   addCardForm: FormGroup;
   isSubmitting = signal(false);
   errorMessage = signal<string | null>(null);
@@ -96,18 +97,107 @@ export class DashboardComponent implements OnInit {
   toggleAddCardModal(): void {
     this.showAddCardModal.set(!this.showAddCardModal());
     this.errorMessage.set(null);
+    this.addCardStep.set(1);
     if (!this.showAddCardModal()) {
       this.addCardForm.reset({ expMonth: 1, expYear: new Date().getFullYear(), isDefault: false });
     }
   }
 
+  getAddCardProgressWidth(): string {
+    const step = this.addCardStep();
+    if (step === 1) return '50%';
+    return '100%';
+  }
+
+  goToCardDetailsStep(): void {
+    this.errorMessage.set(null);
+    this.addCardStep.set(1);
+  }
+
+  goToReviewStep(): void {
+    this.errorMessage.set(null);
+
+    const cardholderNameCtrl = this.addCardForm.get('cardholderName');
+    const cardNumberCtrl = this.addCardForm.get('cardNumber');
+    const expMonthCtrl = this.addCardForm.get('expMonth');
+    const expYearCtrl = this.addCardForm.get('expYear');
+    const issuerIdCtrl = this.addCardForm.get('issuerId');
+
+    cardholderNameCtrl?.markAsTouched();
+    cardNumberCtrl?.markAsTouched();
+    expMonthCtrl?.markAsTouched();
+    expYearCtrl?.markAsTouched();
+    issuerIdCtrl?.markAsTouched();
+
+    const normalizedCardNumber = this.normalizeCardNumber(String(cardNumberCtrl?.value ?? ''));
+    const currentYear = new Date().getFullYear();
+    const expYear = Number(expYearCtrl?.value ?? 0);
+
+    if (!cardholderNameCtrl?.value || !issuerIdCtrl?.value) {
+      this.errorMessage.set('Please fill all required card details before continuing.');
+      return;
+    }
+
+    if (normalizedCardNumber.length !== 16) {
+      this.errorMessage.set('Card number must contain exactly 16 digits.');
+      return;
+    }
+
+    if (expYear < currentYear) {
+      this.errorMessage.set('Expiry year cannot be in the past.');
+      return;
+    }
+
+    cardNumberCtrl?.setValue(normalizedCardNumber);
+    this.addCardStep.set(2);
+  }
+
+  formatCardNumberForReview(): string {
+    const digits = this.normalizeCardNumber(String(this.addCardForm.value.cardNumber || ''));
+    if (!digits) return '---- ---- ---- ----';
+    return digits.match(/.{1,4}/g)?.join(' ') || digits;
+  }
+
+  getReviewIssuerLabel(): string {
+    const issuerId = this.addCardForm.value.issuerId;
+    if (!issuerId) return 'Not selected';
+
+    const issuer = this.issuers().find(item => item.id === issuerId);
+    if (!issuer) return 'Not selected';
+
+    return this.getIssuerLabel(issuer);
+  }
+
+  getMaskedCardNumberForReview(): string {
+    const digits = this.normalizeCardNumber(String(this.addCardForm.value.cardNumber || ''));
+    if (digits.length !== 16) return '•••• •••• •••• ••••';
+
+    return `•••• •••• •••• ${digits.slice(-4)}`;
+  }
+
   onSubmitCard(): void {
+    if (this.addCardStep() !== 2) {
+      this.goToReviewStep();
+      return;
+    }
+
     if (this.addCardForm.invalid) return;
+
+    const normalizedCardNumber = this.normalizeCardNumber(String(this.addCardForm.value.cardNumber || ''));
+    if (normalizedCardNumber.length !== 16) {
+      this.errorMessage.set('Card number must contain exactly 16 digits.');
+      return;
+    }
+
+    const payload = {
+      ...this.addCardForm.value,
+      cardNumber: normalizedCardNumber
+    };
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
     
-    this.dashboardService.addCard(this.addCardForm.value).subscribe({
+    this.dashboardService.addCard(payload).subscribe({
       next: (res) => {
         if (res.success) {
           this.loadDashboardData();
@@ -123,6 +213,10 @@ export class DashboardComponent implements OnInit {
         this.isSubmitting.set(false);
       }
     });
+  }
+
+  private normalizeCardNumber(value: string): string {
+    return (value || '').replace(/\D/g, '');
   }
 
   getTransactionIcon(type: TransactionType): string {
