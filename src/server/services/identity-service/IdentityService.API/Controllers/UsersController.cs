@@ -51,10 +51,10 @@ public class UsersController : BaseApiController
     [HttpGet("me")]
     public async Task<IActionResult> GetMe(CancellationToken cancellationToken)
     {
-        var userId = GetUserIdFromToken();
+        var userId = GetUserIdFromToken();          // JWT token
         if (userId is null)
         {
-            return Unauthorized(new ApiResponse<object>
+            return Unauthorized(new ApiResponse<object>     // custom exception
             {
                 Success = false,
                 Message = "User identity is missing from token.",
@@ -161,6 +161,8 @@ public class UsersController : BaseApiController
     public async Task<IActionResult> UpdateUserRole(Guid userId, [FromBody] UpdateUserRoleRequest request, CancellationToken cancellationToken)
     {
         var roleStr = request.Role?.Trim().ToLowerInvariant() ?? "";
+
+        // convert string into enum(UserRole)
         var role = roleStr switch
         {
             "admin" => IdentityService.Domain.Enums.UserRole.Admin,
@@ -212,6 +214,7 @@ public class UsersController : BaseApiController
         return FromOperationResult(result);
     }
 
+    //! take Auth result ---> converts into proper HTTP response
     private IActionResult FromAuthResult(AuthResult result)
     {
         var response = BuildResponse(result.Success, new { result.User, result.AccessToken }, result.Message);
