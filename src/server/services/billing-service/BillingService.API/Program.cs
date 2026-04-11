@@ -2,7 +2,6 @@ using BillingService.Infrastructure.Persistence.Sql;
 using BillingService.API.Messaging;
 using BillingService.Application.Abstractions.Persistence;
 using BillingService.Application.Commands.Bills;
-using BillingService.Application.Commands.Statements;
 using BillingService.Application.Queries.Bills;
 using BillingService.Application.Queries.Statements;
 using BillingService.Infrastructure.Persistence.Sql.Repositories;
@@ -53,7 +52,6 @@ try
     {
         cfg.RegisterServicesFromAssemblyContaining<MarkBillPaidCommandHandler>();
         cfg.RegisterServicesFromAssemblyContaining<GetMyBillsQueryHandler>();
-        cfg.RegisterServicesFromAssemblyContaining<GenerateStatementCommandHandler>();
         cfg.RegisterServicesFromAssemblyContaining<GetMyStatementsQueryHandler>();
     });
     builder.Services.AddDbContext<BillingDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("BillingDb")));

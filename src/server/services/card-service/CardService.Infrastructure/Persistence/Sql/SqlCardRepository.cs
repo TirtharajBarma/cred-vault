@@ -9,14 +9,14 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
 {
     public async Task AddAsync(CreditCard card, CancellationToken cancellationToken = default)
     {
-        await dbContext.CreditCards.AddAsync(card, cancellationToken);
+        await dbContext.CreditCards.AddAsync(card, cancellationToken);      // .AddAsync() -> adds an entity to the DbContext in memory and marks it for insertion
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public Task<CreditCard?> GetByIdAsync(Guid cardId, CancellationToken cancellationToken = default)
     {
         return dbContext.CreditCards
-            .Include(x => x.Issuer)
+            .Include(x => x.Issuer)     // because it is [foreign-key] which will import all related obj or else by-default return NULL
             .FirstOrDefaultAsync(x => x.Id == cardId, cancellationToken);
     }
 
@@ -37,9 +37,10 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .ToListAsync(cancellationToken);
     }
 
+    //! This is where update card happens
     public async Task UpdateAsync(CreditCard card, CancellationToken cancellationToken = default)
     {
-        dbContext.CreditCards.Update(card);
+        dbContext.CreditCards.Update(card);     // .Update() -> this obj already exist in DB, and has been modified -> update it
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -55,10 +56,11 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    // make only 1 card default not all
     public async Task UnsetDefaultForUserAsync(Guid userId, Guid? exceptCardId, CancellationToken cancellationToken = default)
     {
-        var query = dbContext.CreditCards.Where(x => x.UserId == userId && x.IsDefault);
-        if (exceptCardId.HasValue)
+        var query = dbContext.CreditCards.Where(x => x.UserId == userId && x.IsDefault);    // get all card that are currently default
+        if (exceptCardId.HasValue)      // don't touch this card
         {
             query = query.Where(x => x.Id != exceptCardId.Value);
         }
@@ -70,7 +72,7 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
         }
 
         var now = DateTime.UtcNow;
-        foreach (var card in cards)
+        foreach (var card in cards)     // remove default flag for others
         {
             card.IsDefault = false;
             card.UpdatedAtUtc = now;
@@ -119,15 +121,17 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
     {
         return dbContext.CreditCards
             .Include(x => x.Issuer)
-            .AnyAsync(x => x.UserId == userId 
+            .AnyAsync(x => x.UserId == userId           // does atleast on record exist
                         && x.Issuer!.Network == network 
                         && x.Last4 == last4
                         && !x.IsDeleted, cancellationToken);
     }
 
+    //! IMP CONCEPT
     public async Task AddTransactionAsync(CardTransaction transaction, CancellationToken cancellationToken = default)
     {
         await dbContext.CardTransactions.AddAsync(transaction, cancellationToken);
+        //! Update Card + Add Transaction → BOTH succeed OR BOTH fail
         // Note: SaveChangesAsync left to caller if part of larger unit of work, but we'll call it here if stand-alone
         // The original controller relied on UpdateAsync(card) to commit the transaction added to _db context.
         // To keep it simple, we'll let UpdateAsync(card) flush the changes if used together, 
@@ -137,7 +141,7 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
     public Task<List<CardTransaction>> GetTransactionsByCardAndUserAsync(Guid cardId, Guid userId, CancellationToken cancellationToken = default)
     {
         return dbContext.CardTransactions
-            .AsNoTracking()
+            .AsNoTracking()         // no tracking -> reading mode -> faster -> else default behavior of EF is to update
             .Where(x => x.CardId == cardId && x.UserId == userId)
             .OrderByDescending(x => x.DateUtc)
             .ToListAsync(cancellationToken);
@@ -161,11 +165,14 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
             .ToListAsync(cancellationToken);
     }
 
+    // duplicate checking
     public async Task<bool> HasDuplicateTransactionAsync(Guid cardId, TransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default)
     {
         var tolerance = TimeSpan.FromMinutes(1);
         var minDate = dateUtc.Add(-tolerance);
         var maxDate = dateUtc.Add(tolerance);
+
+        // dateUtc = 10:00 : min => 09.59, max => 10.01
 
         return await dbContext.CardTransactions
             .AnyAsync(x => x.CardId == cardId 

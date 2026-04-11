@@ -16,7 +16,7 @@ public class UserDeletedConsumer(CardDbContext db, ILogger<UserDeletedConsumer> 
         try
         {
             var cards = await db.CreditCards
-                .Where(x => x.UserId == userId)
+                .Where(x => x.UserId == userId)         // find all cards of that user
                 .ToListAsync(context.CancellationToken);
 
             if (cards.Count == 0)
@@ -26,7 +26,7 @@ public class UserDeletedConsumer(CardDbContext db, ILogger<UserDeletedConsumer> 
             }
 
             var now = DateTime.UtcNow;
-            foreach (var card in cards)
+            foreach (var card in cards)         // soft-delete the card
             {
                 card.IsDeleted = true;
                 card.DeletedAtUtc = now;

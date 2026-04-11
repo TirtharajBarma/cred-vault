@@ -267,67 +267,6 @@ public class InitiatePaymentCommandHandler(
         public UserDto? User { get; set; }
     }
 
-    private async Task<(bool Success, string? Message, decimal NewOutstanding)> RedeemRewardsForPaymentAsync(
-        Guid userId, 
-        Guid billId, 
-        decimal dollarValue,
-        string authHeader,
-        CancellationToken ct)
-    {
-        try
-        {
-            var pointsToRedeem = (int)Math.Floor(dollarValue / 0.25m);
-            pointsToRedeem = Math.Max(pointsToRedeem, 1);
-
-            var client = httpClientFactory.CreateClient();
-            var billingUrl = configuration["Services:BillingService"] ?? "http://localhost:5003";
-            client.BaseAddress = new Uri(billingUrl);
-
-            var request = new HttpRequestMessage(HttpMethod.Post, "api/v1/billing/rewards/redeem")
-            {
-                Content = JsonContent.Create(new
-                {
-                    Points = pointsToRedeem,
-                    Target = "Bill",
-                    BillId = billId
-                })
-            };
-
-            if (!string.IsNullOrEmpty(authHeader))
-                request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
-
-            var response = await client.SendAsync(request, ct);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(ct);
-                logger.LogWarning("Rewards redemption failed: {Status} - {Content}", response.StatusCode, errorContent);
-                return (false, $"Rewards redemption failed: {response.StatusCode}", 0);
-            }
-
-            var content = await response.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<Shared.Contracts.Models.ApiResponse<object>>(content, 
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            if (result?.Success != true)
-            {
-                return (false, result?.Message ?? "Rewards redemption failed", 0);
-            }
-
-            var updatedBill = await FetchBillAsync(billId, authHeader, ct);
-            var newOutstanding = updatedBill != null 
-                ? Math.Max(0, updatedBill.Amount - (updatedBill.AmountPaid ?? 0))
-                : 0;
-
-            return (true, null, newOutstanding);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Exception during rewards redemption for Bill {BillId}", billId);
-            return (false, "Error processing rewards redemption", 0);
-        }
-    }
-
     private async Task MarkStuckPaymentsFailedAsync(Guid userId, Guid billId, CancellationToken ct)
     {
         try

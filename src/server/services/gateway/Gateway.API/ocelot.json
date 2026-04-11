@@ -194,25 +194,11 @@
       "UpstreamHttpMethod": ["GET", "POST"]
     },
     {
-      "DownstreamPathTemplate": "/api/v1/billing/statements/generate",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5003 }],
-      "UpstreamPathTemplate": "/api/v1/billing/statements/generate",
-      "UpstreamHttpMethod": ["POST"]
-    },
-    {
       "DownstreamPathTemplate": "/api/v1/billing/statements/admin/all",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5003 }],
       "UpstreamPathTemplate": "/api/v1/billing/statements/admin/all",
       "UpstreamHttpMethod": ["GET"]
-    },
-    {
-      "DownstreamPathTemplate": "/api/v1/billing/statements/admin/generate",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5003 }],
-      "UpstreamPathTemplate": "/api/v1/billing/statements/admin/generate",
-      "UpstreamHttpMethod": ["POST"]
     },
     {
       "DownstreamPathTemplate": "/api/v1/billing/statements/bill/{billId}",
@@ -263,13 +249,6 @@
       "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5003 }],
       "UpstreamPathTemplate": "/api/v1/billing/rewards/transactions",
       "UpstreamHttpMethod": ["GET"]
-    },
-    {
-      "DownstreamPathTemplate": "/api/v1/billing/rewards/redeem",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5003 }],
-      "UpstreamPathTemplate": "/api/v1/billing/rewards/redeem",
-      "UpstreamHttpMethod": ["POST"]
     },
     {
       "DownstreamPathTemplate": "/api/v1/billing/rewards/internal/redeem",

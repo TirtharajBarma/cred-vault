@@ -21,12 +21,13 @@ public class UpdateCardByAdminCommandHandler(
         if (!string.IsNullOrWhiteSpace(request.CardholderName))
             card.CardholderName = request.CardholderName;
 
-        if (request.CreditLimit > 0)
-            card.CreditLimit = request.CreditLimit;
+        if (request.CreditLimit > 0)            // only update the value if the new value is greater than 0
+            card.CreditLimit = request.CreditLimit;     // change card limit to limit req coming from admin
 
         if (request.OutstandingBalance.HasValue)
             card.OutstandingBalance = request.OutstandingBalance.Value;
 
+        // if admin is setting the billing cycle day, validate it and update only if valid
         if (request.BillingCycleStartDay.HasValue)
         {
             if (!CardHelpers.IsValidBillingCycleStartDay(request.BillingCycleStartDay.Value))

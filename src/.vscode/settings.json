@@ -2,5 +2,8 @@
     "kiroAgent.configureMCP": "Disabled",
     "dataworkspace.excludedProjects": [
         "localhost 1434/localhost 1434.sqlproj"
+    ],
+    "cSpell.words": [
+        "Mediat"
     ]
 }

@@ -64,7 +64,7 @@ public class CardsController(IMediator mediator, ICardRepository cardRepository,
             return BadRequestResponse("Card number is required");
         }
 
-        var encryptedCardNumber = cardNumberProtector.Protect(digits);
+        var encryptedCardNumber = cardNumberProtector.Protect(digits);          // built-in function -> .Protect()
 
         var result = await mediator.Send(
             new CreateCardCommand(
@@ -75,7 +75,8 @@ public class CardsController(IMediator mediator, ICardRepository cardRepository,
                 request.CardNumber,
                 request.IssuerId,
                 request.IsDefault,
-                encryptedCardNumber),
+                encryptedCardNumber
+            ),
             cancellationToken);
 
         return CreateResponse(result.Success, result.Card, result.Message, result.ErrorCode, StatusCodes.Status201Created);
@@ -246,7 +247,8 @@ public class CardsController(IMediator mediator, ICardRepository cardRepository,
                 request.CardholderName,
                 request.ExpMonth,
                 request.ExpYear,
-                request.IsDefault),
+                request.IsDefault
+            ),
             cancellationToken);
 
         return CreateResponse(result.Success, result.Card, result.Message, result.ErrorCode);

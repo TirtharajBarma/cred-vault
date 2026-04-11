@@ -91,7 +91,7 @@ public class BillsController(IMediator mediator) : BaseApiController
         [FromBody] GenerateBillRequest request,
         CancellationToken cancellationToken)
     {
-        var authHeader = HttpContext.Request.Headers.Authorization.ToString();
+        var authHeader = HttpContext.Request.Headers.Authorization.ToString();      // extract JWT token from req
         var adminUserId = GetUserIdFromToken() ?? Guid.Empty;
 
         var command = new GenerateAdminBillCommand(adminUserId, request.UserId, request.CardId, request.Currency, authHeader);

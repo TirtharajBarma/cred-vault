@@ -48,11 +48,13 @@ public static class CardHelpers
 
         if (digits.Length == 16)
         {
+            // [..2] -> take first 2 then validate -> [51, 52, 53, 54, 55]
             if (int.TryParse(digits[..2], out var first2) && first2 is >= 51 and <= 55)
             {
                 return CardNetwork.Mastercard;
             }
 
+            // [..4] -> take first 4 then range [2221 -> 2720]
             if (int.TryParse(digits[..4], out var first4) && first4 is >= 2221 and <= 2720)
             {
                 return CardNetwork.Mastercard;

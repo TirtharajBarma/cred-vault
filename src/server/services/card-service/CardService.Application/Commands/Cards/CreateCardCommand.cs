@@ -73,7 +73,7 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
 
         var network = issuer.Network;
 
-        var last4 = digits.Length >= 4 ? digits[^4..] : digits;
+        var last4 = digits.Length >= 4 ? digits[^4..] : digits;     // extract the last 4 digit
         if (await cards.HasDuplicateCardAsync(request.UserId, network, last4, ct))
         {
             logger.LogWarning("CreateCard rejected: duplicate card for UserId={UserId}", request.UserId);
