@@ -166,7 +166,7 @@ public sealed class SqlCardRepository(CardDbContext dbContext) : ICardRepository
     }
 
     // duplicate checking
-    public async Task<bool> HasDuplicateTransactionAsync(Guid cardId, TransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default)
+    public async Task<bool> HasDuplicateTransactionAsync(Guid cardId, CardTransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default)
     {
         var tolerance = TimeSpan.FromMinutes(1);
         var minDate = dateUtc.Add(-tolerance);

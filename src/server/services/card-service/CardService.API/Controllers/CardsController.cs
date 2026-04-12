@@ -170,7 +170,7 @@ public class CardsController(IMediator mediator, ICardRepository cardRepository,
 
     public class AddTransactionRequest
     {
-        public TransactionType Type { get; set; }
+        public CardTransactionType Type { get; set; }
         public decimal Amount { get; set; }
         public string? Description { get; set; }
         public DateTime? DateUtc { get; set; }

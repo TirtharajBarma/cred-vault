@@ -60,7 +60,7 @@ public class RevertPaymentConsumer(
                 PaymentId = payment.Id,
                 UserId = payment.UserId,
                 Amount = payment.Amount,
-                Type = TransactionType.Reversal,
+                Type = PaymentTransactionType.Reversal,
                 Description = $"Saga compensation: {message.CorrelationId}",
                 CreatedAtUtc = DateTime.UtcNow
             };

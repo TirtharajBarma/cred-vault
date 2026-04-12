@@ -11,7 +11,7 @@ namespace CardService.Application.Commands.Transactions;
 public record AddCardTransactionCommand(
     Guid UserId, 
     Guid CardId, 
-    TransactionType Type, 
+    CardTransactionType Type, 
     decimal Amount, 
     string? Description, 
     DateTime? DateUtc,
@@ -53,7 +53,7 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
             throw new ConflictException("A duplicate transaction already exists.");
         }
 
-        if (request.Type == TransactionType.Purchase)
+        if (request.Type == CardTransactionType.Purchase)
         {
             if (card.OutstandingBalance + request.Amount > card.CreditLimit)
             {

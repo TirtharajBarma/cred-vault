@@ -2,6 +2,6 @@ namespace IdentityService.Domain.Enums;
 
 public enum UserRole
 {
-    User = 1,
-    Admin = 2
+    User = 0,
+    Admin = 1
 }

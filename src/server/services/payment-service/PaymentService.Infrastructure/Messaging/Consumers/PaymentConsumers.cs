@@ -37,7 +37,7 @@ public class PaymentCompletedConsumer(IPaymentRepository payments, ITransactionR
             await transactions.AddAsync(new Transaction
             {
                 Id = Guid.NewGuid(), PaymentId = payment.Id, UserId = payment.UserId,
-                Amount = payment.Amount, Type = TransactionType.Payment,
+                Amount = payment.Amount, Type = PaymentTransactionType.Payment,
                 Description = "Payment completed", CreatedAtUtc = DateTime.UtcNow
             });
 

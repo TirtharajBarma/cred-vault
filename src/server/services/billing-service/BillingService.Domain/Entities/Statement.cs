@@ -5,10 +5,10 @@ namespace BillingService.Domain.Entities;
 
 public enum StatementStatus
 {
-    Generated = 1,
-    Paid = 2,
-    Overdue = 3,
-    PartiallyPaid = 4
+    Generated = 0,
+    Paid = 1,
+    Overdue = 2,
+    PartiallyPaid = 3
 }
 
 public class Statement

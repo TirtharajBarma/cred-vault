@@ -67,7 +67,7 @@ public class CardDeductionSagaConsumer(
                 Id = Guid.NewGuid(),
                 CardId = card.Id,
                 UserId = card.UserId,
-                Type = TransactionType.Payment,
+                Type = CardTransactionType.Payment,
                 Amount = message.Amount,
                 Description = $"Saga:{message.CorrelationId}",
                 DateUtc = DateTime.UtcNow

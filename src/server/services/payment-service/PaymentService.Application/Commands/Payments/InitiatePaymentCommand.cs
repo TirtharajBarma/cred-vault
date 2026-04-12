@@ -31,7 +31,7 @@ public class InitiatePaymentCommandHandler(
     IUnitOfWork unitOfWork,
     IPublishEndpoint publishEndpoint,
     ISendEndpointProvider sendEndpointProvider,
-    IHttpClientFactory httpClientFactory,
+    IHttpClientFactory httpClientFactory,           // call other services
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<InitiatePaymentCommandHandler> logger) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
 {
@@ -43,6 +43,7 @@ public class InitiatePaymentCommandHandler(
             request.UserId, request.BillId, request.Amount, request.RewardsAmount);
 
         // Cleanup stuck payments for this user/bill before creating new one
+        // if user started payment before and didn't finish -> make them fail
         await MarkStuckPaymentsFailedAsync(request.UserId, request.BillId, cancellationToken);
 
         if (request.Amount <= 0)
@@ -51,6 +52,7 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, "Amount must be greater than zero");
         }
 
+        // fetch the bill
         var billResult = await FetchBillAsync(request.BillId, request.AuthorizationHeader, cancellationToken);
         
         if (billResult.Bill is null)
@@ -85,10 +87,11 @@ public class InitiatePaymentCommandHandler(
         }
 
         // Calculate rewards amount for display but DON'T redeem yet
-        // Rewards will be redeemed AFTER OTP verification in the SAGA
+        //! Rewards will be redeemed AFTER OTP verification in the SAGA
         decimal rewardsApplied = 0;
         if (request.RewardsAmount.HasValue && request.RewardsAmount > 0)
         {
+            // you can't apply more rewards than the bill amt.
             rewardsApplied = Math.Min(request.RewardsAmount.Value, outstandingAmount);
             logger.LogInformation("Rewards will be applied after payment: {RewardsAmount}", rewardsApplied);
         }
@@ -103,6 +106,7 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, $"Payment exceeds outstanding balance. Outstanding: {outstandingAmount:0.00}");
         }
 
+        // full payment
         if (request.PaymentType == PaymentType.Full && Math.Abs(finalAmount - outstandingAmount) > 0.01m)
         {
             logger.LogWarning("Payment rejected: Full payment amount {Amount} does not match outstanding {Outstanding} for Bill {BillId}",
@@ -204,7 +208,7 @@ public class InitiatePaymentCommandHandler(
 
             var response = await client.SendAsync(request, ct);
             
-            var content = await response.Content.ReadAsStringAsync(ct);
+            var content = await response.Content.ReadAsStringAsync(ct);     // convert req to string
 
             switch (response.StatusCode)
             {
@@ -328,6 +332,7 @@ public class InitiatePaymentCommandHandler(
                 await paymentRepository.UpdateAsync(payment);
                 logger.LogInformation("Marked stuck payment as Failed: PaymentId={PaymentId}", payment.Id);
 
+                // direct queue send
                 var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
                 await endpoint.Send<IOtpFailed>(new
                 {
