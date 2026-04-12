@@ -43,7 +43,7 @@ public class InitiatePaymentCommandHandler(
             request.UserId, request.BillId, request.Amount, request.RewardsAmount);
 
         // Cleanup stuck payments for this user/bill before creating new one
-        // if user started payment before and didn't finish -> make them fail
+        //! if user started payment before and didn't finish -> make them fail
         await MarkStuckPaymentsFailedAsync(request.UserId, request.BillId, cancellationToken);
 
         if (request.Amount <= 0)

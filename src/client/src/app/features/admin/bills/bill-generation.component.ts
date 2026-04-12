@@ -2,6 +2,21 @@ import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AdminService } from '../../../core/services/admin.service';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+
+type EligibleCard = {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  cardId: string;
+  issuerName: string;
+  network: string;
+  last4: string;
+  outstandingBalance: number;
+  creditLimit: number;
+  currency: string;
+};
 
 @Component({
   selector: 'app-bill-generation',
@@ -25,6 +40,8 @@ export class BillGenerationComponent implements OnInit {
   selectedCardDetails = signal<any>(null);
   userSearchTerm = signal('');
   isUserDropdownOpen = signal(false);
+  isLoadingEligibleCards = signal(false);
+  eligibleCards = signal<EligibleCard[]>([]);
 
   filteredUsers = computed(() => {
     const query = this.userSearchTerm().trim().toLowerCase();
@@ -49,6 +66,7 @@ export class BillGenerationComponent implements OnInit {
 
   ngOnInit() {
     this.loadUsers();
+    this.loadEligibleCardsForDemo();
   }
 
   loadUsers() {
@@ -69,12 +87,21 @@ export class BillGenerationComponent implements OnInit {
     });
   }
 
-  private loadCardsForUser(userId: string) {
+  private loadCardsForUser(userId: string, preferredCardId?: string) {
     this.isLoadingCards.set(true);
     this.adminService.getCardsByUser(userId).subscribe({
       next: (res: any) => {
         const data = res.data?.data || res.data || [];
         this.cards.set(data);
+
+        if (preferredCardId) {
+          const preferredCard = data.find((card: any) => String(card.id) === String(preferredCardId));
+          if (preferredCard) {
+            this.billForm.get('cardId')?.setValue(String(preferredCard.id));
+            this.selectedCardDetails.set(preferredCard);
+          }
+        }
+
         this.isLoadingCards.set(false);
       },
       error: (err) => {
@@ -119,6 +146,18 @@ export class BillGenerationComponent implements OnInit {
   }
 
   selectUser(user: any) {
+    this.applyUserSelection(user);
+  }
+
+  useEligibleCard(card: EligibleCard) {
+    this.userSearchTerm.set(`${card.userName} (${card.userEmail})`);
+    this.selectedUserName.set(card.userName);
+    this.billForm.get('userId')?.setValue(card.userId);
+    this.isUserDropdownOpen.set(false);
+    this.loadCardsForUser(card.userId, card.cardId);
+  }
+
+  private applyUserSelection(user: any) {
     const userId = String(user.id);
     this.userSearchTerm.set(this.getUserLabel(user));
     this.selectedUserName.set(user.fullName || '');
@@ -169,6 +208,7 @@ export class BillGenerationComponent implements OnInit {
           this.selectedCardDetails.set(null);
           this.userSearchTerm.set('');
           this.isUserDropdownOpen.set(false);
+          this.loadEligibleCardsForDemo();
         } else {
           this.errorMessage.set(res.message || 'Billing protocol failed');
         }
@@ -204,6 +244,77 @@ export class BillGenerationComponent implements OnInit {
   clearMessages() {
     this.successMessage.set(null);
     this.errorMessage.set(null);
+  }
+
+  private loadEligibleCardsForDemo() {
+    this.isLoadingEligibleCards.set(true);
+
+    this.adminService.getAllUsersForDropdown().pipe(
+      map((res: any) => {
+        const data = res.data?.data || res.data || {};
+        return (data.users || []).filter((user: any) => !!user?.id && !!user?.email);
+      }),
+      catchError(() => of([]))
+    ).subscribe((users: any[]) => {
+      if (!users.length) {
+        this.eligibleCards.set([]);
+        this.isLoadingEligibleCards.set(false);
+        return;
+      }
+
+      const requests = users.map((user: any) =>
+        this.adminService.getCardsByUser(user.id).pipe(
+          map((res: any) => {
+            const cards = res.data?.data || res.data || [];
+            return { user, cards: Array.isArray(cards) ? cards : [] };
+          }),
+          catchError(() => of({ user, cards: [] }))
+        )
+      );
+
+      forkJoin(requests).subscribe({
+        next: (results: Array<{ user: any; cards: any[] }>) => {
+          const cards = results.flatMap(({ user, cards }) =>
+            cards
+              .filter((card: any) => Number(card?.outstandingBalance ?? 0) > 0)
+              .map((card: any) => ({
+                userId: String(user.id),
+                userName: user.fullName || 'User',
+                userEmail: user.email || '',
+                cardId: String(card.id),
+                issuerName: card.issuerName || 'Card',
+                network: this.getNetworkName(card.network),
+                last4: card.last4 || '----',
+                outstandingBalance: Number(card.outstandingBalance || 0),
+                creditLimit: Number(card.creditLimit || 0),
+                currency: card.currency || 'INR'
+              }))
+          );
+
+          cards.sort((a, b) => b.outstandingBalance - a.outstandingBalance);
+          this.eligibleCards.set(cards);
+          this.isLoadingEligibleCards.set(false);
+        },
+        error: () => {
+          this.eligibleCards.set([]);
+          this.isLoadingEligibleCards.set(false);
+        }
+      });
+    });
+  }
+
+  getNetworkName(network: unknown): string {
+    const normalized = String(network ?? '').trim().toLowerCase();
+
+    if (normalized === '1' || normalized === 'visa') {
+      return 'Visa';
+    }
+
+    if (normalized === '2' || normalized === 'mastercard') {
+      return 'Mastercard';
+    }
+
+    return normalized ? String(network) : 'Unknown';
   }
 
   getAvailableBalance(): number {

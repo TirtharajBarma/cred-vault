@@ -1,6 +1,7 @@
 using MediatR;
 using NotificationService.Application.Interfaces;
 using NotificationService.Domain.Entities;
+using NotificationService.Application.Services;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -13,6 +14,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
     {
         var traceId = request.MessageId ?? Guid.NewGuid().ToString();
         var userId = ExtractUserId(request.Payload);
+        var payloadDict = DeserializePayload(request.Payload);
 
         logger.LogInformation("Processing {EventType} for {Email}, UserId={UserId}, TraceId={TraceId}", 
             request.EventType, request.Email, userId, traceId);
@@ -45,7 +47,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
 
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
-            var (subject, body) = GenerateEmail(request.EventType, request.FullName, request.Payload);
+            var (subject, body) = GenerateEmail(request.EventType, request.FullName ?? "User", payloadDict);
             var (success, error) = await email.SendEmailAsync(request.Email, subject, body, ct);
 
             notificationLog.IsSuccess = success;
@@ -108,21 +110,152 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
         return null;
     }
 
-    private static (string Subject, string Body) GenerateEmail(string eventType, string? name, object payload)
+    private static Dictionary<string, object> DeserializePayload(object payload)
     {
-        var json = JsonConvert.SerializeObject(payload);
-        var data = JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        try
+        {
+            var json = JsonConvert.SerializeObject(payload);
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        }
+        catch
+        {
+            return new Dictionary<string, object>();
+        }
+    }
 
+    private static string GetString(Dictionary<string, object> data, string key, string defaultValue = "")
+    {
+        if (data.TryGetValue(key, out var value))
+        {
+            return value?.ToString() ?? defaultValue;
+        }
+        return defaultValue;
+    }
+
+    private static decimal GetDecimal(Dictionary<string, object> data, string key, decimal defaultValue = 0)
+    {
+        if (data.TryGetValue(key, out var value))
+        {
+            if (decimal.TryParse(value?.ToString(), out var result))
+                return result;
+        }
+        return defaultValue;
+    }
+
+    private static DateTime GetDateTime(Dictionary<string, object> data, string key, DateTime defaultValue = default)
+    {
+        if (data.TryGetValue(key, out var value))
+        {
+            if (DateTime.TryParse(value?.ToString(), out var result))
+                return result;
+        }
+        return defaultValue;
+    }
+
+    private static (string Subject, string Body) GenerateEmail(string eventType, string fullName, Dictionary<string, object> data)
+    {
         return eventType switch
         {
-            "UserRegistered" => ("Welcome to CredVault", $"<h2>Welcome {name ?? "User"}!</h2><p>Your account is ready.</p>"),
-            "UserOtpGenerated" => ("Your Verification Code", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Purpose: {data.GetValueOrDefault("Purpose", "N/A")}</p>"),
-            "CardAdded" => ("Card Added", $"<h2>New card ending in {data.GetValueOrDefault("CardNumberLast4", "****")}</h2>"),
-            "BillGenerated" => ("Bill Ready", $"<h2>Amount: ₹{data.GetValueOrDefault("Amount", "0")}</h2><p>Due: {data.GetValueOrDefault("DueDate", "N/A")}</p>"),
-            "PaymentOtpGenerated" => ("Payment Verification", $"<h2>Code: {data.GetValueOrDefault("OtpCode", "N/A")}</h2><p>Amount: ₹{data.GetValueOrDefault("Amount", "0")}</p>"),
-            "PaymentCompleted" => ("Payment Successful", $"<h2>Payment of ₹{data.GetValueOrDefault("Amount", "0")} completed!</h2>"),
-            "PaymentFailed" => ("Payment Failed", $"<h2>Payment failed: {data.GetValueOrDefault("Reason", "Unknown")}</h2>"),
-            _ => (eventType, $"<h2>{eventType}</h2><p>Details: {json}</p>")
+            "UserRegistered" => (
+                "Welcome to CredVault! 🎉",
+                EmailTemplates.UserWelcome(fullName, GetString(data, "email"))
+            ),
+
+            "UserOtpGenerated" => (
+                GetString(data, "Purpose") switch
+                {
+                    "EmailVerification" => "Verify Your Email Address 📧",
+                    "PasswordReset" => "Password Reset Code 🔑",
+                    _ => "Your Verification Code"
+                },
+                GetString(data, "Purpose") switch
+                {
+                    "PasswordReset" => EmailTemplates.PasswordResetOtp(
+                        fullName,
+                        GetString(data, "OtpCode"),
+                        GetDateTime(data, "ExpiresAtUtc")
+                    ),
+                    _ => EmailTemplates.EmailVerificationOtp(
+                        fullName,
+                        GetString(data, "OtpCode"),
+                        GetString(data, "Purpose"),
+                        GetDateTime(data, "ExpiresAtUtc")
+                    )
+                }
+            ),
+
+            "CardAdded" => (
+                "New Card Added to Your Account 💳",
+                EmailTemplates.CardAdded(
+                    fullName,
+                    GetString(data, "CardNumberLast4"),
+                    GetString(data, "CardHolderName"),
+                    GetDateTime(data, "AddedAt")
+                )
+            ),
+
+            "BillGenerated" => (
+                $"Your Bill is Ready — ₹{GetDecimal(data, "Amount"):N2} Due",
+                EmailTemplates.BillGenerated(
+                    fullName,
+                    GetDecimal(data, "Amount"),
+                    GetDateTime(data, "DueDate"),
+                    GetString(data, "BillId")
+                )
+            ),
+
+            "PaymentOtpGenerated" => (
+                "Payment Verification Required 🔐",
+                EmailTemplates.PaymentOtp(
+                    fullName,
+                    GetDecimal(data, "Amount"),
+                    GetString(data, "OtpCode"),
+                    GetDateTime(data, "ExpiresAtUtc")
+                )
+            ),
+
+            "PaymentCompleted" => (
+                "✅ Payment Successful!",
+                EmailTemplates.PaymentCompleted(
+                    fullName,
+                    GetDecimal(data, "Amount"),
+                    GetDecimal(data, "AmountPaid", GetDecimal(data, "Amount")),
+                    GetDecimal(data, "RewardsRedeemed", 0),
+                    GetString(data, "PaymentId")
+                )
+            ),
+
+            "PaymentFailed" => (
+                "❌ Payment Failed",
+                EmailTemplates.PaymentFailed(
+                    fullName,
+                    GetDecimal(data, "Amount"),
+                    GetString(data, "Reason", "Unknown error occurred"),
+                    GetString(data, "PaymentId")
+                )
+            ),
+
+            "OtpFailed" => (
+                "⚠️ OTP Verification Failed",
+                EmailTemplates.OtpVerificationFailed(
+                    fullName,
+                    GetString(data, "Reason", "Verification could not be completed")
+                )
+            ),
+
+            _ => (
+                eventType,
+                EmailTemplates.BaseTemplate(
+                    eventType,
+                    "You have a new notification from CredVault",
+                    $@"<p style=""margin: 0; color: #1F2937; font-size: 16px;"">
+                        Hello <strong>{fullName}</strong>,
+                    </p>
+                    <p style=""margin: 24px 0; color: #1F2937; font-size: 16px;"">
+                        {eventType}
+                    </p>"
+                )
+            )
         };
     }
 }

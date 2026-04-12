@@ -7,5 +7,6 @@ public record ProcessNotificationCommand(
     string? Email,
     string? FullName,
     object Payload,
-    string? TraceId,
-    string? MessageId = null) : IRequest;
+    string? CorrelationId = null,
+    string? MessageId = null
+) : IRequest;

@@ -9,6 +9,7 @@ namespace PaymentService.Application.Sagas;
 
 public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestrationSagaState>
 {
+    // all states of process -> 10
     public new State Initial { get; private set; } = null!;
     public State AwaitingOtpVerification { get; private set; } = null!;
     public State AwaitingPaymentConfirmation { get; private set; } = null!;
@@ -20,6 +21,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
     public State Compensated { get; private set; } = null!;
     public State Failed { get; private set; } = null!;
 
+    // events -> 15
     public Event<IStartPaymentOrchestration> StartOrchestration { get; private set; } = null!;
     public Event<IOtpVerified> OtpVerified { get; private set; } = null!;
     public Event<IOtpFailed> OtpFailed { get; private set; } = null!;
@@ -38,9 +40,10 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
 
     public PaymentOrchestrationSaga()
     {
-        InstanceState(x => x.CurrentState);
+        InstanceState(x => x.CurrentState);         // use CurrentState property in my saga class -> to track state
 
-        Event(() => StartOrchestration, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
+        // Event() -> massTransit method
+        Event(() => StartOrchestration, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));        // connect incoming message to correct saga instance
         Event(() => OtpVerified, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
         Event(() => OtpFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
         Event(() => PaymentSucceeded, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
@@ -56,10 +59,12 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
         Event(() => RewardRedemptionSucceeded, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
         Event(() => RewardRedemptionFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
 
+        //! ctx.Message -> incoming req : ctx.Saga -> saga obj(to be saved in DB)
         Initially(
             When(StartOrchestration)
                 .Then(ctx =>
                 {
+                    // Copy data from message -> store in saga state
                     ctx.Saga.PaymentId = ctx.Message.PaymentId;
                     ctx.Saga.UserId = ctx.Message.UserId;
                     ctx.Saga.Email = ctx.Message.Email;
@@ -74,11 +79,11 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.CreatedAtUtc = DateTime.UtcNow;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
-                .TransitionTo(AwaitingOtpVerification)
+                .TransitionTo(AwaitingOtpVerification)          // saga waits for OTP
         );
 
         During(AwaitingOtpVerification,
-            When(OtpVerified)
+            When(OtpVerified)                                   // if OTP correct
                 .Then(ctx =>
                 {
                     ctx.Saga.OtpVerified = true;
@@ -302,7 +307,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
             When(RevertBillFailed)
                 .Then(ctx =>
                 {
-                    ctx.Saga.CompensationAttempts++;
+                    ctx.Saga.CompensationAttempts++;                // retry upto 3 times
                     ctx.Saga.CompensationReason += $" | Bill revert failed: {ctx.Message.Reason}";
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
@@ -409,3 +414,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
         SetCompletedWhenFinalized();
     }
 }
+
+
+// bill revert -> 3 times
+// payment revert -> 5 times

@@ -2,9 +2,21 @@
 
 System: CredVault Credit Card Platform
 
-Document version: 2.0 (submission draft)
+Document version: 2.1
 Prepared for: Sprint architecture review
-Date: 2026-04-10
+Date: 2026-04-12
+
+## Changelog
+
+### v2.1 (2026-04-12)
+- Updated database FK counts to reflect fixes
+- Added 2 missing same-DB FKs to BillingDbContext:
+  - `RewardAccounts.RewardTierId -> RewardTiers.Id`
+  - `Statements.BillId -> Bills.Id`
+- Migration: `AddMissingForeignKeys` applied to `credvault_billing`
+
+### v2.0 (2026-04-10)
+- Initial release
 
 ## 1. Problem Statement and Goals
 

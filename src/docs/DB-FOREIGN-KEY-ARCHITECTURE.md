@@ -7,15 +7,45 @@ This document shows the current SQL database architecture from EF Core `DbContex
 3. Key columns in each table
 4. Relationship type and cardinality (`1:N`, `N:1`, `1:1`)
 
+## Last Updated
+**Date:** 2026-04-12
+**Changes:** Added 2 missing FKs to BillingDbContext via migration `AddMissingForeignKeys`
+
+---
+
 ## Database Overview
 
 | Service | Database | Tables | SQL FK Count |
 |---|---|---:|---:|
-| Billing | `credvault_billing` | 6 | 3 |
+| Billing | `credvault_billing` | 6 | **5** (was 3, fixed +2) |
 | Card | `credvault_cards` | 3 | 2 |
 | Payment | `credvault_payments` | 3 | 1 |
 | Identity | `credvault_identity` | 1 | 0 |
 | Notification | `credvault_notifications` | 2 | 0 |
+
+---
+
+## Migration History
+
+### 2026-04-12: AddMissingForeignKeys
+
+**Fixed 2 missing same-DB foreign keys in `credvault_billing`:**
+
+| Table | Missing FK | Now References | Status |
+|-------|------------|----------------|--------|
+| `RewardAccounts` | `RewardTierId` | `RewardTiers.Id` | ✅ Fixed |
+| `Statements` | `BillId` | `Bills.Id` | ✅ Fixed |
+
+**Files Modified:**
+- `BillingService.Domain/Entities/Bill.cs` - Added `ICollection<Statement> Statements` navigation
+- `BillingService.Domain/Entities/RewardAccount.cs` - Added `RewardTier? RewardTier` navigation
+- `BillingService.Domain/Entities/Statement.cs` - Added `Bill? Bill` navigation
+- `BillingService.Infrastructure/Persistence/Sql/BillingDbContext.cs` - Added FK configurations
+
+**Migration File:**
+- `BillingService.Infrastructure/Migrations/20260412100953_AddMissingForeignKeys.cs`
+
+---
 
 ## Global Architecture Diagram
 
@@ -32,6 +62,8 @@ flowchart LR
         B2 -->|1:N| B4
         B1 -->|1:N optional| B4
         B5 -->|1:N| B6
+        B2 -->|RewardTierId FK| B3
+        B5 -->|BillId FK| B1
     end
 
     subgraph C[credvault_cards]
@@ -60,6 +92,8 @@ flowchart LR
         N2[NotificationLogs]
     end
 ```
+
+---
 
 ## Detailed ER Diagrams By Database
 
@@ -100,7 +134,7 @@ erDiagram
     RewardAccounts {
         uniqueidentifier Id PK
         uniqueidentifier UserId
-        uniqueidentifier RewardTierId
+        uniqueidentifier RewardTierId FK "-> RewardTiers.Id"
         decimal PointsBalance
         datetime CreatedAtUtc
         datetime UpdatedAtUtc
@@ -108,8 +142,8 @@ erDiagram
 
     RewardTransactions {
         uniqueidentifier Id PK
-        uniqueidentifier RewardAccountId FK
-        uniqueidentifier BillId FK
+        uniqueidentifier RewardAccountId FK "-> RewardAccounts.Id"
+        uniqueidentifier BillId FK "-> Bills.Id"
         decimal Points
         int Type
         datetime CreatedAtUtc
@@ -120,7 +154,7 @@ erDiagram
         uniqueidentifier Id PK
         uniqueidentifier UserId
         uniqueidentifier CardId
-        uniqueidentifier BillId
+        uniqueidentifier BillId FK "-> Bills.Id"
         string StatementPeriod
         string CardLast4
         string CardNetwork
@@ -149,7 +183,7 @@ erDiagram
 
     StatementTransactions {
         uniqueidentifier Id PK
-        uniqueidentifier StatementId FK
+        uniqueidentifier StatementId FK "-> Statements.Id"
         string Type
         decimal Amount
         string Description
@@ -161,6 +195,8 @@ erDiagram
     RewardAccounts ||--o{ RewardTransactions : "1:N via RewardAccountId"
     Bills ||--o{ RewardTransactions : "1:N via BillId (nullable FK)"
     Statements ||--o{ StatementTransactions : "1:N via StatementId"
+    RewardTiers ||--o{ RewardAccounts : "1:N via RewardTierId"
+    Statements ||--o{ Bills : "1:N via BillId (nullable FK)"
 ```
 
 ### Card Database (`credvault_cards`)
@@ -178,7 +214,7 @@ erDiagram
     CreditCards {
         uniqueidentifier Id PK
         uniqueidentifier UserId
-        uniqueidentifier IssuerId FK
+        uniqueidentifier IssuerId FK "-> CardIssuers.Id"
         string CardholderName
         string Last4
         string MaskedNumber
@@ -199,7 +235,7 @@ erDiagram
 
     CardTransactions {
         uniqueidentifier Id PK
-        uniqueidentifier CardId FK
+        uniqueidentifier CardId FK "-> CreditCards.Id"
         uniqueidentifier UserId
         int Type
         decimal Amount
@@ -233,7 +269,7 @@ erDiagram
 
     Transactions {
         uniqueidentifier Id PK
-        uniqueidentifier PaymentId FK
+        uniqueidentifier PaymentId FK "-> Payments.Id"
         uniqueidentifier UserId
         decimal Amount
         int Type
@@ -322,12 +358,18 @@ erDiagram
     }
 ```
 
+---
+
 ## Relationship Cardinality Matrix
+
+### SQL Foreign Keys (Enforced at Database Level)
 
 | Database | Parent Table | Child Table | FK Column | Parent to Child | Child to Parent | On Delete |
 |---|---|---|---|---|---|---|
+| `credvault_billing` | `RewardTiers` | `RewardAccounts` | `RewardTierId` | `1:N` | `N:1` | `RESTRICT` |
+| `credvault_billing` | `Bills` | `RewardTransactions` | `BillId` (nullable) | `1:N` | `N:1` | `RESTRICT` |
 | `credvault_billing` | `RewardAccounts` | `RewardTransactions` | `RewardAccountId` | `1:N` | `N:1` | `CASCADE` |
-| `credvault_billing` | `Bills` | `RewardTransactions` | `BillId` (nullable) | `1:N` (optional link) | `N:1` (optional) | `RESTRICT` |
+| `credvault_billing` | `Bills` | `Statements` | `BillId` (nullable) | `1:N` | `N:1` | `RESTRICT` |
 | `credvault_billing` | `Statements` | `StatementTransactions` | `StatementId` | `1:N` | `N:1` | `CASCADE` |
 | `credvault_cards` | `CardIssuers` | `CreditCards` | `IssuerId` | `1:N` | `N:1` | `RESTRICT` |
 | `credvault_cards` | `CreditCards` | `CardTransactions` | `CardId` | `1:N` | `N:1` | `RESTRICT` |
@@ -335,29 +377,40 @@ erDiagram
 
 Current schema has no `1:1` SQL foreign key relationship.
 
-## Important Architecture Note
+---
 
-You will see many cross-service ID columns like `UserId`, `BillId`, and `CardId` in multiple databases. These are application-level references for microservice boundaries, not SQL-enforced foreign keys across databases.
+## Cross-Service References (Application-Level)
 
-## Logical Links Without SQL FK Constraint
+These columns reference entities in OTHER databases - SQL cannot enforce FKs across databases.
 
-These columns look relational but are not enforced as SQL foreign keys in the current model:
-
-| Database | Table.Column | Logical Target | Notes |
+| Database | Table.Column | Logical Target | Type |
 |---|---|---|---|
-| `credvault_billing` | `RewardAccounts.RewardTierId` | `RewardTiers.Id` | Same DB reference pattern, no FK configured |
-| `credvault_billing` | `Statements.BillId` | `Bills.Id` | Same DB reference pattern, no FK configured |
-| `credvault_payments` | `PaymentOrchestrationSagas.PaymentId` | `Payments.Id` | Workflow/saga linkage, no FK configured |
-| `credvault_payments` | `Payments.BillId` | Billing `Bills.Id` | Cross-service ID reference |
-| `credvault_payments` | `Payments.CardId` | Card `CreditCards.Id` | Cross-service ID reference |
-| `credvault_cards` | `CreditCards.UserId` | Identity `identity_users.Id` | Cross-service ID reference |
-| `credvault_billing` | `Bills.UserId` / `Statements.UserId` | Identity `identity_users.Id` | Cross-service ID references |
-| `credvault_notifications` | `NotificationLogs.UserId` | Identity `identity_users.Id` | Cross-service ID reference |
+| `credvault_billing` | `Bills.UserId` | `identity_users.Id` | Cross-service |
+| `credvault_billing` | `Bills.CardId` | `credit_cards.Id` | Cross-service |
+| `credvault_billing` | `Bills.IssuerId` | `card_issuers.Id` | Cross-service |
+| `credvault_billing` | `Statements.UserId` | `identity_users.Id` | Cross-service |
+| `credvault_billing` | `Statements.CardId` | `credit_cards.Id` | Cross-service |
+| `credvault_billing` | `RewardTiers.IssuerId` | `card_issuers.Id` | Cross-service |
+| `credvault_cards` | `CreditCards.UserId` | `identity_users.Id` | Cross-service |
+| `credvault_cards` | `CardTransactions.UserId` | `identity_users.Id` | Cross-service |
+| `credvault_payments` | `Payments.UserId` | `identity_users.Id` | Cross-service |
+| `credvault_payments` | `Payments.CardId` | `credit_cards.Id` | Cross-service |
+| `credvault_payments` | `Payments.BillId` | `bills.Id` | Cross-service |
+| `credvault_payments` | `PaymentOrchestrationSagas.UserId` | `identity_users.Id` | Cross-service |
+| `credvault_payments` | `PaymentOrchestrationSagas.CardId` | `credit_cards.Id` | Cross-service |
+| `credvault_payments` | `PaymentOrchestrationSagas.BillId` | `bills.Id` | Cross-service |
+| `credvault_notifications` | `NotificationLogs.UserId` | `identity_users.Id` | Cross-service |
+| `credvault_notifications` | `AuditLogs.UserId` | `identity_users.Id` | Cross-service |
 
-## Source of Truth Used
+**Note:** Cross-service references are validated at the application layer via API calls or event payloads.
+
+---
+
+## Source Files
 
 - `server/services/billing-service/BillingService.Infrastructure/Persistence/Sql/BillingDbContext.cs`
 - `server/services/billing-service/BillingService.Infrastructure/Persistence/Sql/Migrations/BillingDbContextModelSnapshot.cs`
+- `server/services/billing-service/BillingService.Infrastructure/Migrations/20260412100953_AddMissingForeignKeys.cs`
 - `server/services/card-service/CardService.Infrastructure/Persistence/Sql/CardDbContext.cs`
 - `server/services/card-service/CardService.Infrastructure/Persistence/Sql/Migrations/CardDbContextModelSnapshot.cs`
 - `server/services/payment-service/PaymentService.Infrastructure/Persistence/Sql/PaymentDbContext.cs`

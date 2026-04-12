@@ -2,9 +2,19 @@
 
 System: CredVault Credit Card Platform
 
-Document version: 2.0 (submission draft)
+Document version: 2.1
 Prepared for: Sprint engineering review
-Date: 2026-04-10
+Date: 2026-04-12
+
+## Changelog
+
+### v2.1 (2026-04-12)
+- Updated database schema to reflect FK fixes
+- `RewardAccounts.RewardTierId` now has FK to `RewardTiers.Id`
+- `Statements.BillId` now has FK to `Bills.Id`
+
+### v2.0 (2026-04-10)
+- Initial release
 
 ## 1. Detailed Requirements and Edge Cases
 
@@ -293,7 +303,7 @@ Table: RewardAccounts
 
 - Id (PK)
 - UserId
-- RewardTierId (logical reference)
+- RewardTierId (FK -> RewardTiers.Id)
 - PointsBalance
 - CreatedAtUtc
 - UpdatedAtUtc
@@ -313,7 +323,7 @@ Table: Statements
 - Id (PK)
 - UserId
 - CardId
-- BillId (logical reference)
+- BillId (FK -> Bills.Id, nullable)
 - StatementPeriod
 - CardLast4
 - CardNetwork

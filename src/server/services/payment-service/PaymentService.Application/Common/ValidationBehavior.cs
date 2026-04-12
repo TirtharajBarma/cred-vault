@@ -3,6 +3,16 @@ using MediatR;
 
 namespace PaymentService.Application.Common;
 
+//! middleware for mediatR that automatically validate every request before it reaches to handler
+
+// Request
+// |
+// ValidationBehavior
+// |
+// Handler
+// |
+// response
+
 public sealed class ValidationBehavior<TRequest, TResponse>(IEnumerable<IValidator<TRequest>> validators)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull

@@ -38,7 +38,7 @@ export class IssuerManagementComponent implements OnInit, OnDestroy {
 
     return source.filter((issuer) => {
       const name = String(issuer?.name ?? '').toLowerCase();
-      const network = String(issuer?.network ?? '').toLowerCase();
+      const network = this.getNetworkName(issuer?.network).toLowerCase();
       return name.includes(query) || network.includes(query);
     });
   });
@@ -80,7 +80,7 @@ export class IssuerManagementComponent implements OnInit, OnDestroy {
       this.editingIssuer.set(issuer);
       this.issuerForm.patchValue({
         name: issuer.name,
-        network: issuer.network === 'Visa' || issuer.network === 1 ? 1 : 2
+        network: this.toNetworkValue(issuer.network)
       });
     } else {
       this.isEditMode.set(false);
@@ -193,6 +193,25 @@ export class IssuerManagementComponent implements OnInit, OnDestroy {
         this.deleteTargetName.set('');
       }
     });
+  }
+
+  getNetworkName(network: unknown): string {
+    const normalized = String(network ?? '').trim().toLowerCase();
+
+    if (normalized === '1' || normalized === 'visa') {
+      return 'Visa';
+    }
+
+    if (normalized === '2' || normalized === 'mastercard') {
+      return 'Mastercard';
+    }
+
+    return normalized ? String(network) : 'Unknown';
+  }
+
+  private toNetworkValue(network: unknown): number {
+    const normalized = String(network ?? '').trim().toLowerCase();
+    return normalized === '2' || normalized === 'mastercard' ? 2 : 1;
   }
 
   private showSuccess(message: string) {
