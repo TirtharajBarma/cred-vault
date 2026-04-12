@@ -37,6 +37,7 @@ public class RevertBillPaidCommandHandler(
         }
 
         // Revert rewards - find the reward transaction for this bill and reverse it
+        // rewards transaction obj
         var rewardTx = await rewardRepository.GetTransactionByBillIdAsync(request.BillId, cancellationToken);
         if (rewardTx != null)
         {

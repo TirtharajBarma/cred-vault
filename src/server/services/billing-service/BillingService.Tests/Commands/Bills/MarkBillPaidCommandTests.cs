@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Contracts.Models;
 using Shared.Contracts.Exceptions;
+using Shared.Contracts.Enums;
 
 namespace BillingService.Tests.Commands.Bills;
 
@@ -48,10 +49,11 @@ public class MarkBillPaidCommandTests
     }
 
     [Fact]
-    public async Task Handle_AlreadyPaid_ReturnsSuccess()
+    public async Task Handle_AlreadyPaid_ReturnsSuccessWithNoChange()
     {
         var bill = CreateTestBill();
         bill.Status = Domain.Entities.BillStatus.Paid;
+        bill.AmountPaid = bill.Amount;
         _billRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(bill);
         _rewardRepositoryMock.Setup(x => x.HasTransactionForBillAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -107,24 +109,134 @@ public class MarkBillPaidCommandTests
     }
 
     [Fact]
-    public async Task Handle_Success_PaysBill()
+    public async Task Handle_PartialPayment_LeavesBillAsPartiallyPaid()
+    {
+        // Arrange: Bill with 500 amount, 0 paid
+        var bill = CreateTestBill();
+        bill.Amount = 500;
+        bill.MinDue = 50;
+        bill.AmountPaid = 0;
+        bill.Status = Domain.Entities.BillStatus.Pending;
+        
+        _billRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(bill);
+        _rewardRepositoryMock.Setup(x => x.HasTransactionForBillAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _rewardRepositoryMock.Setup(x => x.GetBestMatchingTierAsync(It.IsAny<CardNetwork>(), It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RewardTier?)null);
+        _statementRepositoryMock.Setup(x => x.GetByBillIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Statement?)null);
+
+        // Act: Pay only 50 (minimum due) on a 500 bill
+        var command = new MarkBillPaidCommand(bill.UserId, bill.Id, 50);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        bill.AmountPaid.Should().Be(50);
+        bill.Status.Should().Be(Domain.Entities.BillStatus.PartiallyPaid);
+        result.Message.Should().Contain("Remaining");
+    }
+
+    [Fact]
+    public async Task Handle_SecondPartialPayment_UpdatesBillStatus()
+    {
+        // Arrange: Bill with 500 amount, already paid 50
+        var bill = CreateTestBill();
+        bill.Amount = 500;
+        bill.MinDue = 50;
+        bill.AmountPaid = 50;
+        bill.Status = Domain.Entities.BillStatus.PartiallyPaid;
+        
+        _billRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(bill);
+        _rewardRepositoryMock.Setup(x => x.HasTransactionForBillAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _rewardRepositoryMock.Setup(x => x.GetBestMatchingTierAsync(It.IsAny<CardNetwork>(), It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RewardTier?)null);
+        _statementRepositoryMock.Setup(x => x.GetByBillIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Statement?)null);
+
+        // Act: Pay remaining 450 to fully settle
+        var command = new MarkBillPaidCommand(bill.UserId, bill.Id, 450);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        bill.AmountPaid.Should().Be(500);
+        bill.Status.Should().Be(Domain.Entities.BillStatus.Paid);
+        bill.PaidAtUtc.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Handle_FullPayment_SetsStatusToPaid()
     {
         var bill = CreateTestBill();
+        bill.Amount = 500;
         bill.AmountPaid = 0;
         _billRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(bill);
         _rewardRepositoryMock.Setup(x => x.HasTransactionForBillAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        _rewardRepositoryMock.Setup(x => x.GetBestMatchingTierAsync(It.IsAny<Shared.Contracts.Enums.CardNetwork>(), It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Domain.Entities.RewardTier?)null);
+        _rewardRepositoryMock.Setup(x => x.GetBestMatchingTierAsync(It.IsAny<CardNetwork>(), It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RewardTier?)null);
         _statementRepositoryMock.Setup(x => x.GetByBillIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Domain.Entities.Statement?)null);
+            .ReturnsAsync((Statement?)null);
 
-        var command = new MarkBillPaidCommand(bill.UserId, bill.Id, 100);
-
+        var command = new MarkBillPaidCommand(bill.UserId, bill.Id, 500);
         var result = await _handler.Handle(command, CancellationToken.None);
 
         result.Success.Should().BeTrue();
+        bill.Status.Should().Be(Domain.Entities.BillStatus.Paid);
+        bill.PaidAtUtc.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Handle_PaymentExceedsBillAmount_CapsAtBillAmount()
+    {
+        var bill = CreateTestBill();
+        bill.Amount = 500;
+        bill.AmountPaid = 0;
+        _billRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(bill);
+        _rewardRepositoryMock.Setup(x => x.HasTransactionForBillAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _rewardRepositoryMock.Setup(x => x.GetBestMatchingTierAsync(It.IsAny<CardNetwork>(), It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RewardTier?)null);
+        _statementRepositoryMock.Setup(x => x.GetByBillIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Statement?)null);
+
+        var command = new MarkBillPaidCommand(bill.UserId, bill.Id, 600);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        bill.AmountPaid.Should().Be(500); // Capped at bill amount
+        bill.Status.Should().Be(Domain.Entities.BillStatus.Paid);
+    }
+
+    [Fact]
+    public async Task Handle_PartialPaymentExceedsBillAmount_CapsAndMarksPaid()
+    {
+        var bill = CreateTestBill();
+        bill.Amount = 500;
+        bill.AmountPaid = 400;
+        bill.Status = Domain.Entities.BillStatus.PartiallyPaid;
+        _billRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(bill);
+        _rewardRepositoryMock.Setup(x => x.HasTransactionForBillAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _rewardRepositoryMock.Setup(x => x.GetBestMatchingTierAsync(It.IsAny<CardNetwork>(), It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RewardTier?)null);
+        _statementRepositoryMock.Setup(x => x.GetByBillIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Statement?)null);
+
+        // Pay 200 when only 100 remaining
+        var command = new MarkBillPaidCommand(bill.UserId, bill.Id, 200);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        bill.AmountPaid.Should().Be(500); // Capped
+        bill.Status.Should().Be(Domain.Entities.BillStatus.Paid);
     }
 
     private static Bill CreateTestBill() => new()
@@ -132,7 +244,7 @@ public class MarkBillPaidCommandTests
         Id = Guid.NewGuid(),
         UserId = Guid.NewGuid(),
         CardId = Guid.NewGuid(),
-        CardNetwork = Shared.Contracts.Enums.CardNetwork.Visa,
+        CardNetwork = CardNetwork.Visa,
         IssuerId = Guid.NewGuid(),
         Amount = 500,
         MinDue = 50,

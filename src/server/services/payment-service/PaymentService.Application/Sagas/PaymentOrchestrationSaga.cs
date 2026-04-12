@@ -102,6 +102,16 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .TransitionTo(Failed)
+                .PublishAsync(ctx => ctx.Init<IPaymentFailed>(new
+                {
+                    PaymentId = ctx.Saga.PaymentId,
+                    ctx.Saga.UserId,
+                    Email = ctx.Saga.Email ?? string.Empty,
+                    FullName = ctx.Saga.FullName ?? "User",
+                    ctx.Saga.Amount,
+                    Reason = ctx.Saga.CompensationReason ?? "OTP verification failed",
+                    FailedAt = DateTime.UtcNow
+                }))
         );
 
         During(AwaitingPaymentConfirmation,
@@ -129,6 +139,16 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .TransitionTo(Failed)
+                .PublishAsync(ctx => ctx.Init<IPaymentFailed>(new
+                {
+                    PaymentId = ctx.Saga.PaymentId,
+                    ctx.Saga.UserId,
+                    Email = ctx.Saga.Email ?? string.Empty,
+                    FullName = ctx.Saga.FullName ?? "User",
+                    ctx.Saga.Amount,
+                    Reason = ctx.Saga.CompensationReason ?? "Payment processing failed",
+                    FailedAt = DateTime.UtcNow
+                }))
         );
 
         During(AwaitingBillUpdate,
@@ -287,7 +307,18 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .If(ctx => ctx.Saga.CompensationAttempts >= 3,
-                    x => x.TransitionTo(Failed))
+                    x => x.TransitionTo(Failed)
+                        .PublishAsync(ctx => ctx.Init<IPaymentFailed>(new
+                        {
+                            PaymentId = ctx.Saga.PaymentId,
+                            ctx.Saga.UserId,
+                            Email = ctx.Saga.Email ?? string.Empty,
+                            FullName = ctx.Saga.FullName ?? "User",
+                            ctx.Saga.Amount,
+                            Reason = $"Compensation failed after 3 attempts: {ctx.Saga.CompensationReason}",
+                            FailedAt = DateTime.UtcNow
+                        }))
+                )
                 .If(ctx => ctx.Saga.CompensationAttempts < 3,
                     x => x.TransitionTo(Compensating)
                         .PublishAsync(ctx => ctx.Init<IRevertBillUpdateRequested>(new
@@ -328,7 +359,18 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .If(ctx => ctx.Saga.CompensationAttempts >= 5,
-                    x => x.TransitionTo(Failed))
+                    x => x.TransitionTo(Failed)
+                        .PublishAsync(ctx => ctx.Init<IPaymentFailed>(new
+                        {
+                            PaymentId = ctx.Saga.PaymentId,
+                            ctx.Saga.UserId,
+                            Email = ctx.Saga.Email ?? string.Empty,
+                            FullName = ctx.Saga.FullName ?? "User",
+                            ctx.Saga.Amount,
+                            Reason = $"Compensation failed after 5 attempts: {ctx.Saga.CompensationReason}",
+                            FailedAt = DateTime.UtcNow
+                        }))
+                )
                 .If(ctx => ctx.Saga.CompensationAttempts < 5,
                     x => x.TransitionTo(Compensating)
                         .PublishAsync(ctx => ctx.Init<IRevertPaymentRequested>(new

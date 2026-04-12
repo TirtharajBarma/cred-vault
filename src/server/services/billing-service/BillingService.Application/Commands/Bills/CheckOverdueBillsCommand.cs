@@ -16,41 +16,51 @@ public record OverdueCheckResult(int BillsChecked, int OverdueCount);
 public class CheckOverdueBillsCommandHandler(
     IBillRepository bills,
     IStatementRepository statements,
-    IUnitOfWork unitOfWork,
+    IUnitOfWork unitOfWork,             // commit DB changes
     IPublishEndpoint publisher,
     ILogger<CheckOverdueBillsCommandHandler> logger
 ) : IRequestHandler<CheckOverdueBillsCommand, ApiResponse<OverdueCheckResult>>
 {
+    
+    // go through all unpaid bills -> if due date is passes -> mark them overdue
     public async Task<ApiResponse<OverdueCheckResult>> Handle(CheckOverdueBillsCommand request, CancellationToken ct)
     {
         logger.LogInformation("CheckOverdueBillsCommand triggered");
 
-        var pendingBills = await GetPendingBillsAsync(ct);
+        var pendingBills = await GetPendingBillsAsync(ct);      // fetch all pending bill
         var overdueCount = 0;
 
         foreach (var bill in pendingBills)
         {
-            if (bill.DueDateUtc < DateTime.UtcNow)
+            if (bill.DueDateUtc < DateTime.UtcNow)      // if due
             {
-                var outstandingAmount = Math.Max(0m, bill.Amount - (bill.AmountPaid ?? 0m));
+                var outstandingAmount = Math.Max(0m, bill.Amount - (bill.AmountPaid ?? 0m));    // calculate remaining amt
+                // remaining amt = total - paid ("??" if null -> treat as 0), : .max() -> avoid negative 
+                
+                // if nothing is left -> skip
                 if (outstandingAmount <= 0m)
                 {
                     continue;
                 }
 
                 var normalizedStatus = BillingStatusReconciliation.ResolveBillStatus(bill, DateTime.UtcNow);
+                
+                // force to overdue [safety]
                 if (normalizedStatus != BillStatus.Overdue)
                 {
                     normalizedStatus = BillStatus.Overdue;
                 }
 
+                // currentState different from new state?
                 if (bill.Status != normalizedStatus)
                 {
-                    bill.Status = normalizedStatus;
+                    bill.Status = normalizedStatus;     // pending → Overdue
                     bill.UpdatedAtUtc = DateTime.UtcNow;
                     await bills.UpdateAsync(bill, ct);
                 }
 
+
+                // fetch linked statement
                 var statement = await statements.GetByBillIdAsync(bill.Id, ct);
                 if (statement != null)
                 {
@@ -63,6 +73,7 @@ public class CheckOverdueBillsCommandHandler(
                     await statements.UpdateAsync(statement, ct);
                 }
 
+                // calculate difference between today and bill data
                 var daysOverdue = Math.Max(1, (int)(DateTime.UtcNow.Date - bill.DueDateUtc.Date).TotalDays);
 
                 await publisher.Publish<IBillOverdueDetected>(new

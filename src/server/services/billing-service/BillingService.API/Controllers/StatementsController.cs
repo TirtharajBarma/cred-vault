@@ -123,7 +123,7 @@ public class StatementsController(IMediator mediator) : BaseApiController
         CancellationToken cancellationToken)
     {
         var statement = await db.Statements
-            .AsNoTracking()
+            .AsNoTracking()                     // fetch data from db but don;t trace
             .FirstOrDefaultAsync(x => x.Id == statementId, cancellationToken);
 
         if (statement is null)

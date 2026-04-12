@@ -31,6 +31,12 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
             .ThenByDescending(x => x.RewardRate)        // Higher reward rate for same MinSpend
             .FirstOrDefaultAsync(cancellationToken);
     }
+    // match card network
+    // match issuer
+    // is active for that date
+    // prefer issuer-specific
+    // prefer higher spend tier
+    // prefer higher reward rate
 
     public async Task<RewardTier?> GetTierByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {

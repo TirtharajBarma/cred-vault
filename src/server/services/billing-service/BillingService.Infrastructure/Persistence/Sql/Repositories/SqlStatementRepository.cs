@@ -71,7 +71,7 @@ public sealed class SqlStatementRepository(BillingDbContext dbContext) : IStatem
 
     public async Task AddTransactionsAsync(List<StatementTransaction> transactions, CancellationToken ct = default)
     {
-        await dbContext.StatementTransactions.AddRangeAsync(transactions, ct);
+        await dbContext.StatementTransactions.AddRangeAsync(transactions, ct);      // add multiple records to EF core tracking
     }
 
     public Task UpdateAsync(Statement statement, CancellationToken ct = default)

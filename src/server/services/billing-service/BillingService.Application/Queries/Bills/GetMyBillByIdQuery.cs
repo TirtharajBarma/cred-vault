@@ -21,7 +21,7 @@ public class GetMyBillByIdQueryHandler(IBillRepository billRepository)
             throw new NotFoundException("Bill", request.BillId);
         }
 
-        bill.Status = BillingStatusReconciliation.ResolveBillStatus(bill, DateTime.UtcNow);
+        bill.Status = BillingStatusReconciliation.ResolveBillStatus(bill, DateTime.UtcNow);     // resolve bill status with helper function
 
         return new ApiResponse<Bill>
         {

@@ -21,6 +21,7 @@ public sealed class DeleteRewardTierCommandHandler(IRewardRepository rewardRepos
             };
         }
 
+        // remove this tier from all user using it
         var accounts = await rewardRepository.GetAccountsByTierIdAsync(request.Id, cancellationToken);
         foreach (var account in accounts)
         {

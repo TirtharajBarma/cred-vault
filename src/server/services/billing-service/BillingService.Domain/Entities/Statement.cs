@@ -23,6 +23,7 @@ public class Statement
     public Guid CardId { get; set; }
 
     public Guid? BillId { get; set; }
+    public Bill? Bill { get; set; }
 
     [Required]
     [MaxLength(100)]

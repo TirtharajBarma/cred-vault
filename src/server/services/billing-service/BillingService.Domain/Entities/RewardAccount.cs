@@ -6,6 +6,7 @@ public sealed class RewardAccount
     public Guid UserId { get; set; }
 
     public Guid? RewardTierId { get; set; }
+    public RewardTier? RewardTier { get; set; }
 
     public decimal PointsBalance { get; set; }
 

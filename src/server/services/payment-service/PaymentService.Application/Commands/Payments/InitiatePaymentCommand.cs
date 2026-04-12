@@ -51,13 +51,15 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, "Amount must be greater than zero");
         }
 
-        var bill = await FetchBillAsync(request.BillId, request.AuthorizationHeader, cancellationToken);
+        var billResult = await FetchBillAsync(request.BillId, request.AuthorizationHeader, cancellationToken);
         
-        if (bill is null)
+        if (billResult.Bill is null)
         {
-            logger.LogWarning("Payment rejected: could not verify bill {BillId}", request.BillId);
-            return new InitiatePaymentResult(false, null, "Could not verify bill with Billing Service");
+            logger.LogWarning("Payment rejected: could not verify bill {BillId} - {Error}", request.BillId, billResult.Error);
+            return new InitiatePaymentResult(false, null, billResult.Error ?? "Could not verify bill with Billing Service");
         }
+
+        var bill = billResult.Bill;
 
         if (bill.UserId != request.UserId)
         {
@@ -185,34 +187,78 @@ public class InitiatePaymentCommandHandler(
         return RandomNumberGenerator.GetInt32(100000, 999999).ToString();
     }
 
-    private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
+    private record FetchBillResult(BillDto? Bill, string? Error, int StatusCode);
+
+    private async Task<FetchBillResult> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
     {
         try
         {
             var client = httpClientFactory.CreateClient();
             var baseUrl = configuration["Services:BillingService"] ?? "http://localhost:5003";
             client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromSeconds(10);
 
             var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/billing/bills/{billId}");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
             var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode)
+            
+            var content = await response.Content.ReadAsStringAsync(ct);
+
+            switch (response.StatusCode)
             {
-                logger.LogWarning("Billing service returned {Status} for Bill {BillId}", response.StatusCode, billId);
-                return null;
+                case System.Net.HttpStatusCode.NotFound:
+                    logger.LogWarning("Bill {BillId} not found in Billing Service", billId);
+                    return new FetchBillResult(null, "Bill not found", 404);
+
+                case System.Net.HttpStatusCode.Forbidden:
+                case System.Net.HttpStatusCode.Unauthorized:
+                    logger.LogWarning("Unauthorized access to bill {BillId}", billId);
+                    return new FetchBillResult(null, "Unauthorized access to bill", 403);
+
+                case System.Net.HttpStatusCode.BadRequest:
+                    logger.LogWarning("Bad request for bill {BillId}: {Content}", billId, content);
+                    return new FetchBillResult(null, "Invalid bill data", 400);
+
+                case System.Net.HttpStatusCode.InternalServerError:
+                case System.Net.HttpStatusCode.ServiceUnavailable:
+                    logger.LogError("Billing service error {Status} for Bill {BillId}: {Content}", response.StatusCode, billId, content);
+                    return new FetchBillResult(null, "Billing service temporarily unavailable", (int)response.StatusCode);
+
+                default:
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        logger.LogWarning("Billing service returned {Status} for Bill {BillId}", response.StatusCode, billId);
+                        return new FetchBillResult(null, $"Billing service error: {response.StatusCode}", (int)response.StatusCode);
+                    }
+                    break;
             }
 
-            var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<Shared.Contracts.Models.ApiResponse<BillDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
-            return result?.Data;
+            if (result?.Data == null)
+            {
+                logger.LogWarning("Bill {BillId} returned null data from Billing Service", billId);
+                return new FetchBillResult(null, "Bill data not available", 0);
+            }
+            
+            return new FetchBillResult(result.Data, null, 200);
+        }
+        catch (TaskCanceledException)
+        {
+            logger.LogError("Timeout fetching bill {BillId} from Billing Service", billId);
+            return new FetchBillResult(null, "Billing service request timed out", 408);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Network error fetching bill {BillId} from Billing Service", billId);
+            return new FetchBillResult(null, "Unable to connect to Billing Service", 503);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Exception fetching bill {BillId} from Billing Service", billId);
-            return null;
+            return new FetchBillResult(null, "Failed to verify bill", 500);
         }
     }
 

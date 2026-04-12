@@ -7,6 +7,7 @@ using PaymentService.Domain.Entities;
 using PaymentService.Infrastructure.Persistence.Sql.Repositories;
 using PaymentService.Infrastructure.Messaging.Consumers;
 using PaymentService.Infrastructure.Messaging;
+using PaymentService.Infrastructure.BackgroundJobs;
 using PaymentService.Application.Common;
 using PaymentService.Application.Commands.Payments;
 using FluentValidation;
@@ -59,6 +60,8 @@ try
     builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
     builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PaymentDbContext>());
+    
+    builder.Services.AddHostedService<PaymentExpirationBackgroundJob>();
 
     builder.Services.AddMediatR(cfg =>
     {
