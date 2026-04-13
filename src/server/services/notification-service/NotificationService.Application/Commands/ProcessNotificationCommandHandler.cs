@@ -1,4 +1,4 @@
-using MediatR;
+ using MediatR;
 using NotificationService.Application.Interfaces;
 using NotificationService.Domain.Entities;
 using NotificationService.Application.Services;
@@ -14,10 +14,12 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
     {
         var traceId = request.MessageId ?? Guid.NewGuid().ToString();
         var userId = ExtractUserId(request.Payload);
-        var payloadDict = DeserializePayload(request.Payload);
+        var payloadDict = DeserializePayload(request.Payload);      // convert payload -> dictionary
 
         logger.LogInformation("Processing {EventType} for {Email}, UserId={UserId}, TraceId={TraceId}", 
             request.EventType, request.Email, userId, traceId);
+
+        // request.EventType -> "UserRegistered", "PaymentCompleted", "OtpFailed"
 
         db.AddAuditLog(new AuditLog
         {
@@ -25,7 +27,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             EntityName = request.EventType,
             EntityId = request.MessageId ?? "Event",
             Action = "Received",
-            UserId = userId?.ToString() ?? request.Email ?? $"unknown-{request.EventType}",
+            UserId = userId?.ToString() ?? request.Email ?? $"unknown-{request.EventType}",     // priority -> UserId, Email, fallback string
             Changes = JsonConvert.SerializeObject(new { request.Payload, MessageId = request.MessageId, ReceivedAt = DateTime.UtcNow }),
             TraceId = traceId,
             CreatedAtUtc = DateTime.UtcNow
@@ -48,10 +50,10 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
             var (subject, body) = GenerateEmail(request.EventType, request.FullName ?? "User", payloadDict);
-            var (success, error) = await email.SendEmailAsync(request.Email, subject, body, ct);
+            var (success, error) = await email.SendEmailAsync(request.Email, subject, body, ct);        // send email
 
             notificationLog.IsSuccess = success;
-            notificationLog.Subject = success ? subject : request.EventType;
+            notificationLog.Subject = success ? subject : request.EventType;        // if email access -> use real subject ELSE fallback to event type
             notificationLog.Body = success ? body : JsonConvert.SerializeObject(request.Payload);
             notificationLog.ErrorMessage = error;
 
@@ -100,7 +102,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
             var json = JsonConvert.SerializeObject(payload);
             var obj = JObject.Parse(json);
             var userIdToken = obj["UserId"] ?? obj["userId"];
-            if (userIdToken != null && Guid.TryParse(userIdToken.ToString(), out var userId))
+            if (userIdToken != null && Guid.TryParse(userIdToken.ToString(), out var userId))       // safe parsing
                 return userId;
         }
         catch (Exception ex)
@@ -115,7 +117,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
         try
         {
             var json = JsonConvert.SerializeObject(payload);
-            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();        // JSON -> dictionary
         }
         catch
         {
@@ -125,7 +127,7 @@ public class ProcessNotificationCommandHandler(INotificationDbContext db, IEmail
 
     private static string GetString(Dictionary<string, object> data, string key, string defaultValue = "")
     {
-        if (data.TryGetValue(key, out var value))
+        if (data.TryGetValue(key, out var value))       // Type safe if key is not there
         {
             return value?.ToString() ?? defaultValue;
         }

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using CardService.Application.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace CardService.Infrastructure.Services;
@@ -8,11 +9,15 @@ public class BillingServiceClient : IBillingServiceClient
 {
     private readonly HttpClient _httpClient;        // used to called APIs (send HTTp request)
     private readonly ILogger<BillingServiceClient> _logger;
-    private const string BillingServiceBaseUrl = "http://localhost:5003";
 
-    public BillingServiceClient(HttpClient httpClient, ILogger<BillingServiceClient> logger)
+    public BillingServiceClient(
+        HttpClient httpClient,
+        ILogger<BillingServiceClient> logger,
+        IConfiguration configuration)
     {
         _httpClient = httpClient;
+        var billingServiceBaseUrl = configuration["Services:BillingService:BaseUrl"] ?? "http://localhost:5003";
+        _httpClient.BaseAddress = new Uri(billingServiceBaseUrl);
         _httpClient.BaseAddress = new Uri(BillingServiceBaseUrl);
         _logger = logger;
     }

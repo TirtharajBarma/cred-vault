@@ -11,7 +11,7 @@ public class PaymentExpirationBackgroundJob : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<PaymentExpirationBackgroundJob> _logger;
-    private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);
+    private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);      // runs every 1minute
 
     public PaymentExpirationBackgroundJob(
         IServiceProvider serviceProvider,
@@ -25,7 +25,7 @@ public class PaymentExpirationBackgroundJob : BackgroundService
     {
         _logger.LogInformation("Payment Expiration Background Job started");
 
-        while (!stoppingToken.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)              // infinite loop until app shuts down
         {
             try
             {
@@ -42,12 +42,13 @@ public class PaymentExpirationBackgroundJob : BackgroundService
 
     private async Task ExpireOldPaymentsAsync(CancellationToken ct)
     {
-        using var scope = _serviceProvider.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+        // scope -> a short-lived container  : 
+        using var scope = _serviceProvider.CreateScope();                           // create a new DI scope
+        var context = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();     // gets your DbContext -> sage usage, proper lifecycle
 
         var now = DateTime.UtcNow;
         
-        var expiredPayments = await context.Payments
+        var expiredPayments = await context.Payments            // find expired payment
             .Where(p => p.Status == PaymentStatus.Initiated 
                      && p.OtpExpiresAtUtc.HasValue 
                      && p.OtpExpiresAtUtc.Value < now)

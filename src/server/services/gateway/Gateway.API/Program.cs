@@ -4,6 +4,8 @@ using Shared.Contracts.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var ocelotConfigFile = builder.Configuration["Ocelot:ConfigFile"] ?? "ocelot.json";
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowWebClients", policy =>
@@ -15,7 +17,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Configuration
-    .AddJsonFile("ocelot.json", optional: false, reloadOnChange: true)
+    .AddJsonFile(ocelotConfigFile, optional: false, reloadOnChange: true)
     .AddEnvironmentVariables();
 
 builder.Services.AddStandardApi();

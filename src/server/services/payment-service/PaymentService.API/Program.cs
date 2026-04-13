@@ -48,27 +48,28 @@ try
                 .AllowAnyMethod();
         });
     });
-    builder.Services.AddStandardAuth(builder.Configuration);
+    builder.Services.AddStandardAuth(builder.Configuration);            // JWt token
 
     builder.Services.AddDbContext<PaymentDbContext>(o =>
     {
-        o.UseSqlServer(builder.Configuration.GetConnectionString("PaymentDb"));
+        o.UseSqlServer(builder.Configuration.GetConnectionString("PaymentDb"));     // register EF
+        // connects to SQL server
         o.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     });
 
     builder.Services.AddHttpClient();
     builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
-    builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PaymentDbContext>());
+    builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PaymentDbContext>());       // DbContext is UnitOfWork
     
-    builder.Services.AddHostedService<PaymentExpirationBackgroundJob>();
+    builder.Services.AddHostedService<PaymentExpirationBackgroundJob>();        // background job
 
     builder.Services.AddMediatR(cfg =>
     {
-        cfg.RegisterServicesFromAssemblyContaining<InitiatePaymentCommand>();
-        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        cfg.RegisterServicesFromAssemblyContaining<InitiatePaymentCommand>();               // auto register Commands, handlers
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));       // middleware for mediatR
     });
-    builder.Services.AddValidatorsFromAssemblyContaining<InitiatePaymentCommand>();
+    builder.Services.AddValidatorsFromAssemblyContaining<InitiatePaymentCommand>();         // register FluentValidation
 
     builder.Services.AddMassTransit(x =>
     {

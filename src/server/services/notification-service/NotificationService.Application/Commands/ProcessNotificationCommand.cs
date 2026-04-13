@@ -1,5 +1,6 @@
 using MediatR;
 
+// it is like a parcel -> hold data about notification events
 namespace NotificationService.Application.Commands;
 
 public record ProcessNotificationCommand(

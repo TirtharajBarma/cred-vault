@@ -1,817 +1,541 @@
-# Low Level Design (LLD)
+# Enterprise Low-Level Design (LLD) Specification
 
-System: CredVault Credit Card Platform
+**System:** CredVault Credit Card Management Platform  
+**Prepared for:** Core Engineering, Architecture, QA, and Integration Teams  
+**Document Version:** 4.1 (Enterprise Detailed Specification)  
+**Date:** 2026-04-13  
 
-Document version: 2.1
-Prepared for: Sprint engineering review
-Date: 2026-04-12
+> [!NOTE]
+> This expansive document represents the absolute source of truth for the CredVault ecosystem. It details software patterns, bounded contexts, database schemas, object relations, distributed event messaging, complex Saga State Machine interactions, and strict API contracts.
 
-## Changelog
+---
 
-### v2.1 (2026-04-12)
-- Updated database schema to reflect FK fixes
-- `RewardAccounts.RewardTierId` now has FK to `RewardTiers.Id`
-- `Statements.BillId` now has FK to `Bills.Id`
+# Table of Contents
+1. [Executive Summary & Design Principles](#1-executive-summary--design-principles)
+2. [Macro Use Case & Actor Topologies](#2-macro-use-case--actor-topologies)
+3. [Software Class Models & Components](#3-software-class-models--components)
+4. [Enterprise Database Architecture (Detailed DB Schemas)](#4-enterprise-database-architecture-detailed-db-schemas)
+5. [Event Broker Architecture (RabbitMQ)](#5-event-broker-architecture-rabbitmq)
+6. [Distributed Workflows & Saga Pattern Sequences](#6-distributed-workflows--saga-pattern-sequences)
+7. [Core Business Logic Flow Instructions (Pseudocode)](#7-core-business-logic-flow-instructions-pseudocode)
+8. [Unified API Request/Response Envelopes](#8-unified-api-requestresponse-envelopes)
+9. [Error Mapping & Technical Defect Tracking](#9-error-mapping--technical-defect-tracking)
 
-### v2.0 (2026-04-10)
-- Initial release
+---
 
-## 1. Detailed Requirements and Edge Cases
+## 1. Executive Summary & Design Principles
 
-### 1.1 Detailed Functional Requirements
+CredVault relies on a highly scalable, isolated microservices setup emphasizing **Command Query Responsibility Segregation (CQRS)**, **Clean Architecture**, and **Event-Driven messaging** for eventual consistency.
 
-#### Identity Module
-
-- Create account with email/password.
-- Generate and verify email OTP.
-- Support resend OTP and password reset OTP lifecycle.
-- Authenticate and issue JWT.
-- Support Google login.
-- Support profile update and password change.
-- Admin controls for user status and role changes.
-
-#### Card Module
-
-- CRUD operations for cards with soft delete semantics.
-- Issuer management APIs (admin).
-- Add/list card transactions.
-- Admin read paths for user card diagnostics.
-- Consume deduction/reversal/user-deletion events.
-
-#### Billing Module
-
-- Generate bills and mark overdue bills.
-- Mark bill paid, revert bill paid (compensation path).
-- Generate statements and expose statement line items.
-- Manage reward tiers, reward account, reward transactions.
-- Redeem rewards for user flow and internal saga flow.
-
-#### Payment Module
-
-- Initiate payment with pre-validation.
-- Generate OTP and enforce OTP verification.
-- Persist payment and orchestration state.
-- Trigger distributed steps through saga state machine.
-- Handle compensation with retries on failures.
-
-#### Notification Module
-
-- Consume identity/card/billing/payment events.
-- Persist notification logs and audit logs.
-- Send email notifications.
-- Expose paginated logs APIs.
-
-### 1.2 Detailed Non-Functional Requirements
-
-- Secure endpoints with JWT and role checks.
-- Deterministic response envelope for all APIs.
-- Idempotent handling for retried event messages where applicable.
-- Bounded retries for transient errors and compensation steps.
-- Strong consistency per service DB transaction.
-- Eventual consistency for cross-service workflows.
-
-### 1.3 Edge Case Catalog
-
-| Area | Edge Case | Expected Behavior |
+### 1.1 Structural Implementation Patterns
+| Pattern Achieved | How It Is Implemented | Strategic Benefit |
 |---|---|---|
-| Payment OTP | OTP incorrect | Reject verification and keep state pending or fail path |
-| Payment OTP | OTP expired | Reject verification and return actionable message |
-| Payment initiate | Duplicate in-progress payment on same bill | Mark stuck prior initiation failed and continue with new flow |
-| Payment validation | Bill does not belong to user | Reject request with business error |
-| Payment validation | Card does not match bill | Reject request with business error |
-| Payment validation | Full payment amount mismatch | Reject request with explicit required amount |
-| Reward | Reward redemption fails | Enter compensation path |
-| Card | Card deduction fails after bill update | Trigger bill revert path |
-| Compensation | Revert operations repeatedly fail | Bounded retries then terminal fail |
-| Gateway | Route mismatch | Return controlled error, avoid gateway 500 drift |
+| **Clean Architecture** | Enforced project separation: `Domain`, `Application`, `Infrastructure`, `Presentation`. | Business logic is decoupled from ASP.NET specifics. |
+| **CQRS** | Utilizing `MediatR` for discrete `CommandHandlers` (Writes) and `QueryHandlers` (Reads). | Clear boundaries of read/write side-effects and performance tuning. |
+| **Saga State Machine** | Implemented using `MassTransit` state saga orchestration over `RabbitMQ`. | Resolves the dual-write problem across independent databases. |
+| **API Gateway Routing** | `Ocelot` JSON configuration proxy bounding upstream/downstream maps. | Client UI remains abstracted from port collisions or routing. |
 
-## 2. Class Diagrams and Entity Relationships
+---
 
-### 2.1 Service Class View: Payment Orchestration Core
+## 2. Macro Use Case & Actor Topologies
+
+The below diagram visually isolates Actor relationships along a perfectly crafted horizontal mapping line into the bounded context subgraphs, providing a beautiful overview of system capabilities.
+
+```mermaid
+flowchart LR
+    %% Actors
+    User(["👨‍💼 End User Actor"])
+    Admin(["🛠️ System Admin Actor"])
+
+    %% System Boundaries
+    subgraph Identity[Identity Service]
+        direction TB
+        R(["Register Profile & OTP"])
+        L(["Login & Authorize"])
+        P(["Update JWT Profile"])
+        M(["Elevate User Roles"])
+    end
+
+    subgraph Card[Card Service]
+        direction TB
+        AC(["Register Credit Card"])
+        VC(["View Available Cards"])
+        CT(["Fetch Transactions"])
+    end
+
+    subgraph Billing[Billing Service]
+        direction TB
+        S(["Fetch PDF Statements"])
+        PT(["Inspect Reward Points"])
+        RT(["Configure Tier Margins"])
+    end
+
+    subgraph Payment[Payment Service]
+        direction TB
+        IP(["Initiate Distributed Payment"])
+        VP(["Validate Payment 2FA OTP"])
+    end
+
+    %% Routing Actor -> Nodes
+    User --- R
+    User --- L
+    User --- P
+    User --- AC
+    User --- VC
+    User --- CT
+    User --- S
+    User --- PT
+    User --- IP
+    User --- VP
+
+    Admin --- M
+    Admin --- RT
+
+```
+
+---
+
+## 3. Software Class Models & Components
+
+### 3.1 Core Class Controller Flow: Payment Orchestrator
+The `Payment Orchestrator` represents the most complicated aspect of the software structure. The following explicit class view shows how controllers hit commands, hit sagas, and dispatch out messages.
 
 ```mermaid
 classDiagram
     class PaymentsController {
-      +InitiatePayment()
-      +VerifyOtp()
+      +InitiatePayment(request)
+      +VerifyOtp(request)
       +ResendOtp()
       +GetMyPayments()
-      +GetPaymentById()
     }
 
     class InitiatePaymentCommandHandler {
-      +Handle(command)
+      +Handle(command, cancellationToken)
       -FetchBillAsync()
-      -FetchUserDetailsAsync()
       -MarkStuckPaymentsFailedAsync()
       -GenerateOtp()
     }
 
     class PaymentRepository {
-      +AddAsync()
-      +GetByIdAsync()
-      +UpdateAsync()
-      +GetStuckPaymentsAsync()
+      <<Interface>>
+      +AddAsync(Payment)
+      +GetByIdAsync(Guid)
+      +UpdateAsync(Payment)
     }
 
     class PaymentOrchestrationSaga {
       +StateMachineTransitions()
-    }
-
-    class PaymentOrchestrationSagaState {
-      +Guid CorrelationId
-      +string CurrentState
-      +Guid PaymentId
-      +Guid UserId
-      +Guid CardId
-      +Guid BillId
-      +decimal Amount
-      +decimal RewardsAmount
-      +bool OtpVerified
-      +bool PaymentProcessed
-      +bool BillUpdated
-      +bool CardDeducted
-      +int CompensationAttempts
+      +Event<IStartPaymentOrchestration> StartEvent
+      +Event<IOtpVerified> OtpSuccessEvent
     }
 
     class PaymentProcessConsumer {
-      +Consume(IPaymentProcessRequested)
-    }
-
-    class RevertPaymentConsumer {
-      +Consume(IRevertPaymentRequested)
+      +Consume(IPaymentProcessRequested msg)
     }
 
     class RewardRedemptionConsumer {
-      +Consume(IRewardRedemptionRequested)
+      +Consume(IRewardRedemptionRequested msg)
     }
 
-    PaymentsController --> InitiatePaymentCommandHandler
-    InitiatePaymentCommandHandler --> PaymentRepository
-    PaymentOrchestrationSaga --> PaymentOrchestrationSagaState
-    PaymentProcessConsumer --> PaymentRepository
-    RevertPaymentConsumer --> PaymentRepository
-    RewardRedemptionConsumer --> PaymentOrchestrationSagaState
+    PaymentsController --> InitiatePaymentCommandHandler : Routes standard HTTP
+    InitiatePaymentCommandHandler --> PaymentRepository : Validations & Setup
+    InitiatePaymentCommandHandler --> PaymentOrchestrationSaga : Dispatches Start Event
+    PaymentOrchestrationSaga --> PaymentProcessConsumer : Triggers distributed behavior
+    PaymentOrchestrationSaga --> RewardRedemptionConsumer : Modulates external reward system
 ```
 
-### 2.2 Domain Entity Relationship View
+---
+
+## 4. Enterprise Database Architecture (Detailed DB Schemas)
+
+Data ownership is extremely strict. A component has exclusive access to its schema. Any cross-database joins are illegal. Relationships are constructed "logically" using Application-Level Foreign key checks across boundaries.
+
+### 4.1 Card Bounded Context (`credvault_cards`)
 
 ```mermaid
 erDiagram
-    CardIssuers ||--o{ CreditCards : IssuerId
-    CreditCards ||--o{ CardTransactions : CardId
+    CardIssuers {
+        uniqueidentifier Id PK
+        string Name
+        int Network
+        datetime CreatedAtUtc
+        datetime UpdatedAtUtc
+    }
 
-    RewardAccounts ||--o{ RewardTransactions : RewardAccountId
-    Bills ||--o{ RewardTransactions : BillId (optional)
-    Statements ||--o{ StatementTransactions : StatementId
+    CreditCards {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId
+        uniqueidentifier IssuerId FK
+        string CardholderName
+        string Last4
+        string MaskedNumber
+        string EncryptedCardNumber
+        int ExpMonth
+        int ExpYear
+        decimal CreditLimit
+        decimal OutstandingBalance
+        int BillingCycleStartDay
+        bool IsDefault
+        bool IsVerified
+        datetime VerifiedAtUtc
+        bool IsDeleted
+        datetime DeletedAtUtc
+        datetime CreatedAtUtc
+        datetime UpdatedAtUtc
+    }
 
-    Payments ||--o{ Transactions : PaymentId
+    CardTransactions {
+        uniqueidentifier Id PK
+        uniqueidentifier CardId FK
+        uniqueidentifier UserId
+        int Type
+        decimal Amount
+        string Description
+        datetime DateUtc
+        datetime CreatedAtUtc
+    }
 
-    identity_users ||..o{ CreditCards : logical UserId reference
-    identity_users ||..o{ Bills : logical UserId reference
-    identity_users ||..o{ Payments : logical UserId reference
+    CardIssuers ||--o{ CreditCards : "issues"
+    CreditCards ||--o{ CardTransactions : "contains"
 ```
 
-### 2.3 State Machine View
+### 4.2 Billing & Rewards Context (`credvault_billing`)
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Initial
-    Initial --> AwaitingOtpVerification: IStartPaymentOrchestration
-    AwaitingOtpVerification --> AwaitingPaymentConfirmation: IOtpVerified
-    AwaitingOtpVerification --> Failed: IOtpFailed
+erDiagram
+    Bills {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId
+        uniqueidentifier CardId
+        int CardNetwork
+        uniqueidentifier IssuerId
+        decimal Amount
+        decimal MinDue
+        string Currency
+        datetime BillingDateUtc
+        datetime DueDateUtc
+        int Status
+        datetime CreatedAtUtc
+        datetime UpdatedAtUtc
+        datetime PaidAtUtc
+        decimal AmountPaid
+    }
 
-    AwaitingPaymentConfirmation --> AwaitingBillUpdate: IPaymentProcessSucceeded
-    AwaitingPaymentConfirmation --> Failed: IPaymentProcessFailed
+    RewardAccounts {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId
+        uniqueidentifier RewardTierId FK
+        decimal PointsBalance
+        datetime CreatedAtUtc
+        datetime UpdatedAtUtc
+    }
 
-    AwaitingBillUpdate --> AwaitingRewardRedemption: IBillUpdateSucceeded and rewards > 0
-    AwaitingBillUpdate --> AwaitingCardDeduction: IBillUpdateSucceeded and rewards <= 0
-    AwaitingBillUpdate --> Compensating: IBillUpdateFailed
+    RewardTransactions {
+        uniqueidentifier Id PK
+        uniqueidentifier RewardAccountId FK
+        uniqueidentifier BillId FK
+        decimal Points
+        int Type
+        datetime CreatedAtUtc
+        datetime ReversedAtUtc
+    }
 
-    AwaitingRewardRedemption --> AwaitingCardDeduction: IRewardRedemptionSucceeded
-    AwaitingRewardRedemption --> Compensating: IRewardRedemptionFailed
+    Statements {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId
+        uniqueidentifier CardId
+        uniqueidentifier BillId FK
+        string StatementPeriod
+        string CardLast4
+        string CardNetwork
+        string IssuerName
+        decimal ClosingBalance
+        decimal MinimumDue
+        decimal AmountPaid
+        datetime GeneratedAtUtc
+        datetime DueDateUtc
+        datetime PaidAtUtc
+        int Status
+    }
 
-    AwaitingCardDeduction --> Completed: ICardDeductionSucceeded
-    AwaitingCardDeduction --> Compensating: ICardDeductionFailed
+    StatementTransactions {
+        uniqueidentifier Id PK
+        uniqueidentifier StatementId FK
+        string Type
+        decimal Amount
+        string Description
+        datetime DateUtc
+    }
 
-    Compensating --> Compensated: IRevertPaymentSucceeded
-    Compensating --> Failed: Retry threshold exceeded
-
-    Compensated --> [*]
-    Completed --> [*]
-    Failed --> [*]
+    RewardAccounts ||--o{ RewardTransactions : "tracks"
+    Bills ||--o{ RewardTransactions : "sources"
+    Statements ||--o{ StatementTransactions : "embeds"
+    Bills ||--o{ Statements : "mapped to"
 ```
 
-## 3. Database Schema with Fields and Keys
+### 4.3 Payments Isolation Context (`credvault_payments`)
 
-Detailed schema source: docs/DB-FOREIGN-KEY-ARCHITECTURE.md
+```mermaid
+erDiagram
+    Payments {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId
+        uniqueidentifier CardId
+        uniqueidentifier BillId
+        decimal Amount
+        int PaymentType
+        int Status
+        string FailureReason
+        string OtpCode
+        datetime OtpExpiresAtUtc
+        datetime CreatedAtUtc
+        datetime UpdatedAtUtc
+    }
 
-### 3.1 Identity Database (credvault_identity)
+    Transactions {
+        uniqueidentifier Id PK
+        uniqueidentifier PaymentId FK
+        uniqueidentifier UserId
+        decimal Amount
+        int Type
+        string Description
+        datetime CreatedAtUtc
+    }
 
-Table: identity_users
+    PaymentOrchestrationSagas {
+        uniqueidentifier CorrelationId PK
+        uniqueidentifier UserId
+        uniqueidentifier PaymentId
+        uniqueidentifier CardId
+        uniqueidentifier BillId
+        decimal Amount
+        string CurrentState
+        string FullName
+        string Email
+        string PaymentType
+        bool OtpVerified
+        bool PaymentProcessed
+        bool CardDeducted
+        bool BillUpdated
+        bool RewardsRedeemed
+        decimal RewardsAmount
+        int CompensationAttempts
+        string PaymentError
+        datetime CreatedAtUtc
+    }
 
-- Id (PK)
-- FullName
-- Email
-- PasswordHash
-- Role
-- Status
-- IsEmailVerified
-- EmailVerificationOtp
-- EmailVerificationOtpExpiresAtUtc
-- PasswordResetOtp
-- PasswordResetOtpExpiresAtUtc
-- CreatedAtUtc
-- UpdatedAtUtc
-
-### 3.2 Card Database (credvault_cards)
-
-Table: CardIssuers
-
-- Id (PK)
-- Name
-- Network
-- CreatedAtUtc
-- UpdatedAtUtc
-
-Table: CreditCards
-
-- Id (PK)
-- UserId
-- IssuerId (FK -> CardIssuers.Id)
-- CardholderName
-- Last4
-- MaskedNumber
-- EncryptedCardNumber
-- ExpMonth
-- ExpYear
-- CreditLimit
-- OutstandingBalance
-- BillingCycleStartDay
-- IsDefault
-- IsVerified
-- VerifiedAtUtc
-- IsDeleted
-- DeletedAtUtc
-- CreatedAtUtc
-- UpdatedAtUtc
-
-Table: CardTransactions
-
-- Id (PK)
-- CardId (FK -> CreditCards.Id)
-- UserId
-- Type
-- Amount
-- Description
-- DateUtc
-- CreatedAtUtc
-
-### 3.3 Billing Database (credvault_billing)
-
-Table: Bills
-
-- Id (PK)
-- UserId
-- CardId
-- CardNetwork
-- IssuerId
-- Amount
-- MinDue
-- Currency
-- BillingDateUtc
-- DueDateUtc
-- Status
-- AmountPaid
-- PaidAtUtc
-- CreatedAtUtc
-- UpdatedAtUtc
-
-Table: RewardTiers
-
-- Id (PK)
-- CardNetwork
-- IssuerId
-- MinSpend
-- RewardRate
-- EffectiveFromUtc
-- EffectiveToUtc
-- CreatedAtUtc
-- UpdatedAtUtc
-
-Table: RewardAccounts
-
-- Id (PK)
-- UserId
-- RewardTierId (FK -> RewardTiers.Id)
-- PointsBalance
-- CreatedAtUtc
-- UpdatedAtUtc
-
-Table: RewardTransactions
-
-- Id (PK)
-- RewardAccountId (FK -> RewardAccounts.Id)
-- BillId (FK -> Bills.Id, nullable)
-- Points
-- Type
-- ReversedAtUtc
-- CreatedAtUtc
-
-Table: Statements
-
-- Id (PK)
-- UserId
-- CardId
-- BillId (FK -> Bills.Id, nullable)
-- StatementPeriod
-- CardLast4
-- CardNetwork
-- IssuerName
-- OpeningBalance
-- TotalPurchases
-- TotalPayments
-- TotalRefunds
-- PenaltyCharges
-- InterestCharges
-- ClosingBalance
-- MinimumDue
-- AmountPaid
-- CreditLimit
-- AvailableCredit
-- PeriodStartUtc
-- PeriodEndUtc
-- GeneratedAtUtc
-- DueDateUtc
-- PaidAtUtc
-- Status
-- Notes
-- CreatedAtUtc
-- UpdatedAtUtc
-
-Table: StatementTransactions
-
-- Id (PK)
-- StatementId (FK -> Statements.Id)
-- Type
-- Amount
-- Description
-- DateUtc
-- SourceTransactionId
-- CreatedAtUtc
-
-### 3.4 Payment Database (credvault_payments)
-
-Table: Payments
-
-- Id (PK)
-- UserId
-- CardId
-- BillId
-- Amount
-- PaymentType
-- Status
-- FailureReason
-- OtpCode
-- OtpExpiresAtUtc
-- CreatedAtUtc
-- UpdatedAtUtc
-
-Table: Transactions
-
-- Id (PK)
-- PaymentId (FK -> Payments.Id)
-- UserId
-- Amount
-- Type
-- Description
-- CreatedAtUtc
-
-Table: PaymentOrchestrationSagas
-
-- CorrelationId (PK)
-- CurrentState
-- PaymentId
-- UserId
-- Email
-- FullName
-- CardId
-- BillId
-- Amount
-- PaymentType
-- RewardsAmount
-- RewardsRedeemed
-- OtpCode
-- OtpExpiresAtUtc
-- OtpVerified
-- PaymentProcessed
-- BillUpdated
-- CardDeducted
-- PaymentError
-- BillUpdateError
-- CardDeductionError
-- CompensationReason
-- CompensationAttempts
-- CreatedAtUtc
-- UpdatedAtUtc
-
-### 3.5 Notification Database (credvault_notifications)
-
-Table: NotificationLogs
-
-- Id (PK)
-- Type
-- Recipient
-- Subject
-- Body
-- IsSuccess
-- ErrorMessage
-- UserId
-- TraceId
-- CreatedAtUtc
-
-Table: AuditLogs
-
-- Id (PK)
-- EntityName
-- EntityId
-- Action
-- Changes
-- UserId
-- TraceId
-- CreatedAtUtc
-
-## 4. APIs with Request and Response Format
-
-Gateway base URL: http://localhost:5006
-
-### 4.1 Standard API Response Contract
-
-Base format:
-
-```json
-{
-  "success": true,
-  "message": "Operation completed",
-  "data": {}
-}
+    Payments ||--o{ Transactions : "bundles"
 ```
 
-Extended error payload in current implementation can include optional fields:
+### 4.4 Identity Core Context (`credvault_identity`)
 
+```mermaid
+erDiagram
+    identity_users {
+        uniqueidentifier Id PK
+        string FullName
+        string Email
+        string PasswordHash
+        string Role
+        string Status
+        bool IsEmailVerified
+        string EmailVerificationOtp
+        datetime EmailVerificationOtpExpiresAtUtc
+        string PasswordResetOtp
+        datetime PasswordResetOtpExpiresAtUtc
+        datetime CreatedAtUtc
+        datetime UpdatedAtUtc
+    }
+```
+
+---
+
+## 5. Event Broker Architecture (RabbitMQ)
+
+Credvault adheres strictly to decoupling services over Rabbit MQ. Two distinct paradigms exist:
+- **Domain Event Pattern:** (Publish/Subscriber - Fire & Forget). Primarily leveraged by `NotificationService` reading off single events (e.g. `IPaymentFailed`).
+- **Distributed Request/Response Pattern:** Managed exclusively by the Saga Orchestrator in `payment-orchestration`, handling deterministic point-to-point calls over RabbitMQ.
+
+```mermaid
+flowchart TB
+    %% Services 
+    subgraph Publisher Services
+        IS[Identity Service]
+        CS[Card Service]
+        BS[Billing Service]
+        PS[Payment Service]
+    end
+
+    %% Broker
+    subgraph Message Broker Server
+        direction TB
+        
+        %% Exchanges
+        subgraph Exchanges Layer
+            E_ID(identity-exchange)
+            E_CARD(card-exchange)
+            E_BILL(billing-exchange)
+            E_PAY(payment-exchange)
+        end
+        
+        %% Queues
+        subgraph Destination Queues
+            Q_NOTIF[notification-domain-event]
+            Q_CARD[card-domain-event]
+            Q_BILL[billing-domain-event]
+            Q_SAGA[payment-orchestration]
+            Q_PROC[payment-process]
+        end
+
+        %% Routing
+        E_ID ---> Q_NOTIF
+        E_CARD ---> Q_NOTIF & Q_SAGA
+        E_BILL ---> Q_NOTIF & Q_SAGA
+        E_PAY ---> Q_SAGA & Q_PROC & Q_NOTIF
+    end
+
+    %% Maps
+    IS --> E_ID
+    CS --> E_CARD
+    BS --> E_BILL
+    PS --> E_PAY
+
+    %% Consumers
+    Q_NOTIF --> NS[Notification Email Workers]
+    Q_SAGA --> SG[Saga Coordinate Workers]
+```
+
+---
+
+## 6. Distributed Workflows & Saga Pattern Sequences
+
+The Saga State Machine forces 4 specific sub-actions to resolve into ONE atomic operation for the user. Failure at any level reverts the previous blocks recursively up the chain.
+
+### 6.1 Strict Execution Happy-Path (Orchestrated)
+```mermaid
+sequenceDiagram
+    participant UI as Angular Frontend
+    participant GW as Ocelot API Gateway
+    participant PA as Payment Orchestrator
+    participant BI as Billing Worker
+    participant RW as Rewards Worker
+    participant CA as Card Deduct Worker
+
+    UI->>GW: POST /api/payments/initiate
+    GW-->>PA: Route request
+    PA->>PA: Spawn Saga & generate OTP
+    PA-->>UI: Require 2FA Challenge
+
+    UI->>GW: POST /api/payments/{id}/verify-otp
+    GW-->>PA: Trigger OTP Confirm Event
+    PA->>PA: Validated!
+
+    Note over PA, CA: Dsitributed Atomicity Execution Begins via RabbitMQ
+
+    PA->>BI: Publish `IBillUpdateRequested`
+    BI-->>PA: Acknowledge `IBillUpdateSucceeded`
+    
+    opt Has Outstanding Rewards Points
+        PA->>RW: Publish `IRewardRedemptionRequested`
+        RW-->>PA: Acknowledge `IRewardRedemptionSucceeded`
+    end
+
+    PA->>CA: Publish `ICardDeductionRequested`
+    CA-->>PA: Acknowledge `ICardDeductionSucceeded`
+    
+    Note over PA: State changes to COMPLETED. Success finalized.
+```
+
+### 6.2 The Compensation Retry Block (Orchestrated Failover)
+If `ICardDeductionRequested` errors out due to unavailable dependencies, the orchestrator begins compensating behaviors to prevent dangling ledger records.
+
+```mermaid
+sequenceDiagram
+    participant PA as Payment Orchestrator
+    participant CA as Card Deduct Worker
+    participant BI as Billing Worker
+    participant PR as Payment Persistance
+
+    PA->>CA: Publish `ICardDeductionRequested`
+    CA-->>PA: Error Payload `ICardDeductionFailed`
+
+    Note over PA: State changes to COMPENSATING. Recursing upwards...
+
+    PA->>BI: Publish `IRevertBillUpdateRequested` (Re-open bill)
+    BI-->>PA: Acknowledge `IRevertBillUpdateSucceeded`
+    
+    PA->>PR: Publish `IRevertPaymentRequested` (Void internal transaction)
+    PR-->>PA: Acknowledge `IRevertPaymentSucceeded`
+
+    PA->>PA: Finalize State -> FAILED.
+```
+
+---
+
+## 7. Core Business Logic Flow Instructions (Pseudocode)
+
+### 7.1 Detailed Payment Validation Command Requirements
+The `InitiatePaymentCommandHandler` must assert extremely rigid validation.
+
+```text
+function EvaluateInitiatePayment(userContext, CardId, BillId, TargetAmount):
+    Execute MarkExpiredStuckPaymentsAsync(userId, BillId) -- ensure no phantom sagas remain.
+    
+    bill = GET Database.Bills(BillId)
+    if bill is NULL: throw NotFound()
+    if bill.UserId != userContext.Id: throw UnauthorizedAccess("Entity mismatch")
+    if bill.CardId != CardId: throw CrossBoundaryValidation("Card/Bill drift detected")
+
+    outstandingDelta = MAX(0, bill.Amount - bill.AmountPaid)
+    if outstandingDelta == 0: throw ValidationException("Bill zeroed out")
+    if TargetAmount > outstandingDelta: throw OverpaymentException("Requested too much")
+    
+    if Validation clears:
+        OTP = GenerateCryptoRNG(6)
+        PaymentRecord = CREATE Payment in Status "AwaitingOTP"
+        PUBLISH IStartPaymentOrchestration (PaymentRecord)
+        return HTTP 200 OK -> PaymentID & Challenge
+```
+
+---
+
+## 8. Unified API Request/Response Envelopes
+
+Every microservice exposes its surface through the global `:5006` gateway. 
+
+### 8.1 Required Standard Response Wrapper Payload
 ```json
 {
-  "success": false,
-  "message": "Validation failed",
-  "errorCode": "ValidationError",
-  "data": {
-    "title": "Validation failed"
+  "success": true,               // Essential boolean trigger for Frontend RxJs observation  
+  "message": "Dynamic payload message defining outcome",
+  "errorCode": "null or string for translation sets",
+  "data": {                      // The core response body structure
+      "id": "c1f...4d"
   },
-  "traceId": "0HN..."
+  "traceId": "0HNHTGXXXXX"       // Sentry/ELK tracing ID for diagnostic correlation
 }
 ```
 
-### 4.2 Key API Definitions (Representative)
-
-#### Identity
-
-POST /api/v1/identity/auth/register
-
-Request:
-
-```json
-{
-  "fullName": "Aarav Sharma",
-  "email": "aarav@example.com",
-  "password": "StrongPassword@123"
-}
-```
-
-Response:
-
-```json
-{
-  "success": true,
-  "message": "Registration successful",
-  "data": {
-    "userId": "guid"
-  }
-}
-```
-
-#### Card
-
-POST /api/v1/cards
-
-Request:
-
-```json
-{
-  "cardholderName": "Aarav Sharma",
-  "cardNumber": "4111111111111111",
-  "expMonth": 12,
-  "expYear": 2029,
-  "issuerId": "guid",
-  "isDefault": true
-}
-```
-
-#### Billing
-
-GET /api/v1/billing/statements/{statementId}/transactions
-
-Response:
-
-```json
-{
-  "success": true,
-  "message": "Statement transactions fetched",
-  "data": {
-    "items": []
-  }
-}
-```
-
-#### Payment
-
-POST /api/v1/payments/initiate
-
-Request:
-
-```json
-{
-  "cardId": "guid",
-  "billId": "guid",
-  "amount": 4200,
-  "paymentType": "Full",
-  "rewardsPoints": 100
-}
-```
-
-Response:
-
-```json
-{
-  "success": true,
-  "message": "Payment initiated",
-  "data": {
-    "paymentId": "guid",
-    "otpRequired": true
-  }
-}
-```
-
-POST /api/v1/payments/{paymentId}/verify-otp
-
-Request:
-
-```json
-{
-  "otpCode": "123456"
-}
-```
-
-#### Notification
-
-GET /api/v1/notifications/logs?email=user@example.com&page=1&pageSize=20
-
-GET /api/v1/notifications/audit?userId=guid&page=1&pageSize=20
-
-### 4.3 API Security Rules
-
-- Public endpoints are limited to explicit auth lifecycle and internal integration routes.
-- Authenticated endpoints require bearer JWT.
-- Admin endpoints require role authorization.
-
-## 5. Sequence Flow for Key Operations
-
-### 5.1 Registration and Verification Flow
-
-```mermaid
-sequenceDiagram
-    participant UI as Client
-    participant GW as Gateway
-    participant ID as Identity Service
-    participant MQ as RabbitMQ
-    participant NO as Notification Service
-
-    UI->>GW: POST register
-    GW->>ID: Forward register
-    ID->>ID: Create user, generate OTP
-    ID->>MQ: Publish user registered and otp generated events
-    MQ->>NO: Consume event
-    NO->>NO: Persist log and send email
-    ID-->>GW: success response
-    GW-->>UI: success response
-```
-
-### 5.2 Add Card Flow
-
-```mermaid
-sequenceDiagram
-    participant UI as Client
-    participant GW as Gateway
-    participant CA as Card Service
-    participant DB as Card DB
-    participant MQ as RabbitMQ
-
-    UI->>GW: POST add card
-    GW->>CA: Forward request
-    CA->>CA: Validate card payload
-    CA->>DB: Insert CreditCard
-    CA->>MQ: Publish ICardAdded
-    CA-->>GW: success response
-    GW-->>UI: success response
-```
-
-### 5.3 Payment Success Flow
-
-```mermaid
-sequenceDiagram
-    participant UI as Client
-    participant GW as Gateway
-    participant PA as Payment API
-    participant SG as Saga
-    participant BI as Billing Consumer
-    participant RS as Reward Consumer
-    participant CA as Card Consumer
-    participant NO as Notification Consumer
-
-    UI->>GW: initiate payment
-    GW->>PA: forward
-    PA->>SG: start orchestration
-    UI->>GW: verify otp
-    GW->>PA: verify request
-    SG->>SG: transition to process payment
-    SG->>BI: bill update request
-    BI-->>SG: bill update success
-    SG->>RS: reward redemption request (optional)
-    RS-->>SG: redemption success
-    SG->>CA: card deduction request
-    CA-->>SG: card deduction success
-    SG->>NO: payment completed event
-```
-
-### 5.4 Compensation Flow
-
-```mermaid
-sequenceDiagram
-    participant SG as Payment Saga
-    participant BI as Billing Consumer
-    participant PA as Payment Revert Consumer
-
-    SG->>BI: bill update request
-    BI-->>SG: bill update failed
-    SG->>PA: revert payment request
-    PA-->>SG: revert payment succeeded
-    SG-->>SG: state becomes Compensated
-```
-
-## 6. Core Business Logic (Pseudocode or Code)
-
-### 6.1 Payment Initiation Logic
-
-```text
-function initiatePayment(userId, cardId, billId, amount, paymentType, authHeader, rewardsAmount):
-  markStuckPaymentsFailed(userId, billId)
-
-  if amount <= 0:
-    return fail("Amount must be greater than zero")
-
-  bill = fetchBill(billId, authHeader)
-  if bill is null:
-    return fail("Could not verify bill")
-  if bill.userId != userId:
-    return fail("Bill does not belong to user")
-  if bill.cardId != cardId:
-    return fail("Card does not match bill")
-
-  outstanding = max(0, bill.amount - bill.amountPaid)
-  if outstanding <= 0:
-    return fail("Bill is already settled")
-  if amount > outstanding:
-    return fail("Payment exceeds outstanding")
-  if paymentType == Full and abs(amount - outstanding) > tolerance:
-    return fail("Full payment must equal outstanding")
-
-  otp = generateOtp()
-  payment = createPayment(status=Initiated, otp=otp)
-
-  publish(IStartPaymentOrchestration)
-  publish(IPaymentOtpGenerated)
-
-  return success(payment.id)
-```
-
-### 6.2 OTP Verification Logic
-
-```text
-function verifyOtp(paymentId, otpCode):
-  payment = loadPayment(paymentId)
-  if payment not found:
-    return fail("Payment not found")
-  if payment.status is terminal:
-    return fail("Payment cannot be verified in current state")
-  if payment.otpExpired:
-    emit IOtpFailed
-    return fail("OTP expired")
-  if otp mismatch:
-    emit IOtpFailed
-    return fail("Invalid OTP")
-
-  emit IOtpVerified
-  return success("OTP verified")
-```
-
-### 6.3 Bill Update Saga Consumer Logic
-
-```text
-on IBillUpdateRequested(message):
-  result = MarkBillPaid(userId, billId, amount)
-  if result.success:
-    publish IBillUpdateSucceeded
-  else:
-    publish IBillUpdateFailed
-```
-
-### 6.4 Card Deduction Consumer Logic
-
-```text
-on ICardDeductionRequested(message):
-  if transaction exists with description Saga:correlationId:
-    publish ICardDeductionSucceeded
-    return
-
-  card = getCard(message.cardId)
-  if card missing:
-    publish ICardDeductionFailed
-    return
-
-  card.outstandingBalance -= amount
-  addCardTransaction(type=Payment, description=Saga:correlationId)
-  save
-  publish ICardDeductionSucceeded
-```
-
-### 6.5 Compensation Retry Logic
-
-```text
-if revert operation fails:
-  compensationAttempts += 1
-  if compensationAttempts >= threshold:
-    state = Failed
-  else:
-    republish revert request
-```
-
-## 7. Error Handling and Edge Cases
-
-### 7.1 API Error Handling Strategy
-
-- ExceptionHandlingMiddleware wraps domain and generic exceptions.
-- Response format remains consistent with success/message/data baseline.
-- Extended fields include errorCode and traceId for diagnostics.
-
-### 7.2 Error Classification
-
-| Error Type | HTTP Status | Source | Handling |
+### 8.2 Standard HTTP Errors Map
+- `200 OK / 201 Created` : Success behaviors.
+- `400 Bad Request`: Usually caught in the `FluentValidation` intercept pipeline.
+- `401 Unauthorized`: Rejections in the Bearer JWT.
+- `403 Forbidden`: Passed Authentication but role-claim (like `Admin`) is falsy.
+- `404 Not Found`: Internal `DbSet` queries yielding nulls.
+- `500 Server Error`: Global `ExceptionHandlingMiddleware.cs` wrapped outputs preventing stack-trace leaks into the UI.
+
+---
+
+## 9. Error Mapping & Technical Defect Tracking
+
+### 9.1 Known Missing RabbitMQ Implementations
+| Defect Location | Feature Title | Technical Context | Impact Level |
 |---|---|---|---|
-| Validation error | 400 | command/query validation | return business-safe message |
-| Unauthorized | 401 | auth middleware | frontend interceptor logout on 401 |
-| Forbidden | 403 | role authorization | deny operation |
-| Not found | 404 | repository/service | return not-found message |
-| Domain business failure | 400 | service logic | return explicit business reason |
-| Unexpected exception | 500 | runtime | log with trace and return generic error |
+| **Identity Service** | `IUserDeleted` Global Propagation | Administrative UI can delete user context. The Identity service wipes the DB. However, there is NO event publisher for `IUserDeleted`. | **CRITICAL BUG**. Orphaned invoices, payments, and credit cards will sit dead in isolated context databases taking up space. |
+| **Billing Service** | `IBillOverdueDetected` Event Consumer | A CRON job sweeps and successfully publishes `IBillOverdueDetected` to the broker accurately. However, the Notification Service is not wired to consume this! | **LOW**. The architecture is sound but the business value is lost. No emails are actively warning users they've breached late timelines. |
 
-### 7.3 Messaging Failure Handling
-
-- Message retry intervals configured at receive endpoints.
-- In-memory outbox used to reduce duplicate publication side effects.
-- Idempotency checks implemented in selected critical consumers.
-- Compensation paths provide fallback if direct happy path fails.
-
-### 7.4 Notable Domain Edge Behaviors
-
-- Payment supersession marks previous initiated/stuck records failed and emits OTP failure event.
-- Reward redemption amount is bounded by payment amount before downstream deduction.
-- Card deduction path records saga marker in transaction description for dedupe.
-- Statement and rewards queries should rely on paginated retrieval to avoid heavy payloads.
-
-## 8. Design Patterns Used
-
-| Pattern | Where Used | Why |
-|---|---|---|
-| Clean Architecture | all services | enforce separation of concerns |
-| CQRS with MediatR | application command and query handlers | clear read/write use-case boundaries |
-| Repository and Unit of Work | infrastructure persistence layers | data access abstraction and transactional control |
-| Saga State Machine | payment orchestration | coordinated distributed transaction and compensation |
-| Event-Driven Messaging | cross-service integrations | temporal decoupling and resilience |
-| Middleware | centralized exception handling and auth pipeline | uniform cross-cutting behavior |
-| API Gateway | Ocelot ingress | unified client surface and route centralization |
-
-### 8.1 Pattern Fit Summary
-
-- Pattern set is suitable for a domain with distributed financial workflows.
-- Compensation-aware orchestration is critical due to multi-service side effects.
-- Contract-first event design reduces integration ambiguity across teams.
-
+### 9.2 Broker Retry Toleration Models
+When events are rejected:
+- First strike: Fast-retry applied within 5 seconds.
+- Multi-strike: Messages are pushed to `.error` deadlock queues to be reviewed.
+- Saga Fault exception: 3 attempts internally programmed in MassTransit before dropping back into `Compensated` mapping. 
