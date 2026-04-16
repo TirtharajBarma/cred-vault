@@ -196,3 +196,30 @@ public interface IRewardRedemptionFailed
     string Reason { get; }
     DateTime FailedAt { get; }
 }
+
+public interface IWalletRefundRequested
+{
+    Guid CorrelationId { get; }
+    Guid PaymentId { get; }
+    Guid UserId { get; }
+    decimal Amount { get; }
+    string Reason { get; }
+    DateTime RequestedAt { get; }
+}
+
+public interface IWalletRefundSucceeded
+{
+    Guid CorrelationId { get; }
+    Guid PaymentId { get; }
+    decimal RefundedAmount { get; }
+    decimal NewBalance { get; }
+    DateTime SucceededAt { get; }
+}
+
+public interface IWalletRefundFailed
+{
+    Guid CorrelationId { get; }
+    Guid PaymentId { get; }
+    string Reason { get; }
+    DateTime FailedAt { get; }
+}

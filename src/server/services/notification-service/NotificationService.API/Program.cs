@@ -1,5 +1,5 @@
 using NotificationService.Infrastructure.Persistence;
-using NotificationService.Infrastructure.Services;
+using NotificationService.Infrastructure.Services;              // gives -> GmailSmtpEmailSender
 using NotificationService.Application.Interfaces;
 using NotificationService.Application.Consumers;
 using NotificationService.Application.Commands;
@@ -44,9 +44,12 @@ try
     });
     builder.Services.AddStandardAuth(builder.Configuration);
 
+    // connects sql server
     builder.Services.AddDbContext<NotificationDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("NotificationDb")));
-    builder.Services.AddScoped<INotificationDbContext>(sp => sp.GetRequiredService<NotificationDbContext>());
+    builder.Services.AddScoped<INotificationDbContext>(sp => sp.GetRequiredService<NotificationDbContext>());           // interface -> DI
     builder.Services.AddScoped<IEmailSender, GmailSmtpEmailSender>();
+
+    // Registers all handlers in that assembly
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<ProcessNotificationCommandHandler>());
 
     builder.Services.AddMassTransit(x =>
@@ -66,7 +69,7 @@ try
             {
                 e.UseMessageRetry(r => r.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15)));
                 e.UseInMemoryOutbox();
-                e.ConfigureConsumer<DomainEventConsumer>(ctx);
+                e.ConfigureConsumer<DomainEventConsumer>(ctx);      // link consumer to queue
             });
         });
     });

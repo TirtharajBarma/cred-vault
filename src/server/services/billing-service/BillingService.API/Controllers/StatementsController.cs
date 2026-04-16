@@ -1,4 +1,3 @@
-using BillingService.Application.Commands.Statements;
 using BillingService.Application.Queries.Statements;
 using BillingService.Infrastructure.Persistence.Sql;
 using MediatR;
@@ -11,19 +10,17 @@ namespace BillingService.API.Controllers;
 
 /// <summary>
 /// Statements controller handling credit card statement operations.
-/// Manages statement generation, viewing, and retrieval of statement transactions.
+/// Manages statement viewing and retrieval of statement transactions.
 /// Statements summarize a billing cycle's transactions and payments.
 /// </summary>
 /// <remarks>
 /// User endpoints (requires authentication):
 /// - GET /: List all statements for user
 /// - GET /{statementId}: Get specific statement details
-/// - POST /generate: Generate statement for a card
 /// - GET /bill/{billId}: Get statements linked to a bill
 /// - GET /{statementId}/transactions: Get transactions in a statement
 ///
 /// Admin endpoints (requires admin role):
-/// - POST /admin/generate: Generate statement for any user
 /// - GET /admin/all: Get all statements
 /// - GET /admin/{statementId}/full: Get full statement details with bill and transactions
 /// </remarks>
@@ -67,49 +64,6 @@ public class StatementsController(IMediator mediator) : BaseApiController
 
         var result = await mediator.Send(new GetStatementByIdQuery(userId.Value, statementId), cancellationToken);
         return CreateResponse(result.Success, result.Statement, result.Message);
-    }
-
-    /// <summary>
-    /// Generate a statement for the authenticated user's card.
-    /// Creates a new statement record summarizing all transactions in the billing period.
-    /// </summary>
-    /// <param name="request">GenerateStatementRequest with CardId</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>ApiResponse with generated statement ID</returns>
-    [HttpPost("generate")]
-    public async Task<IActionResult> GenerateStatement(
-        [FromBody] GenerateStatementRequest request,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null) return UnauthorizedResponse();
-
-        var authHeader = HttpContext.Request.Headers.Authorization.ToString();
-        var result = await mediator.Send(
-            new GenerateStatementCommand(request.CardId, userId.Value, authHeader),
-            cancellationToken);
-
-        return CreateResponse(result.Success, new { statementId = result.StatementId }, result.Message);
-    }
-
-    /// <summary>
-    /// Admin: Generate a statement for any user's card.
-    /// </summary>
-    /// <param name="request">AdminGenerateStatementRequest with CardId and UserId</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>ApiResponse with generated statement ID</returns>
-    [HttpPost("admin/generate")]
-    [Authorize(Roles = "admin")]
-    public async Task<IActionResult> AdminGenerateStatement(
-        [FromBody] AdminGenerateStatementRequest request,
-        CancellationToken cancellationToken)
-    {
-        var authHeader = HttpContext.Request.Headers.Authorization.ToString();
-        var result = await mediator.Send(
-            new GenerateStatementCommand(request.CardId, request.UserId, authHeader),
-            cancellationToken);
-
-        return CreateResponse(result.Success, new { statementId = result.StatementId }, result.Message);
     }
 
     /// <summary>
@@ -169,7 +123,7 @@ public class StatementsController(IMediator mediator) : BaseApiController
         CancellationToken cancellationToken)
     {
         var statement = await db.Statements
-            .AsNoTracking()
+            .AsNoTracking()                     // fetch data from db but don;t trace
             .FirstOrDefaultAsync(x => x.Id == statementId, cancellationToken);
 
         if (statement is null)
@@ -204,6 +158,3 @@ public class StatementsController(IMediator mediator) : BaseApiController
         }, "Statement full details fetched.");
     }
 }
-
-public record GenerateStatementRequest(Guid CardId);
-public record AdminGenerateStatementRequest(Guid CardId, Guid UserId);

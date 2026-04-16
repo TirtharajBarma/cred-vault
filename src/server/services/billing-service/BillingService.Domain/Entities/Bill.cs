@@ -24,4 +24,6 @@ public sealed class Bill
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+
+    public ICollection<Statement> Statements { get; set; } = new List<Statement>();
 }

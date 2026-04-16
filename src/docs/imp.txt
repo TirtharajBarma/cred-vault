@@ -98,3 +98,13 @@ NotificationService
 server/services/notification-service/NotificationService.Application/Queries/Notifications/
 ├── GetAuditLogsQuery.cs
 └── GetNotificationLogsQuery.cs
+
+
+
+UseRouting
+2. UseCors
+3. UseHttpsRedirection
+4. UseAuthentication
+5. UseAuthorization
+6. UseSerilogRequestLogging (this is from Serilog library but is considered standard in .NET projects)
+7. UseStandardApi (custom extension method, wraps UseRouting + exception handling)

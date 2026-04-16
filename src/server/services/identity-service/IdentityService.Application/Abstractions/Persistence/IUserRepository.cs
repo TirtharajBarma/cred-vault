@@ -16,6 +16,7 @@ public interface IUserRepository
     /// <param name="user">IdentityUser entity to create (Id should be generated beforehand)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task AddAsync(IdentityUser user, CancellationToken cancellationToken = default);
+    //! IdentityUser -> user domain
 
     /// <summary>
     /// Retrieves a user by their unique identifier.
@@ -23,6 +24,7 @@ public interface IUserRepository
     /// <param name="userId">User's GUID identifier</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>IdentityUser if found, null otherwise</returns>
+    //! <T> -> returns
     Task<IdentityUser?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>

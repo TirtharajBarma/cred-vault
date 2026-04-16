@@ -30,7 +30,7 @@ public static class IdentityHelpers
             Email = user.Email,
             FullName = user.FullName,
             IsEmailVerified = user.IsEmailVerified,
-            Status = ToApiStatus(user.Status),
+            Status = ToApiStatus(user.Status),      // covert enum to string
             Role = ToApiRole(user.Role)
         };
 
@@ -47,7 +47,7 @@ public static class IdentityHelpers
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SecretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new List<Claim>
+        var claims = new List<Claim>        // create claims
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -55,14 +55,15 @@ public static class IdentityHelpers
             new(ClaimTypes.Role, ToApiRole(user.Role))
         };
 
-        var token = new JwtSecurityToken(
+        var token = new JwtSecurityToken(       // build actual jwt
             issuer: options.Issuer,
             audience: options.Audience,
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(options.AccessTokenMinutes),
-            signingCredentials: creds);
+            signingCredentials: creds
+        );
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return new JwtSecurityTokenHandler().WriteToken(token); // convert to string
     }
 
     /// <summary>
@@ -73,7 +74,7 @@ public static class IdentityHelpers
     public static string GenerateOtpCode() => RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
     /// <summary>
-    /// Converts internal UserRole enum to API-friendly string.
+    ///! Converts internal UserRole enum to API-friendly string.
     /// </summary>
     /// <param name="role">Internal UserRole (Admin or User)</param>
     /// <returns>String: "admin" or "user"</returns>

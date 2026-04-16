@@ -95,8 +95,12 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   openUserManagement(userId: string, cardId?: string) {
     this.showAlerts.set(false);
-    const queryParams = cardId ? { userId, cardId } : { userId };
-    this.router.navigate(['/admin/users'], { queryParams });
+    this.router.navigate(['/admin/users', userId]);
+  }
+
+  openCardSetup(userId: string, cardId: string) {
+    this.showAlerts.set(false);
+    this.router.navigate(['/admin/users', userId, 'cards', cardId]);
   }
 
   loadPendingCardAlerts() {

@@ -5,6 +5,7 @@ import { StatementService, StatementDetail } from '../../../core/services/reward
 import { DashboardService } from '../../../core/services/dashboard.service';
 import { CreditCard } from '../../../core/models/card.models';
 import { StatementAnalyticsComponent } from '../analytics/analytics.component';
+import { formatIstDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-statement-detail',
@@ -75,18 +76,20 @@ export class StatementDetailComponent implements OnInit {
 
   getStatusLabel(status: number): string {
     switch (status) {
-      case 1: return 'Pending';
-      case 2: return 'Paid';
-      case 3: return 'Overdue';
+      case 0: return 'Generated';
+      case 1: return 'Paid';
+      case 2: return 'Overdue';
+      case 3: return 'Partially Paid';
       default: return 'Unknown';
     }
   }
 
   getStatusClass(status: number): string {
     switch (status) {
-      case 1: return 'bg-[#ffdcbd]/30 text-[#693c00]';
-      case 2: return 'bg-emerald-100 text-emerald-700';
-      case 3: return 'bg-red-100 text-red-700';
+      case 0: return 'bg-[#ffdcbd]/30 text-[#693c00]';
+      case 1: return 'bg-emerald-100 text-emerald-700';
+      case 2: return 'bg-red-100 text-red-700';
+      case 3: return 'bg-amber-100 text-amber-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   }
@@ -94,24 +97,10 @@ export class StatementDetailComponent implements OnInit {
   formatDate(date: string | null, includeTime = false): string {
     if (!date) return 'N/A';
 
-    const options: Intl.DateTimeFormatOptions = includeTime
-      ? {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-          timeZone: 'Asia/Kolkata'
-        }
-      : {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          timeZone: 'Asia/Kolkata'
-        };
+    const formatted = includeTime
+      ? formatIstDate(date, 'MMM d, y, hh:mm a', 'N/A')
+      : formatIstDate(date, 'MMM d, y', 'N/A');
 
-    const formatted = new Intl.DateTimeFormat('en-IN', options).format(new Date(date));
     return includeTime ? `${formatted} IST` : formatted;
   }
 
@@ -157,5 +146,32 @@ export class StatementDetailComponent implements OnInit {
 
   exportToPdf(): void {
     window.print();
+  }
+
+  private normalizeStatementTransactionType(type: string | null | undefined): 'purchase' | 'payment' | 'refund' | 'other' {
+    const lowered = (type || '').trim().toLowerCase();
+    if (lowered === 'purchase' || lowered === 'debit') return 'purchase';
+    if (lowered === 'payment' || lowered === 'credit') return 'payment';
+    if (lowered === 'refund') return 'refund';
+    return 'other';
+  }
+
+  isStatementCredit(tx: { type: string; amount: number }): boolean {
+    const normalized = this.normalizeStatementTransactionType(tx.type);
+    if (normalized === 'payment' || normalized === 'refund') return true;
+    if (normalized === 'purchase') return false;
+    return tx.amount < 0;
+  }
+
+  getStatementTransactionIcon(tx: { type: string; amount: number }): string {
+    return this.isStatementCredit(tx) ? 'payments' : 'shopping_cart';
+  }
+
+  getStatementTransactionAmountPrefix(tx: { type: string; amount: number }): string {
+    return this.isStatementCredit(tx) ? '+' : '-';
+  }
+
+  getStatementTransactionAmountValue(tx: { type: string; amount: number }): number {
+    return Math.abs(tx.amount);
   }
 }

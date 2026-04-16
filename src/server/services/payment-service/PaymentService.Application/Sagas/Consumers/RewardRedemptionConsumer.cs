@@ -69,10 +69,13 @@ public class RewardRedemptionConsumer(
                 return;
             }
 
+            // convert to string
             var responseBody = await response.Content.ReadAsStringAsync(context.CancellationToken);
+            
+            // parse string -> c# code
             var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
-            var dataElement = responseJson.RootElement.GetProperty("data");
-            var actualDollarValue = dataElement.TryGetProperty("dollarValue", out var dv) 
+            var dataElement = responseJson.RootElement.GetProperty("data");             // get the "data" obj
+            var actualDollarValue = dataElement.TryGetProperty("dollarValue", out var dv)       // access only the dollarValue inside the obj safety
                 ? dv.GetDecimal() 
                 : 0m;
 

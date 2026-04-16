@@ -35,5 +35,5 @@ public interface ICardRepository
     Task<List<CardTransaction>> GetTransactionsByCardAndUserAsync(Guid cardId, Guid userId, CancellationToken cancellationToken = default);
     Task<List<CardTransaction>> GetTransactionsByCardIdAsync(Guid cardId, CancellationToken cancellationToken = default);
     Task<List<CardTransaction>> GetTransactionsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-    Task<bool> HasDuplicateTransactionAsync(Guid cardId, TransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default);
+    Task<bool> HasDuplicateTransactionAsync(Guid cardId, CardTransactionType type, decimal amount, string description, DateTime dateUtc, CancellationToken cancellationToken = default);
 }

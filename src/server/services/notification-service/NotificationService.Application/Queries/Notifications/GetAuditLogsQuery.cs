@@ -16,11 +16,11 @@ public class GetAuditLogsQueryHandler(
 {
     public async Task<ApiResponse<GetAuditLogsResult>> Handle(GetAuditLogsQuery request, CancellationToken cancellationToken)
     {
-        var query = ((INotificationDbContext)dbContext).AuditLogs;
+        var query = ((INotificationDbContext)dbContext).AuditLogs;      // SELECT * FROM AuditLogs
 
         if (!string.IsNullOrEmpty(request.UserId))
         {
-            query = query.Where(l => l.UserId == request.UserId);
+            query = query.Where(l => l.UserId == request.UserId);       // WHERE UserId = 'abc'
         }
 
         if (!string.IsNullOrEmpty(request.TraceId))

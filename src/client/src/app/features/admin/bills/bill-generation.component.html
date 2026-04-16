@@ -5,6 +5,52 @@
     <p class="text-misty-gray font-medium text-sm lg:text-lg max-w-xl">Manual ledger reconciliation and mandatory billing cycle execution.</p>
   </div>
 
+  <!-- Demo Fast Lane -->
+  <div class="glass-card-premium p-5 lg:p-6 rounded-2xl lg:rounded-4xl border border-emerald-500/20 bg-emerald-50/30">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+      <div>
+        <h2 class="text-lg lg:text-xl font-black text-charcoal flex items-center gap-2">
+          <span class="material-symbols-outlined text-emerald-600">rocket_launch</span>
+          Demo Fast Lane
+        </h2>
+        <p class="text-xs lg:text-sm text-charcoal/60">Cards with outstanding balances are listed here for one-click bill generation.</p>
+      </div>
+      <span class="px-3 py-1 rounded-full bg-white border border-emerald-200 text-[10px] lg:text-xs font-black uppercase tracking-wider text-emerald-700">
+        {{ eligibleCards().length }} eligible cards
+      </span>
+    </div>
+
+    @if (isLoadingEligibleCards()) {
+      <div class="space-y-2">
+        @for (_ of [1,2,3]; track $index) {
+          <div class="h-14 rounded-xl bg-white/70 border border-charcoal/5 animate-pulse"></div>
+        }
+      </div>
+    } @else if (eligibleCards().length > 0) {
+      <div class="max-h-56 overflow-y-auto space-y-2 pr-1">
+        @for (card of eligibleCards(); track card.cardId) {
+          <button type="button" (click)="useEligibleCard(card)"
+                  class="w-full text-left rounded-xl border border-charcoal/10 bg-white px-4 py-3 hover:bg-mist-cream/50 hover:border-emerald-300 transition-all">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <p class="text-sm font-bold text-charcoal">{{ card.userName }} • {{ card.issuerName }} •••• {{ card.last4 }}</p>
+                <p class="text-xs text-charcoal/60">{{ card.userEmail }} • {{ card.network }}</p>
+              </div>
+              <div class="text-left sm:text-right">
+                <p class="text-[10px] uppercase tracking-wider text-charcoal/50 font-bold">Outstanding</p>
+                <p class="text-sm font-black text-red-600">{{ formatAmount(card.outstandingBalance, card.currency) }}</p>
+              </div>
+            </div>
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="rounded-xl border border-charcoal/10 bg-white p-4 text-sm text-charcoal/60">
+        No cards with outstanding balance found right now.
+      </div>
+    }
+  </div>
+
   <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-12">
     <!-- Form Section -->
     <div class="lg:col-span-3">
@@ -43,6 +89,8 @@
         }
 
         <form [formGroup]="billForm" (ngSubmit)="generateBill()" class="space-y-5 relative z-10">
+          <input type="hidden" formControlName="userId" />
+
           <!-- User Selection -->
           <div class="space-y-2">
             <label class="text-[10px] font-black uppercase tracking-widest text-misty-gray ml-1">Select User</label>
@@ -53,14 +101,39 @@
               </div>
             } @else {
               <div class="relative">
-                <select formControlName="userId" (change)="onUserChange($event)" 
-                        class="premium-input px-5 h-14 text-base appearance-none cursor-pointer bg-white/60">
-                  <option value="">-- Select User --</option>
-                  @for (user of users(); track user.id) {
-                    <option [value]="user.id">{{ user.fullName }} ({{ user.email }})</option>
-                  }
-                </select>
-                <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-charcoal/30">unfold_more</span>
+                <input
+                  type="text"
+                  [value]="userSearchTerm()"
+                  (input)="onUserSearchInput($event)"
+                  (focus)="onUserInputFocus()"
+                  (blur)="onUserInputBlur()"
+                  placeholder="Search by name or email"
+                  autocomplete="off"
+                  class="premium-input pl-5 pr-20 h-14 text-base bg-white/60"
+                />
+                <span class="material-symbols-outlined absolute right-14 top-1/2 -translate-y-1/2 pointer-events-none text-charcoal/30">search</span>
+                @if (userSearchTerm()) {
+                  <button type="button" (click)="clearUserSelection()"
+                          class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-charcoal/5 hover:bg-charcoal/10 transition-colors flex items-center justify-center">
+                    <span class="material-symbols-outlined text-base text-charcoal/50">close</span>
+                  </button>
+                }
+
+                @if (isUserDropdownOpen()) {
+                  <div class="absolute z-40 mt-2 w-full rounded-xl border border-charcoal/10 bg-white shadow-2xl max-h-72 overflow-y-auto">
+                    @if (filteredUsers().length === 0) {
+                      <div class="px-4 py-3 text-sm text-charcoal/50">No users found</div>
+                    } @else {
+                      @for (user of filteredUsers(); track user.id) {
+                        <button type="button" (mousedown)="selectUser(user)"
+                                class="w-full px-4 py-3 text-left hover:bg-mist-cream/70 transition-colors border-b border-charcoal/5 last:border-b-0">
+                          <p class="text-sm font-semibold text-charcoal">{{ user.fullName }}</p>
+                          <p class="text-xs text-charcoal/50">{{ user.email }}</p>
+                        </button>
+                      }
+                    }
+                  </div>
+                }
               </div>
             }
           </div>
@@ -83,7 +156,7 @@
                         class="premium-input px-5 h-14 text-base appearance-none cursor-pointer bg-white/60">
                   <option value="">-- Select Card --</option>
                   @for (card of cards(); track card.id) {
-                    <option [value]="card.id">{{ card.cardBrand || 'Card' }} ****{{ card.last4 }} - {{ card.outstandingBalance | currency }} outstanding</option>
+                    <option [value]="card.id">{{ getNetworkName(card.network) }} ****{{ card.last4 }} - {{ formatAmount(card.outstandingBalance, card.currency) }} outstanding</option>
                   }
                 </select>
                 <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-charcoal/30">unfold_more</span>
@@ -98,18 +171,18 @@
           @if (selectedCardDetails()) {
             <div class="p-4 bg-mist-cream/50 rounded-xl border border-charcoal/5 animate-in slide-in-from-top-4">
               <h4 class="text-xs font-black text-charcoal/60 uppercase tracking-wider mb-3">Selected Card Details</h4>
-              <div class="grid grid-cols-3 gap-4 text-center">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                 <div class="p-3 bg-white rounded-xl">
                   <p class="text-[10px] text-misty-gray uppercase tracking-wider mb-1">Outstanding</p>
-                  <p class="text-lg font-black text-red-500">{{ selectedCardDetails().outstandingBalance | currency }}</p>
+                  <p class="text-base sm:text-lg font-black text-red-500 tabular-nums whitespace-nowrap">{{ formatAmount(selectedCardDetails().outstandingBalance, getSelectedCurrencyCode()) }}</p>
                 </div>
                 <div class="p-3 bg-white rounded-xl">
                   <p class="text-[10px] text-misty-gray uppercase tracking-wider mb-1">Credit Limit</p>
-                  <p class="text-lg font-black text-charcoal">{{ selectedCardDetails().creditLimit | currency }}</p>
+                  <p class="text-base sm:text-lg font-black text-charcoal tabular-nums whitespace-nowrap">{{ formatAmount(selectedCardDetails().creditLimit, getSelectedCurrencyCode()) }}</p>
                 </div>
                 <div class="p-3 bg-white rounded-xl">
                   <p class="text-[10px] text-misty-gray uppercase tracking-wider mb-1">Available</p>
-                  <p class="text-lg font-black text-emerald-600">{{ getAvailableBalance() | currency }}</p>
+                  <p class="text-base sm:text-lg font-black text-emerald-600 tabular-nums whitespace-nowrap">{{ formatAmount(getAvailableBalance(), getSelectedCurrencyCode()) }}</p>
                 </div>
               </div>
             </div>

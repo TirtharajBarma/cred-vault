@@ -64,7 +64,7 @@ public class ExceptionHandlingMiddleware
             Message = ex.Message,
             ErrorCode = ex.ErrorCode,
             Data = problem,
-            TraceId = context.TraceIdentifier
+            TraceId = context.TraceIdentifier    //  ← ASP.NET auto-generates this
         };
 
         await context.Response.WriteAsJsonAsync(response, new JsonSerializerOptions

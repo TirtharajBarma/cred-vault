@@ -15,6 +15,7 @@ public class GetAllPaymentsQueryHandler(IPaymentRepository paymentRepository)
     public async Task<List<PaymentDto>> Handle(GetAllPaymentsQuery request, CancellationToken cancellationToken)
     {
         var payments = await paymentRepository.GetByUserIdAsync(request.UserId);
+        
         return payments.Select(PaymentMapping.ToDto).ToList();
     }
 }
@@ -27,6 +28,7 @@ public class GetPaymentByIdQueryHandler(IPaymentRepository paymentRepository)
         var payment = await paymentRepository.GetByIdAsync(request.PaymentId);
         if (payment is null || payment.UserId != request.RequestingUserId)
             return null;
+        
         return PaymentMapping.ToDto(payment);
     }
 }

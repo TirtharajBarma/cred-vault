@@ -3,13 +3,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CardService.Infrastructure.Persistence.Sql;
 
-public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbContext(options)
+public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbContext(options)     // options -> DB connection config
 {
+    // DbSet -> table
+    // entity -> row
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
     public DbSet<CardIssuer> CardIssuers => Set<CardIssuer>();
     public DbSet<CardTransaction> CardTransactions => Set<CardTransaction>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder modelBuilder)      // how DB table should be structured
     {
         modelBuilder.Entity<CardIssuer>(entity =>
         {
@@ -26,13 +28,15 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
         {
             entity.ToTable("CreditCards");
             entity.HasKey(x => x.Id);
-            entity.HasOne(x => x.Issuer)
-                .WithMany()
-                .HasForeignKey(x => x.IssuerId)
+            entity.HasOne(x => x.Issuer)        // -> credit card depends on card issuer
+                .WithMany()                        // -> one Issuer have many credit-cards
+                .HasForeignKey(x => x.IssuerId)     // use IssuerId in CreditCard as FK : [CreditCards.IssuerId  →  CardIssuers.Id]
+                // HasPrincipalKey(x => x.IssuerCode); [CreditCards.IssuerId → CardIssuers.IssuerCode]
                 .OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.CardholderName).IsRequired().HasMaxLength(256);
             entity.Property(x => x.Last4).IsRequired().HasMaxLength(4);
             entity.Property(x => x.MaskedNumber).IsRequired().HasMaxLength(32);
+            entity.Property(x => x.EncryptedCardNumber).HasMaxLength(512);
             entity.Property(x => x.ExpMonth).IsRequired();
             entity.Property(x => x.ExpYear).IsRequired();
             entity.Property(x => x.CreditLimit).IsRequired().HasColumnType("decimal(18,2)");
@@ -55,7 +59,7 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
         {
             entity.ToTable("CardTransactions");
             entity.HasKey(x => x.Id);
-            entity.HasOne(x => x.Card)
+            entity.HasOne(x => x.Card)                  // transaction depends on credit card
                 .WithMany()
                 .HasForeignKey(x => x.CardId)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -68,7 +72,7 @@ public sealed class CardDbContext(DbContextOptions<CardDbContext> options) : DbC
             entity.HasIndex(x => x.CardId);
             entity.HasIndex(x => x.UserId);
             entity.HasIndex(x => x.DateUtc);
-            entity.HasQueryFilter(x => !x.Card!.IsDeleted);
+            entity.HasQueryFilter(x => !x.Card!.IsDeleted);     // only return transactions where the related card is NOT deleted
         });
     }
 }

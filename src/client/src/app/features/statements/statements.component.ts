@@ -4,11 +4,13 @@ import { Router } from '@angular/router';
 import { StatementService, Statement } from '../../core/services/rewards.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { CreditCard } from '../../core/models/card.models';
+import { IstDatePipe } from '../../shared/pipes/ist-date.pipe';
+import { formatIstDate, parseUtcDate } from '../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-statements',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IstDatePipe],
   templateUrl: './statements.component.html',
   styleUrls: ['./statements.component.css']
 })
@@ -160,7 +162,7 @@ export class StatementsComponent implements OnInit {
         this.getStatementBadgeLabel(s),
         this.getDisplayAmount(s),
         s.minimumDue,
-        s.dueDateUtc ? new Date(s.dueDateUtc).toLocaleDateString() : 'N/A'
+        s.dueDateUtc ? formatIstDate(s.dueDateUtc, 'MM/dd/yyyy', 'N/A') : 'N/A'
       ];
     });
     
@@ -234,7 +236,7 @@ export class StatementsComponent implements OnInit {
     if (closingBalance <= 0) return 2;
 
     if (statement.dueDateUtc) {
-      const dueDate = new Date(statement.dueDateUtc);
+      const dueDate = parseUtcDate(statement.dueDateUtc);
       if (dueDate.getTime() < Date.now()) {
         return 3;
       }

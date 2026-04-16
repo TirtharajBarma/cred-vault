@@ -1,7 +1,9 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
+import { formatIstDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-system-logs',
@@ -11,6 +13,7 @@ import { AdminService } from '../../../core/services/admin.service';
 })
 export class SystemLogsComponent implements OnInit {
   private adminService = inject(AdminService);
+  private router = inject(Router);
   Math = Math;
   
   isLoading = signal(true);
@@ -28,6 +31,8 @@ export class SystemLogsComponent implements OnInit {
   // Filters (backend only supports traceId for audit, email for notifications)
   traceIdFilter = signal('');
   emailFilter = signal('');
+  selectedLog = signal<any | null>(null);
+  selectedLogType = signal<'audit' | 'activity' | null>(null);
 
   ngOnInit() {
     this.fetchData();
@@ -103,6 +108,7 @@ export class SystemLogsComponent implements OnInit {
 
   switchTab(tab: 'audit' | 'activity') {
     this.activeTab.set(tab);
+    this.clearLogDetail();
     this.currentPage.set(1);
     this.auditLogs.set([]);
     this.notificationLogs.set([]);
@@ -115,6 +121,7 @@ export class SystemLogsComponent implements OnInit {
   }
 
   onSearch() {
+    this.clearLogDetail();
     this.currentPage.set(1);
     if (this.activeTab() === 'audit') {
       this.fetchData();
@@ -144,6 +151,7 @@ export class SystemLogsComponent implements OnInit {
   }
 
   refresh() {
+    this.clearLogDetail();
     this.currentPage.set(1);
     if (this.activeTab() === 'audit') {
       this.fetchData();
@@ -166,15 +174,7 @@ export class SystemLogsComponent implements OnInit {
 
   formatDateTime(dateStr: string): string {
     if (!dateStr) return '-';
-    return `${new Intl.DateTimeFormat('en-IN', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata'
-    }).format(new Date(dateStr))} IST`;
+    return `${formatIstDate(dateStr, 'MMM d, y, hh:mm a', '-')} IST`;
   }
 
   getAuditEventTitle(log: any): string {
@@ -186,6 +186,19 @@ export class SystemLogsComponent implements OnInit {
   getAuditActor(log: any): string {
     const changes = this.parseJson(log?.changes);
     return changes?.UserId || changes?.userId || changes?.Actor || changes?.actor || 'System';
+  }
+
+  getAuditUser(log: any): string {
+    const changes = this.parseJson(log?.changes);
+    const fullName = this.pickFirst(changes, ['FullName', 'fullName', 'Name', 'name']);
+    const email = this.pickFirst(changes, ['Email', 'email']);
+    const userId = this.pickFirst(changes, ['UserId', 'userId']) || log?.userId;
+
+    if (fullName) return fullName;
+    if (email) return email;
+    if (userId) return String(userId);
+
+    return 'System';
   }
 
   getAuditContext(log: any): string {
@@ -213,6 +226,19 @@ export class SystemLogsComponent implements OnInit {
     return log?.subject || 'Notification';
   }
 
+  getNotificationUser(log: any): string {
+    const payload = this.parseJson(log?.body);
+    const fullName = this.pickFirst(payload, ['FullName', 'fullName', 'Name', 'name']);
+    const email = this.pickFirst(payload, ['Email', 'email']) || log?.recipient;
+    const userId = this.pickFirst(payload, ['UserId', 'userId']);
+
+    if (fullName) return fullName;
+    if (email) return String(email);
+    if (userId) return String(userId);
+
+    return 'Unknown user';
+  }
+
   getNotificationContext(log: any): string {
     const payload = this.parseJson(log?.body);
     const parts: string[] = [];
@@ -229,6 +255,104 @@ export class SystemLogsComponent implements OnInit {
     return parts.join(' | ') || 'No contextual payload';
   }
 
+  openAuditDetail(log: any) {
+    this.selectedLogType.set('audit');
+    this.selectedLog.set(log);
+  }
+
+  openActivityDetail(log: any) {
+    this.selectedLogType.set('activity');
+    this.selectedLog.set(log);
+  }
+
+  clearLogDetail() {
+    this.selectedLog.set(null);
+    this.selectedLogType.set(null);
+  }
+
+  getDetailRows(): Array<{ label: string; value: string }> {
+    const log = this.selectedLog();
+    const type = this.selectedLogType();
+
+    if (!log || !type) {
+      return [];
+    }
+
+    if (type === 'audit') {
+      return [
+        { label: 'Event', value: this.getAuditEventTitle(log) },
+        { label: 'User', value: this.getAuditUser(log) },
+        { label: 'Action', value: log?.action || '-' },
+        { label: 'Actor', value: this.getAuditActor(log) },
+        { label: 'Entity', value: log?.entityName || '-' },
+        { label: 'Entity ID', value: log?.entityId || '-' },
+        { label: 'Trace ID', value: log?.traceId || '-' },
+        { label: 'Time', value: this.formatDateTime(log?.createdAtUtc) },
+        { label: 'Context', value: this.getAuditContext(log) }
+      ];
+    }
+
+    return [
+      { label: 'Event', value: this.getNotificationTitle(log) },
+      { label: 'User', value: this.getNotificationUser(log) },
+      { label: 'Status', value: log?.isSuccess ? 'Success' : 'Failed' },
+      { label: 'Recipient', value: log?.recipient || '-' },
+      { label: 'Type', value: log?.type || '-' },
+      { label: 'Trace ID', value: log?.traceId || '-' },
+      { label: 'Time', value: this.formatDateTime(log?.createdAtUtc) },
+      { label: 'Context', value: this.getNotificationContext(log) },
+      { label: 'Error', value: log?.errorMessage || '-' }
+    ];
+  }
+
+  canOpenSelectedUser(): boolean {
+    return !!this.getSelectedUserId();
+  }
+
+  openSelectedUser(): void {
+    const userId = this.getSelectedUserId();
+    if (!userId) return;
+    this.router.navigate(['/admin/users', userId]);
+  }
+
+  getSelectedUserId(): string | null {
+    const log = this.selectedLog();
+    const type = this.selectedLogType();
+
+    if (!log || !type) return null;
+
+    if (type === 'audit') {
+      const changes = this.parseJson(log?.changes);
+      const id = this.pickFirst(changes, ['UserId', 'userId']) || log?.userId;
+      return this.asGuid(id);
+    }
+
+    const payload = this.parseJson(log?.body);
+    const id = this.pickFirst(payload, ['UserId', 'userId']);
+    return this.asGuid(id);
+  }
+
+  getSelectedRawPayload(): string {
+    const log = this.selectedLog();
+    const type = this.selectedLogType();
+
+    if (!log || !type) {
+      return '{}';
+    }
+
+    const payload = type === 'audit' ? this.parseJson(log?.changes) : this.parseJson(log?.body);
+
+    if (!payload) {
+      return '{}';
+    }
+
+    try {
+      return JSON.stringify(payload, null, 2);
+    } catch {
+      return '{}';
+    }
+  }
+
   private parseJson(value: any): any {
     if (!value) return null;
     if (typeof value === 'object') return value;
@@ -237,5 +361,25 @@ export class SystemLogsComponent implements OnInit {
     } catch {
       return null;
     }
+  }
+
+  private pickFirst(source: any, keys: string[]): string | null {
+    if (!source || typeof source !== 'object') return null;
+
+    for (const key of keys) {
+      const value = source?.[key];
+      if (value !== undefined && value !== null && String(value).trim()) {
+        return String(value).trim();
+      }
+    }
+
+    return null;
+  }
+
+  private asGuid(value: unknown): string | null {
+    if (!value) return null;
+    const text = String(value).trim();
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return guidRegex.test(text) ? text : null;
   }
 }

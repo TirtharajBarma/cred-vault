@@ -45,7 +45,7 @@ public sealed class SqlUserRepository(IdentityDbContext dbContext) : IUserReposi
     /// </summary>
     public async Task UpdateAsync(IdentityUser user, CancellationToken cancellationToken = default)
     {
-        dbContext.Users.Update(user);
+        dbContext.Users.Update(user);       // EF -> inbuilt, this obj is changed marked as updated in db
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

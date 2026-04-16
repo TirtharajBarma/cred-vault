@@ -13,15 +13,15 @@ public class PaymentReversedConsumer(
 {
     public async Task Consume(ConsumeContext<IPaymentReversed> context)
     {
-        var message = context.Message;
+        var message = context.Message;      // got the actual event data
 
         logger.LogInformation("PaymentReversed: PaymentId={PaymentId}, CardId={CardId}, Amount={Amount} - Restoring card balance", 
             message.PaymentId, message.CardId, message.Amount);
 
         try
         {
-            var card = await dbContext.CreditCards
-                .IgnoreQueryFilters()
+            var card = await dbContext.CreditCards      // find card
+                .IgnoreQueryFilters()                   // ignore soft-deleted card [still fetches it]
                 .FirstOrDefaultAsync(x => x.Id == message.CardId, context.CancellationToken);
 
             if (card is null)
@@ -30,10 +30,10 @@ public class PaymentReversedConsumer(
                 return;
             }
 
-            card.OutstandingBalance += message.Amount;
+            card.OutstandingBalance += message.Amount;      // restore balance
             card.UpdatedAtUtc = DateTime.UtcNow;
 
-            await dbContext.SaveChangesAsync(context.CancellationToken);
+            await dbContext.SaveChangesAsync(context.CancellationToken);    // save to db
 
             logger.LogInformation("Card balance restored: CardId={CardId}, NewOutstanding={Outstanding}", 
                 message.CardId, card.OutstandingBalance);

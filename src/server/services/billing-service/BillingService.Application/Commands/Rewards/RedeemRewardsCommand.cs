@@ -9,8 +9,8 @@ namespace BillingService.Application.Commands.Rewards;
 public record RedeemRewardsCommand(
     Guid UserId,
     int Points,
-    RedeemRewardsTarget Target,
-    Guid? TargetId
+    RedeemRewardsTarget Target,         // where to apply
+    Guid? TargetId                      // which bill
 ) : IRequest<ApiResponse<RedeemRewardsResult>>;
 
 public enum RedeemRewardsTarget
@@ -18,6 +18,9 @@ public enum RedeemRewardsTarget
     Account = 1,
     Bill = 2
 }
+
+// normal flow -> redeemRewardTarget = Bill
+
 
 public class RedeemRewardsResult
 {
@@ -84,7 +87,7 @@ public class RedeemRewardsCommandHandler(
                 return await HandleAccountRedemption(account, request.Points, dollarValue, now, cancellationToken);
 
             case RedeemRewardsTarget.Bill:
-                if (!request.TargetId.HasValue)
+                if (!request.TargetId.HasValue)     // you must provide bill-Id
                 {
                     return new ApiResponse<RedeemRewardsResult> { Success = false, Message = "Bill ID is required for bill redemption." };
                 }
@@ -111,7 +114,7 @@ public class RedeemRewardsCommandHandler(
         {
             Id = Guid.NewGuid(),
             RewardAccountId = account.Id,
-            BillId = null, // Account redemption - no bill associated
+            BillId = null,                  // Account redemption - no bill associated
             Points = points,
             Type = RewardTransactionType.Redeemed,
             CreatedAtUtc = now
@@ -197,6 +200,7 @@ public class RedeemRewardsCommandHandler(
             };
         }
 
+        // user pay will rewards
         var paymentAmount = dollarValue;
         var existingPaid = bill.AmountPaid ?? 0;
         var proposedTotalPaid = existingPaid + paymentAmount;

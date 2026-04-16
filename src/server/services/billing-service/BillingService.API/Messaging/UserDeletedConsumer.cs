@@ -8,6 +8,7 @@ namespace BillingService.API.Messaging;
 
 public class UserDeletedConsumer(BillingDbContext db, ILogger<UserDeletedConsumer> logger) : IConsumer<IUserDeleted>
 {
+    // cancel their bills, remove their reward acct, delete reward transaction
     public async Task Consume(ConsumeContext<IUserDeleted> context)
     {
         var userId = context.Message.UserId;
@@ -15,7 +16,7 @@ public class UserDeletedConsumer(BillingDbContext db, ILogger<UserDeletedConsume
 
         try
         {
-            var bills = await db.Bills.Where(x => x.UserId == userId).ToListAsync(context.CancellationToken);
+            var bills = await db.Bills.Where(x => x.UserId == userId).ToListAsync(context.CancellationToken);       // fetch all bills of the user
             foreach (var bill in bills)
             {
                 bill.Status = Domain.Entities.BillStatus.Cancelled;
@@ -26,6 +27,7 @@ public class UserDeletedConsumer(BillingDbContext db, ILogger<UserDeletedConsume
             if (rewardAccount != null)
             {
                 // Delete all reward transactions for this account first (cascade handles this, but be explicit)
+                //! firstly delete all reward transaction of reward account
                 var rewardTransactions = await db.RewardTransactions
                     .Where(x => x.RewardAccountId == rewardAccount.Id)
                     .ToListAsync(context.CancellationToken);

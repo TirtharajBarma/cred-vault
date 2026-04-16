@@ -1,0 +1,372 @@
+{
+  "Routes": [
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/users",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/users",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/users",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/users",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/users/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/users/{everything}",
+      "UpstreamHttpMethod": ["GET", "PUT", "PATCH", "DELETE"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/auth/register",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/auth/register",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/auth/login",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/auth/login",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/auth/verify-email-otp",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/auth/verify-email-otp",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/auth/resend-verification",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/auth/resend-verification",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/auth/forgot-password",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/auth/forgot-password",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/auth/reset-password",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/auth/reset-password",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/identity/auth/google",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "identity-service", "Port": 5001 }],
+      "UpstreamPathTemplate": "/api/v1/identity/auth/google",
+      "UpstreamHttpMethod": ["POST"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/cards",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/transactions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards/transactions",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards/{everything}",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/{cardId}/transactions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards/{cardId}/transactions",
+      "UpstreamHttpMethod": ["GET", "POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/admin/{cardId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards/admin/{cardId}",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/admin/{cardId}/transactions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards/admin/{cardId}/transactions",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/{cardId}/admin",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards/{cardId}/admin",
+      "UpstreamHttpMethod": ["PUT"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/cards/user/{userId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/cards/user/{userId}",
+      "UpstreamHttpMethod": ["GET"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/issuers",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/issuers",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/issuers/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "card-service", "Port": 5002 }],
+      "UpstreamPathTemplate": "/api/v1/issuers/{everything}",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/bills",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/bills",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/bills/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/bills/{everything}",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/bills/has-pending/{cardId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/bills/has-pending/{cardId}",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/bills/admin/generate-bill",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/bills/admin/generate-bill",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/bills/admin/check-overdue",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/bills/admin/check-overdue",
+      "UpstreamHttpMethod": ["POST"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/statements",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/statements",
+      "UpstreamHttpMethod": ["GET", "POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/statements/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/statements/{everything}",
+      "UpstreamHttpMethod": ["GET", "POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/statements/admin/all",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/statements/admin/all",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/statements/bill/{billId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/statements/bill/{billId}",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/statements/{statementId}/transactions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/statements/{statementId}/transactions",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/statements/admin/{statementId}/full",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/statements/admin/{statementId}/full",
+      "UpstreamHttpMethod": ["GET"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/rewards/tiers",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/rewards/tiers",
+      "UpstreamHttpMethod": ["GET", "POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/rewards/tiers/{id}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/rewards/tiers/{id}",
+      "UpstreamHttpMethod": ["GET", "PUT", "DELETE"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/rewards/account",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/rewards/account",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/rewards/transactions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/rewards/transactions",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/billing/rewards/internal/redeem",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "billing-service", "Port": 5003 }],
+      "UpstreamPathTemplate": "/api/v1/billing/rewards/internal/redeem",
+      "UpstreamHttpMethod": ["POST"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/payments",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/payments",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/payments/initiate",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/payments/initiate",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/payments/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/payments/{everything}",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/payments/{paymentId}/verify-otp",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/payments/{paymentId}/verify-otp",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/payments/{paymentId}/resend-otp",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/payments/{paymentId}/resend-otp",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/payments/{paymentId}/transactions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/payments/{paymentId}/transactions",
+      "UpstreamHttpMethod": ["GET"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/wallets/me",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/wallets/me",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/wallets/balance",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/wallets/balance",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/wallets/topup",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/wallets/topup",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/wallets/transactions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/wallets/transactions",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/wallets/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/wallets/{everything}",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+
+    {
+      "DownstreamPathTemplate": "/api/v1/notifications",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "notification-service", "Port": 5005 }],
+      "UpstreamPathTemplate": "/api/v1/notifications",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/notifications/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "notification-service", "Port": 5005 }],
+      "UpstreamPathTemplate": "/api/v1/notifications/{everything}",
+      "UpstreamHttpMethod": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/notifications/logs",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "notification-service", "Port": 5005 }],
+      "UpstreamPathTemplate": "/api/v1/notifications/logs",
+      "UpstreamHttpMethod": ["GET"]
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/notifications/audit",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "notification-service", "Port": 5005 }],
+      "UpstreamPathTemplate": "/api/v1/notifications/audit",
+      "UpstreamHttpMethod": ["GET"]
+    }
+  ],
+  "GlobalConfiguration": {
+    "BaseUrl": "http://gateway:5006"
+  }
+}

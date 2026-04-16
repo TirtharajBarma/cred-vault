@@ -2,19 +2,19 @@ namespace BillingService.Domain.Entities;
 
 public enum BillStatus
 {
-    Pending = 1,
-    Paid = 2,
-    Overdue = 3,
-    Cancelled = 4,
-    PartiallyPaid = 5
+    Pending = 0,
+    Paid = 1,
+    Overdue = 2,
+    Cancelled = 3,
+    PartiallyPaid = 4
 }
 
 
 public enum RewardTransactionType
 {
-    Earned = 1,
-    Adjusted = 2,
-    Redeemed = 3,
-    Reversed = 4
+    Earned = 0,
+    Adjusted = 1,
+    Redeemed = 2,
+    Reversed = 3
 }
 

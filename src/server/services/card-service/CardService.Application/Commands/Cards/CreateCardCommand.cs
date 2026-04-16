@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace CardService.Application.Commands.Cards;
 
-public sealed record CreateCardCommand(Guid UserId, string CardholderName, int ExpMonth, int ExpYear, string CardNumber, Guid IssuerId, bool IsDefault) : IRequest<CardResult>;
+public sealed record CreateCardCommand(Guid UserId, string CardholderName, int ExpMonth, int ExpYear, string CardNumber, Guid IssuerId, bool IsDefault, string EncryptedCardNumber) : IRequest<CardResult>;
 
 public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndpoint publisher, ILogger<CreateCardCommandHandler> logger) : IRequestHandler<CreateCardCommand, CardResult>
 {
@@ -29,6 +29,12 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
         {
             logger.LogWarning("CreateCard rejected: missing card number or holder name");
             return new() { Success = false, ErrorCode = "ValidationError", Message = "Card number and holder name required" };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.EncryptedCardNumber))
+        {
+            logger.LogWarning("CreateCard rejected: encrypted card number missing");
+            return new() { Success = false, ErrorCode = "ValidationError", Message = "Card number could not be secured" };
         }
 
         if (request.ExpMonth < 1 || request.ExpMonth > 12)
@@ -67,7 +73,7 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
 
         var network = issuer.Network;
 
-        var last4 = digits.Length >= 4 ? digits[^4..] : digits;
+        var last4 = digits.Length >= 4 ? digits[^4..] : digits;     // extract the last 4 digit
         if (await cards.HasDuplicateCardAsync(request.UserId, network, last4, ct))
         {
             logger.LogWarning("CreateCard rejected: duplicate card for UserId={UserId}", request.UserId);
@@ -79,6 +85,7 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
             Id = Guid.NewGuid(), UserId = request.UserId, CardholderName = request.CardholderName.Trim(),
             ExpMonth = request.ExpMonth, ExpYear = request.ExpYear, Last4 = last4,
             MaskedNumber = CardHelpers.MaskCardNumber(digits), IssuerId = issuer.Id,
+            EncryptedCardNumber = request.EncryptedCardNumber,
             CreditLimit = 0, OutstandingBalance = 0, BillingCycleStartDay = DateTime.UtcNow.Day,
             IsDefault = request.IsDefault, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         };

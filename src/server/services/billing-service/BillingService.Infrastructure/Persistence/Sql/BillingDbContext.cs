@@ -74,6 +74,11 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options)
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
 
+            entity.HasOne(x => x.RewardTier)
+                .WithMany()
+                .HasForeignKey(x => x.RewardTierId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasIndex(x => x.UserId).IsUnique();
         });
 
@@ -131,6 +136,11 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options)
 
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            entity.HasOne(x => x.Bill)
+                .WithMany(b => b.Statements)
+                .HasForeignKey(x => x.BillId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(x => x.UserId);
             entity.HasIndex(x => x.CardId);

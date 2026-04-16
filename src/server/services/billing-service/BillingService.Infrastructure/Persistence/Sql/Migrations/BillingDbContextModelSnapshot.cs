@@ -106,6 +106,8 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("RewardTierId");
+
                     b.HasIndex("UserId")
                         .IsUnique();
 
@@ -281,6 +283,8 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BillId");
+
                     b.HasIndex("CardId");
 
                     b.HasIndex("PeriodEndUtc");
@@ -332,6 +336,16 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                     b.ToTable("StatementTransactions", (string)null);
                 });
 
+            modelBuilder.Entity("BillingService.Domain.Entities.RewardAccount", b =>
+                {
+                    b.HasOne("BillingService.Domain.Entities.RewardTier", "RewardTier")
+                        .WithMany()
+                        .HasForeignKey("RewardTierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RewardTier");
+                });
+
             modelBuilder.Entity("BillingService.Domain.Entities.RewardTransaction", b =>
                 {
                     b.HasOne("BillingService.Domain.Entities.Bill", null)
@@ -346,6 +360,16 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BillingService.Domain.Entities.Statement", b =>
+                {
+                    b.HasOne("BillingService.Domain.Entities.Bill", "Bill")
+                        .WithMany("Statements")
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Bill");
+                });
+
             modelBuilder.Entity("BillingService.Domain.Entities.StatementTransaction", b =>
                 {
                     b.HasOne("BillingService.Domain.Entities.Statement", "Statement")
@@ -356,6 +380,11 @@ namespace BillingService.Infrastructure.Persistence.Sql.Migrations
                         .HasConstraintName("FK_StatementTransactions_Statements_StatementId");
 
                     b.Navigation("Statement");
+                });
+
+            modelBuilder.Entity("BillingService.Domain.Entities.Bill", b =>
+                {
+                    b.Navigation("Statements");
                 });
 
             modelBuilder.Entity("BillingService.Domain.Entities.Statement", b =>

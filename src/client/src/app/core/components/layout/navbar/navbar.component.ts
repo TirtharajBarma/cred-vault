@@ -20,6 +20,17 @@ export class NavbarComponent {
   authService = inject(AuthService);
   private adminService = inject(AdminService);
   private eRef = inject(ElementRef);
+  private readonly istTimeFormatter = new Intl.DateTimeFormat('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
+  });
+  private readonly istMonthFormatter = new Intl.DateTimeFormat('en-IN', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata'
+  });
   
   user = this.authService.currentUser;
   isProfileOpen = signal(false);
@@ -29,7 +40,7 @@ export class NavbarComponent {
   notifications = signal<NotificationLog[]>([]);
   groupedNotifications = computed<NotificationGroup[]>(() => {
     const sorted = [...this.notifications()].sort(
-      (a, b) => new Date(b.createdAtUtc).getTime() - new Date(a.createdAtUtc).getTime()
+      (a, b) => this.parseUtcDate(b.createdAtUtc).getTime() - this.parseUtcDate(a.createdAtUtc).getTime()
     );
 
     const now = new Date();
@@ -165,24 +176,50 @@ export class NavbarComponent {
     }
   }
 
+  formatNotificationTime(createdAtUtc: string): string {
+    const date = this.parseUtcDate(createdAtUtc);
+    if (Number.isNaN(date.getTime())) return '--';
+    return this.istTimeFormatter.format(date);
+  }
+
   private getRelativeGroupLabel(createdAtUtc: string, now: Date): string {
-    const createdAt = new Date(createdAtUtc);
-    const dayDiff = this.getDayDifference(createdAt, now);
+    const createdAt = this.parseUtcDate(createdAtUtc);
+    if (Number.isNaN(createdAt.getTime())) return 'Recent';
+
+    const dayDiff = this.getDayDifferenceInIst(createdAt, now);
 
     if (dayDiff <= 0) return 'Today';
     if (dayDiff === 1) return 'Yesterday';
     if (dayDiff <= 7) return 'Earlier This Week';
 
-    return createdAt.toLocaleDateString('en-IN', {
-      month: 'short',
-      year: 'numeric'
-    });
+    return this.istMonthFormatter.format(createdAt);
   }
 
-  private getDayDifference(date: Date, compareTo: Date): number {
-    const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const compareStart = new Date(compareTo.getFullYear(), compareTo.getMonth(), compareTo.getDate());
-    return Math.floor((compareStart.getTime() - dateStart.getTime()) / (1000 * 60 * 60 * 24));
+  private parseUtcDate(value: string): Date {
+    if (!value) return new Date(Number.NaN);
+
+    const normalized = value.trim().replace(' ', 'T');
+    const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+    return new Date(hasOffset ? normalized : `${normalized}Z`);
+  }
+
+  private getDayDifferenceInIst(date: Date, compareTo: Date): number {
+    const toIstEpochDays = (input: Date): number => {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: 'Asia/Kolkata'
+      }).formatToParts(input);
+
+      const year = Number(parts.find((part) => part.type === 'year')?.value);
+      const month = Number(parts.find((part) => part.type === 'month')?.value);
+      const day = Number(parts.find((part) => part.type === 'day')?.value);
+
+      return Math.floor(Date.UTC(year, month - 1, day) / (1000 * 60 * 60 * 24));
+    };
+
+    return toIstEpochDays(compareTo) - toIstEpochDays(date);
   }
 
   @HostListener('document:click', ['$event'])

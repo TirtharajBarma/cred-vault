@@ -2,7 +2,6 @@ using BillingService.Infrastructure.Persistence.Sql;
 using BillingService.API.Messaging;
 using BillingService.Application.Abstractions.Persistence;
 using BillingService.Application.Commands.Bills;
-using BillingService.Application.Commands.Statements;
 using BillingService.Application.Queries.Bills;
 using BillingService.Application.Queries.Statements;
 using BillingService.Infrastructure.Persistence.Sql.Repositories;
@@ -22,7 +21,7 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
     .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
     .MinimumLevel.Override("MassTransit", LogEventLevel.Debug)
-    .Enrich.FromLogContext()
+    .Enrich.FromLogContext()                                                        // add extra metadata to logs
     .Enrich.WithProperty("Application", "BillingService")
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
     .WriteTo.File("logs/billing-service-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7)
@@ -32,12 +31,12 @@ try
 {
     Environment.SetEnvironmentVariable("MT_LICENSE", "free");
 
-    var builder = WebApplication.CreateBuilder(args);
+    var builder = WebApplication.CreateBuilder(args);               // DI + config
     builder.Host.UseSerilog();
 
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddStandardApi();
+    builder.Services.AddStandardApi();                              // custom extension
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowWebClients", policy =>
@@ -47,26 +46,27 @@ try
                 .AllowAnyMethod();
         });
     });
-    builder.Services.AddStandardAuth(builder.Configuration);
+    builder.Services.AddStandardAuth(builder.Configuration);            // custom auth setup
 
     builder.Services.AddMediatR(cfg => 
     {
         cfg.RegisterServicesFromAssemblyContaining<MarkBillPaidCommandHandler>();
         cfg.RegisterServicesFromAssemblyContaining<GetMyBillsQueryHandler>();
-        cfg.RegisterServicesFromAssemblyContaining<GenerateStatementCommandHandler>();
         cfg.RegisterServicesFromAssemblyContaining<GetMyStatementsQueryHandler>();
     });
     builder.Services.AddDbContext<BillingDbContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("BillingDb")));
-    builder.Services.AddScoped<IBillRepository, SqlBillRepository>();
+    builder.Services.AddScoped<IBillRepository, SqlBillRepository>();               // DI
     builder.Services.AddScoped<IRewardRepository, SqlRewardRepository>();
     builder.Services.AddScoped<IStatementRepository, SqlStatementRepository>();
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-    builder.Services.AddHttpClient();
+    builder.Services.AddHttpClient();                                               // external API's
     builder.Services.AddHostedService<OverdueBillScheduler>();
 
     builder.Services.AddMassTransit(x =>
     {
         x.SetKebabCaseEndpointNameFormatter();
+
+        // register this class in DI so that it can process messages
         x.AddConsumer<UserDeletedConsumer>();
         x.AddConsumer<BillUpdateSagaConsumer>();
         x.AddConsumer<RevertBillSagaConsumer>();
@@ -85,10 +85,12 @@ try
                 e.UseInMemoryOutbox();
                 e.ConfigureConsumeTopology = false;
 
+                // listen to these event-types from rabbitmq
                 e.Bind<IUserDeleted>();
                 e.Bind<IBillUpdateRequested>();
                 e.Bind<IRevertBillUpdateRequested>();
 
+                // connect event -> consumer [when events comes who will handle it (consumer)]
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
                 e.ConfigureConsumer<BillUpdateSagaConsumer>(ctx);
                 e.ConfigureConsumer<RevertBillSagaConsumer>(ctx);

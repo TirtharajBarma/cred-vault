@@ -15,6 +15,7 @@ public sealed class CreditCard
 
     public string Last4 { get; set; } = string.Empty;
     public string MaskedNumber { get; set; } = string.Empty;
+    public string? EncryptedCardNumber { get; set; }
 
     public decimal CreditLimit { get; set; }
     public decimal OutstandingBalance { get; set; }

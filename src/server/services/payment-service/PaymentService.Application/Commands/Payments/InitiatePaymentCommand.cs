@@ -5,6 +5,7 @@ using System.Text.Json;
 using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using PaymentService.Application.Services;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
@@ -31,7 +32,8 @@ public class InitiatePaymentCommandHandler(
     IUnitOfWork unitOfWork,
     IPublishEndpoint publishEndpoint,
     ISendEndpointProvider sendEndpointProvider,
-    IHttpClientFactory httpClientFactory,
+    IHttpClientFactory httpClientFactory,           // call other services
+    IWalletService walletService,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<InitiatePaymentCommandHandler> logger) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
 {
@@ -43,6 +45,7 @@ public class InitiatePaymentCommandHandler(
             request.UserId, request.BillId, request.Amount, request.RewardsAmount);
 
         // Cleanup stuck payments for this user/bill before creating new one
+        //! if user started payment before and didn't finish -> make them fail
         await MarkStuckPaymentsFailedAsync(request.UserId, request.BillId, cancellationToken);
 
         if (request.Amount <= 0)
@@ -51,13 +54,16 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, "Amount must be greater than zero");
         }
 
-        var bill = await FetchBillAsync(request.BillId, request.AuthorizationHeader, cancellationToken);
+        // fetch the bill
+        var billResult = await FetchBillAsync(request.BillId, request.AuthorizationHeader, cancellationToken);
         
-        if (bill is null)
+        if (billResult.Bill is null)
         {
-            logger.LogWarning("Payment rejected: could not verify bill {BillId}", request.BillId);
-            return new InitiatePaymentResult(false, null, "Could not verify bill with Billing Service");
+            logger.LogWarning("Payment rejected: could not verify bill {BillId} - {Error}", request.BillId, billResult.Error);
+            return new InitiatePaymentResult(false, null, billResult.Error ?? "Could not verify bill with Billing Service");
         }
+
+        var bill = billResult.Bill;
 
         if (bill.UserId != request.UserId)
         {
@@ -83,10 +89,11 @@ public class InitiatePaymentCommandHandler(
         }
 
         // Calculate rewards amount for display but DON'T redeem yet
-        // Rewards will be redeemed AFTER OTP verification in the SAGA
+        //! Rewards will be redeemed AFTER OTP verification in the SAGA
         decimal rewardsApplied = 0;
         if (request.RewardsAmount.HasValue && request.RewardsAmount > 0)
         {
+            // you can't apply more rewards than the bill amt.
             rewardsApplied = Math.Min(request.RewardsAmount.Value, outstandingAmount);
             logger.LogInformation("Rewards will be applied after payment: {RewardsAmount}", rewardsApplied);
         }
@@ -101,11 +108,25 @@ public class InitiatePaymentCommandHandler(
             return new InitiatePaymentResult(false, null, $"Payment exceeds outstanding balance. Outstanding: {outstandingAmount:0.00}");
         }
 
+        // full payment
         if (request.PaymentType == PaymentType.Full && Math.Abs(finalAmount - outstandingAmount) > 0.01m)
         {
             logger.LogWarning("Payment rejected: Full payment amount {Amount} does not match outstanding {Outstanding} for Bill {BillId}",
                 finalAmount, outstandingAmount, request.BillId);
             return new InitiatePaymentResult(false, null, $"Full payment must equal outstanding balance ({outstandingAmount:0.00})");
+        }
+
+        // Ensure wallet has enough balance before OTP flow starts.
+        var wallet = await walletService.GetWalletAsync(request.UserId, cancellationToken);
+        var walletBalance = wallet?.Balance ?? 0m;
+        if (walletBalance < finalAmount)
+        {
+            logger.LogWarning("Payment rejected: insufficient wallet balance. UserId={UserId}, Balance={Balance}, Required={Required}",
+                request.UserId, walletBalance, finalAmount);
+            return new InitiatePaymentResult(
+                false,
+                null,
+                $"Insufficient wallet balance. Available: {walletBalance:0.00}, required: {finalAmount:0.00}. Please top up first.");
         }
 
         var otpCode = GenerateOtp();
@@ -143,7 +164,7 @@ public class InitiatePaymentCommandHandler(
         // Pass rewards info to SAGA - it will redeem AFTER successful payment
         await publishEndpoint.Publish<IStartPaymentOrchestration>(new
         {
-            CorrelationId = payment.Id,
+            CorrelationId = payment.Id,     // ← You generate it when payment starts
             PaymentId = payment.Id,
             UserId = payment.UserId,
             Email = user?.Email ?? string.Empty,
@@ -185,34 +206,78 @@ public class InitiatePaymentCommandHandler(
         return RandomNumberGenerator.GetInt32(100000, 999999).ToString();
     }
 
-    private async Task<BillDto?> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
+    private record FetchBillResult(BillDto? Bill, string? Error, int StatusCode);
+
+    private async Task<FetchBillResult> FetchBillAsync(Guid billId, string authHeader, CancellationToken ct)
     {
         try
         {
             var client = httpClientFactory.CreateClient();
             var baseUrl = configuration["Services:BillingService"] ?? "http://localhost:5003";
             client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromSeconds(10);
 
             var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/billing/bills/{billId}");
             if (!string.IsNullOrEmpty(authHeader))
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
             var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode)
+            
+            var content = await response.Content.ReadAsStringAsync(ct);     // convert req to string
+
+            switch (response.StatusCode)
             {
-                logger.LogWarning("Billing service returned {Status} for Bill {BillId}", response.StatusCode, billId);
-                return null;
+                case System.Net.HttpStatusCode.NotFound:
+                    logger.LogWarning("Bill {BillId} not found in Billing Service", billId);
+                    return new FetchBillResult(null, "Bill not found", 404);
+
+                case System.Net.HttpStatusCode.Forbidden:
+                case System.Net.HttpStatusCode.Unauthorized:
+                    logger.LogWarning("Unauthorized access to bill {BillId}", billId);
+                    return new FetchBillResult(null, "Unauthorized access to bill", 403);
+
+                case System.Net.HttpStatusCode.BadRequest:
+                    logger.LogWarning("Bad request for bill {BillId}: {Content}", billId, content);
+                    return new FetchBillResult(null, "Invalid bill data", 400);
+
+                case System.Net.HttpStatusCode.InternalServerError:
+                case System.Net.HttpStatusCode.ServiceUnavailable:
+                    logger.LogError("Billing service error {Status} for Bill {BillId}: {Content}", response.StatusCode, billId, content);
+                    return new FetchBillResult(null, "Billing service temporarily unavailable", (int)response.StatusCode);
+
+                default:
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        logger.LogWarning("Billing service returned {Status} for Bill {BillId}", response.StatusCode, billId);
+                        return new FetchBillResult(null, $"Billing service error: {response.StatusCode}", (int)response.StatusCode);
+                    }
+                    break;
             }
 
-            var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<Shared.Contracts.Models.ApiResponse<BillDto>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
-            return result?.Data;
+            if (result?.Data == null)
+            {
+                logger.LogWarning("Bill {BillId} returned null data from Billing Service", billId);
+                return new FetchBillResult(null, "Bill data not available", 0);
+            }
+            
+            return new FetchBillResult(result.Data, null, 200);
+        }
+        catch (TaskCanceledException)
+        {
+            logger.LogError("Timeout fetching bill {BillId} from Billing Service", billId);
+            return new FetchBillResult(null, "Billing service request timed out", 408);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Network error fetching bill {BillId} from Billing Service", billId);
+            return new FetchBillResult(null, "Unable to connect to Billing Service", 503);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Exception fetching bill {BillId} from Billing Service", billId);
-            return null;
+            return new FetchBillResult(null, "Failed to verify bill", 500);
         }
     }
 
@@ -267,67 +332,6 @@ public class InitiatePaymentCommandHandler(
         public UserDto? User { get; set; }
     }
 
-    private async Task<(bool Success, string? Message, decimal NewOutstanding)> RedeemRewardsForPaymentAsync(
-        Guid userId, 
-        Guid billId, 
-        decimal dollarValue,
-        string authHeader,
-        CancellationToken ct)
-    {
-        try
-        {
-            var pointsToRedeem = (int)Math.Floor(dollarValue / 0.25m);
-            pointsToRedeem = Math.Max(pointsToRedeem, 1);
-
-            var client = httpClientFactory.CreateClient();
-            var billingUrl = configuration["Services:BillingService"] ?? "http://localhost:5003";
-            client.BaseAddress = new Uri(billingUrl);
-
-            var request = new HttpRequestMessage(HttpMethod.Post, "api/v1/billing/rewards/redeem")
-            {
-                Content = JsonContent.Create(new
-                {
-                    Points = pointsToRedeem,
-                    Target = "Bill",
-                    BillId = billId
-                })
-            };
-
-            if (!string.IsNullOrEmpty(authHeader))
-                request.Headers.Authorization = AuthenticationHeaderValue.Parse(authHeader);
-
-            var response = await client.SendAsync(request, ct);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(ct);
-                logger.LogWarning("Rewards redemption failed: {Status} - {Content}", response.StatusCode, errorContent);
-                return (false, $"Rewards redemption failed: {response.StatusCode}", 0);
-            }
-
-            var content = await response.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<Shared.Contracts.Models.ApiResponse<object>>(content, 
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            if (result?.Success != true)
-            {
-                return (false, result?.Message ?? "Rewards redemption failed", 0);
-            }
-
-            var updatedBill = await FetchBillAsync(billId, authHeader, ct);
-            var newOutstanding = updatedBill != null 
-                ? Math.Max(0, updatedBill.Amount - (updatedBill.AmountPaid ?? 0))
-                : 0;
-
-            return (true, null, newOutstanding);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Exception during rewards redemption for Bill {BillId}", billId);
-            return (false, "Error processing rewards redemption", 0);
-        }
-    }
-
     private async Task MarkStuckPaymentsFailedAsync(Guid userId, Guid billId, CancellationToken ct)
     {
         try
@@ -343,6 +347,7 @@ public class InitiatePaymentCommandHandler(
                 await paymentRepository.UpdateAsync(payment);
                 logger.LogInformation("Marked stuck payment as Failed: PaymentId={PaymentId}", payment.Id);
 
+                // direct queue send
                 var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
                 await endpoint.Send<IOtpFailed>(new
                 {

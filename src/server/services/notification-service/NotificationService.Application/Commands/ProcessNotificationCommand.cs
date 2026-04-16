@@ -1,5 +1,6 @@
 using MediatR;
 
+// it is like a parcel -> hold data about notification events
 namespace NotificationService.Application.Commands;
 
 public record ProcessNotificationCommand(
@@ -7,5 +8,6 @@ public record ProcessNotificationCommand(
     string? Email,
     string? FullName,
     object Payload,
-    string? TraceId,
-    string? MessageId = null) : IRequest;
+    string? CorrelationId = null,
+    string? MessageId = null
+) : IRequest;

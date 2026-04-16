@@ -34,6 +34,7 @@ public class AuthController(IMediator mediator) : BaseApiController
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
+        // register -> DTO
         var result = await mediator.Send(new RegisterCommand(request.Email, request.Password, request.FullName), cancellationToken);
         return CreateResponse(result.Success, result, result.Message, result.ErrorCode, StatusCodes.Status201Created);
     }

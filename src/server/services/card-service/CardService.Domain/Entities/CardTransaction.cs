@@ -2,11 +2,11 @@ using System;
 
 namespace CardService.Domain.Entities;
 
-public enum TransactionType
+public enum CardTransactionType
 {
-    Purchase = 1,
-    Payment = 2,
-    Refund = 3
+    Purchase = 0,
+    Payment = 1,
+    Refund = 2
 }
 
 public class CardTransaction
@@ -15,7 +15,7 @@ public class CardTransaction
     public Guid CardId { get; set; }
     public CreditCard? Card { get; set; }
     public Guid UserId { get; set; }
-    public TransactionType Type { get; set; }
+    public CardTransactionType Type { get; set; }
     public decimal Amount { get; set; }
     public string Description { get; set; } = string.Empty;
     public DateTime DateUtc { get; set; }

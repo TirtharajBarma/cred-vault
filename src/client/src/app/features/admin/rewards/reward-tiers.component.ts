@@ -4,11 +4,13 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angu
 import { AdminService } from '../../../core/services/admin.service';
 import { RewardTier } from '../../../core/services/rewards.service';
 import { CardIssuer } from '../../../core/models/card.models';
+import { IstDatePipe } from '../../../shared/pipes/ist-date.pipe';
+import { parseUtcDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-reward-tiers',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, IstDatePipe],
   templateUrl: './reward-tiers.component.html'
 })
 export class RewardTiersComponent implements OnInit {
@@ -221,8 +223,8 @@ export class RewardTiersComponent implements OnInit {
 
   getTierStatus(tier: RewardTier): { label: string; color: string } {
     const now = new Date();
-    const from = new Date(tier.effectiveFromUtc);
-    const to = tier.effectiveToUtc ? new Date(tier.effectiveToUtc) : null;
+    const from = parseUtcDate(tier.effectiveFromUtc);
+    const to = tier.effectiveToUtc ? parseUtcDate(tier.effectiveToUtc) : null;
 
     if (now < from) {
       return { label: 'SCHEDULED', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' };
@@ -323,6 +325,6 @@ export class RewardTiersComponent implements OnInit {
   getCashbackDisplay(rate: number | null | undefined): string {
     if (!rate || rate === 0) return '0%';
     const pct = (rate * 100).toFixed(2).replace(/\.?0+$/, '');
-    return pct;
+    return `${pct}%`;
   }
 }

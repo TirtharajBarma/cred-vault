@@ -82,7 +82,7 @@
                         <div class="min-w-0 flex-1">
                           <div class="mb-1 flex items-center justify-between gap-2">
                             <span class="inline-flex rounded-full bg-[#efe8e1] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#615e5c]">{{ getNotificationTypeLabel(notif.type) }}</span>
-                            <span class="text-[10px] font-semibold text-[#615e5c]">{{ notif.createdAtUtc | date:'h:mm a':'Asia/Kolkata' }}</span>
+                            <span class="text-[10px] font-semibold text-[#615e5c]">{{ formatNotificationTime(notif.createdAtUtc) }}</span>
                           </div>
                           <p class="truncate text-sm font-bold text-[#1b1c1c]">{{ notif.subject }}</p>
                           @if (notif.errorMessage) {

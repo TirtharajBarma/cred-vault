@@ -11,6 +11,7 @@ public class NotificationDbContext : DbContext, INotificationDbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<NotificationLog> NotificationLogs => Set<NotificationLog>();
 
+    // IQueryable -> query that is not executed immediately. only execute when used .ToList()
     IQueryable<AuditLog> INotificationDbContext.AuditLogs => AuditLogs;
     IQueryable<NotificationLog> INotificationDbContext.NotificationLogs => NotificationLogs;
 

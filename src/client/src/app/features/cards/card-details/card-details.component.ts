@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -10,15 +10,17 @@ import { CreditCard, CardTransaction } from '../../../core/models/card.models';
 import { ApiResponse } from '../../../core/models/auth.models';
 import { environment } from '../../../../environments/environment';
 import { finalize } from 'rxjs';
+import { IstDatePipe } from '../../../shared/pipes/ist-date.pipe';
+import { formatIstDate, getUtcTimestamp, parseUtcDate } from '../../../core/utils/date-time.util';
 
 @Component({
   selector: 'app-card-details',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, IstDatePipe],
   templateUrl: './card-details.component.html',
   styleUrl: './card-details.component.css'
 })
-export class CardDetailsComponent implements OnInit {
+export class CardDetailsComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private dashboardService = inject(DashboardService);
   private rewardsService = inject(RewardsService);
@@ -33,6 +35,21 @@ export class CardDetailsComponent implements OnInit {
   rewards = signal<number>(0);
   isLoading = signal(true);
   error = signal<string | null>(null);
+  isFullCardNumberVisible = signal(false);
+  isRevealingCardNumber = signal(false);
+  fullCardNumber = signal<string | null>(null);
+  revealCardNumberError = signal<string | null>(null);
+
+  displayCardNumber = computed(() => {
+    const c = this.card();
+    if (!c) return '';
+
+    if (this.isFullCardNumberVisible() && this.fullCardNumber()) {
+      return this.formatCardNumber(this.fullCardNumber()!);
+    }
+
+    return `•••• •••• •••• ${c.last4}`;
+  });
 
   // Bill-related signals
   currentBill = signal<Bill | null>(null);
@@ -55,16 +72,22 @@ export class CardDetailsComponent implements OnInit {
   useRewards = signal(false);
   readonly pointsToRupeeRate = environment.pointsToRupeeRate;
 
-  availablePoints = computed(() => Math.floor(this.rewards()));
-  rewardValue = computed(() => this.availablePoints() * this.pointsToRupeeRate);
+  private paymentStatusPollTimer: ReturnType<typeof setInterval> | null = null;
+  private paymentStatusPollAttempts = 0;
+  private readonly maxPaymentStatusPollAttempts = 20;
+  private readonly paymentStatusPollIntervalMs = 2000;
+
+  availableRedeemablePoints = computed(() => Math.floor(this.availablePoints()));
+  availablePoints = computed(() => this.rewards());
+  rewardValue = computed(() => this.availableRedeemablePoints() * this.pointsToRupeeRate);
 
   maxRedeemablePoints = computed(() => {
     const bill = this.currentBill();
     if (!bill) return 0;
 
-    const outstanding = this.getBillOutstandingAmount(bill);
-    const maxPointsByAmount = Math.floor(outstanding / this.pointsToRupeeRate);
-    return Math.min(this.availablePoints(), maxPointsByAmount);
+    const selectedPaymentAmount = this.getPaymentAmount(bill, this.paymentType());
+    const maxPointsByAmount = Math.floor(selectedPaymentAmount / this.pointsToRupeeRate);
+    return Math.min(this.availableRedeemablePoints(), maxPointsByAmount);
   });
 
   // Pagination
@@ -118,7 +141,8 @@ export class CardDetailsComponent implements OnInit {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const monthTxs = txs.filter(t => {
-      const d = new Date(t.dateUtc);
+      const d = parseUtcDate(t.dateUtc);
+      if (Number.isNaN(d.getTime())) return false;
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
@@ -130,7 +154,7 @@ export class CardDetailsComponent implements OnInit {
     for (const tx of monthTxs) {
       const normalizedType = this.getNormalizedTransactionType(tx.type);
 
-      if (normalizedType === 1) {
+      if (normalizedType === 0) {
         const desc = (tx.description || '').toLowerCase();
         let category = 'Services';
 
@@ -165,7 +189,7 @@ export class CardDetailsComponent implements OnInit {
 
   sortedTransactions = computed(() => {
     return [...this.transactions()].sort(
-      (a, b) => new Date(b.dateUtc).getTime() - new Date(a.dateUtc).getTime()
+      (a, b) => getUtcTimestamp(b.dateUtc) - getUtcTimestamp(a.dateUtc)
     );
   });
 
@@ -173,6 +197,7 @@ export class CardDetailsComponent implements OnInit {
     this.route.paramMap.subscribe(params => {
       const cardId = params.get('id');
       if (cardId) {
+        this.clearCardNumberRevealState();
         this.loadCardDetails(cardId);
         this.loadRewards();
         this.loadBillForCard(cardId);
@@ -181,6 +206,11 @@ export class CardDetailsComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.stopPaymentStatusPolling();
+    this.clearCardNumberRevealState();
   }
 
   loadBillForCard(cardId: string): void {
@@ -256,7 +286,7 @@ export class CardDetailsComponent implements OnInit {
     this.submitSuccess.set(false);
 
     this.dashboardService.addTransaction(c.id, {
-      type: 1, // Purchase
+      type: 0, // Purchase
       amount: amount,
       description: desc,
       dateUtc: new Date().toISOString()
@@ -292,20 +322,73 @@ export class CardDetailsComponent implements OnInit {
     return null;
   }
 
+  toggleCardNumberVisibility(): void {
+    const card = this.card();
+    if (!card || this.isRevealingCardNumber()) {
+      return;
+    }
+
+    if (this.isFullCardNumberVisible()) {
+      this.clearCardNumberRevealState();
+      return;
+    }
+
+    this.isRevealingCardNumber.set(true);
+    this.revealCardNumberError.set(null);
+
+    this.dashboardService.getFullCardNumber(card.id).pipe(
+      finalize(() => this.isRevealingCardNumber.set(false))
+    ).subscribe({
+      next: (res) => {
+        if (res.success && res.data?.cardNumber) {
+          this.fullCardNumber.set(res.data.cardNumber);
+          this.isFullCardNumberVisible.set(true);
+          return;
+        }
+
+        const message = (res.message || '').toLowerCase();
+        if (message.includes('not available')) {
+          this.revealCardNumberError.set('Full number is unavailable for this older card. Re-add card to enable reveal.');
+        } else {
+          this.revealCardNumberError.set('Could not reveal card number right now. Please try again.');
+        }
+
+        setTimeout(() => this.revealCardNumberError.set(null), 3500);
+      },
+      error: () => {
+        this.revealCardNumberError.set('Could not reveal card number right now. Please try again.');
+        setTimeout(() => this.revealCardNumberError.set(null), 3500);
+      }
+    });
+  }
+
+  private clearCardNumberRevealState(): void {
+    this.isFullCardNumberVisible.set(false);
+    this.fullCardNumber.set(null);
+    this.revealCardNumberError.set(null);
+    this.isRevealingCardNumber.set(false);
+  }
+
+  private formatCardNumber(value: string): string {
+    const digits = (value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.match(/.{1,4}/g)?.join(' ') || digits;
+  }
+
   getTransactionIcon(type: number): string {
     switch (this.getNormalizedTransactionType(type)) {
-      case 1: return 'shopping_cart';
-      case 2: return 'account_balance_wallet';
-      case 3: return 'keyboard_return';
+      case 0: return 'shopping_cart';
+      case 1: return 'account_balance_wallet';
+      case 2: return 'keyboard_return';
       default: return 'payments';
     }
   }
 
-  getNormalizedTransactionType(type: number | string): 1 | 2 | 3 {
-    if (type === 1 || type === '1' || type === 'Purchase') return 1;
-    if (type === 2 || type === '2' || type === 'Payment') return 2;
-    if (type === 3 || type === '3' || type === 'Refund') return 3;
-    return 1;
+  getNormalizedTransactionType(type: number | string): 0 | 1 | 2 {
+    if (type === 0 || type === '0' || type === 'Purchase') return 0;
+    if (type === 1 || type === '1' || type === 'Payment') return 1;
+    if (type === 2 || type === '2' || type === 'Refund') return 2;
+    return 0;
   }
 
   getTransactionTitle(tx: CardTransaction): string {
@@ -316,7 +399,7 @@ export class CardDetailsComponent implements OnInit {
       return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
     }
 
-    if (lowered.startsWith('saga:') && this.getNormalizedTransactionType(tx.type) === 2) {
+    if (lowered.startsWith('saga:') && this.getNormalizedTransactionType(tx.type) === 1) {
       return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
     }
 
@@ -324,25 +407,22 @@ export class CardDetailsComponent implements OnInit {
   }
 
   getTransactionFlowLabel(type: number | string): string {
-    return this.getNormalizedTransactionType(type) === 1 ? 'Debit' : 'Credit';
+    return this.getNormalizedTransactionType(type) === 0 ? 'Debit' : 'Credit';
   }
 
   getTransactionTypeLabel(type: number | string): string {
     const normalized = this.getNormalizedTransactionType(type);
-    if (normalized === 1) return 'Purchase';
-    if (normalized === 2) return 'Payment';
+    if (normalized === 0) return 'Purchase';
+    if (normalized === 1) return 'Payment';
     return 'Refund';
   }
 
   getSignedAmountPrefix(type: number | string): string {
-    return this.getNormalizedTransactionType(type) === 1 ? '-' : '+';
+    return this.getNormalizedTransactionType(type) === 0 ? '-' : '+';
   }
 
   private getMonthYear(dateUtc: string): string {
-    return new Intl.DateTimeFormat('en-IN', {
-      month: 'short',
-      year: 'numeric'
-    }).format(new Date(dateUtc));
+    return formatIstDate(dateUtc, 'MMM yyyy', '-');
   }
 
   page() { return this.currentPage(); }
@@ -396,6 +476,12 @@ export class CardDetailsComponent implements OnInit {
     return Math.min(outstanding, Number(bill.minDue));
   }
 
+  canSelectMinimumDue(bill: Bill | null): boolean {
+    if (!bill) return false;
+    if (this.getBillOutstandingAmount(bill) <= 0) return false;
+    return this.getBillAmountPaid(bill) <= 0;
+  }
+
   getSelectedBillOutstanding(): number {
     return this.getPaymentAmount(this.currentBill(), 'full');
   }
@@ -437,6 +523,13 @@ export class CardDetailsComponent implements OnInit {
     if (!card || !bill) return;
 
     const amount = this.getPaymentAmount(bill, this.paymentType());
+
+    if (this.paymentType() === 'min' && !this.canSelectMinimumDue(bill)) {
+      this.paymentError.set('Minimum due can only be paid once. Please pay the full remaining amount.');
+      this.paymentType.set('full');
+      return;
+    }
+
     if (amount <= 0) {
       this.paymentError.set('This bill is already settled.');
       return;
@@ -470,8 +563,11 @@ export class CardDetailsComponent implements OnInit {
           this.paymentStage.set('initiated');
         }
       },
-      error: () => {
-        this.paymentError.set('Network error. Please try again.');
+      error: (err: any) => {
+        const backendMessage = err?.error?.message
+          || err?.error?.data?.message
+          || err?.message;
+        this.paymentError.set(backendMessage || 'Network error. Please try again.');
         this.paymentStage.set('initiated');
       }
     });
@@ -499,11 +595,10 @@ export class CardDetailsComponent implements OnInit {
           const bill = this.currentBill();
           this.paidAmount.set(this.getPaymentAmount(bill, this.paymentType()));
 
-          const cardId = this.card()?.id;
-          if (cardId) {
-            this.loadCardDetails(cardId);
-            this.loadBillForCard(cardId);
-            this.loadRewards();
+          if (paymentId) {
+            this.startPaymentStatusPolling(paymentId);
+          } else {
+            this.refreshCardAndBillData();
           }
         } else {
           this.otpError.set(res.message || 'Invalid OTP');
@@ -518,7 +613,68 @@ export class CardDetailsComponent implements OnInit {
 
   closeSuccessModal(): void {
     this.showSuccessModal.set(false);
+    this.refreshCardAndBillData();
     this.resetPaymentState();
+  }
+
+  private refreshCardAndBillData(): void {
+    const cardId = this.card()?.id;
+    if (!cardId) return;
+
+    this.loadCardDetails(cardId);
+    this.loadBillForCard(cardId);
+    this.loadRewards();
+  }
+
+  private startPaymentStatusPolling(paymentId: string): void {
+    this.stopPaymentStatusPolling();
+    this.paymentStatusPollAttempts = 0;
+
+    const pollStatus = () => {
+      this.paymentService.getPaymentById(paymentId).subscribe({
+        next: (res: ApiResponse<any>) => {
+          const status = String(res.data?.status || '').toLowerCase();
+
+          if (status === 'completed') {
+            this.paymentStage.set('completed');
+            this.refreshCardAndBillData();
+            this.stopPaymentStatusPolling();
+            return;
+          }
+
+          if (status === 'failed' || status === 'reversed' || status === 'cancelled') {
+            this.stopPaymentStatusPolling();
+            this.showSuccessModal.set(false);
+            this.paymentError.set('Payment could not be completed. Please try again.');
+            this.refreshCardAndBillData();
+            return;
+          }
+
+          this.paymentStatusPollAttempts += 1;
+          if (this.paymentStatusPollAttempts >= this.maxPaymentStatusPollAttempts) {
+            this.refreshCardAndBillData();
+            this.stopPaymentStatusPolling();
+          }
+        },
+        error: () => {
+          this.paymentStatusPollAttempts += 1;
+          if (this.paymentStatusPollAttempts >= this.maxPaymentStatusPollAttempts) {
+            this.refreshCardAndBillData();
+            this.stopPaymentStatusPolling();
+          }
+        }
+      });
+    };
+
+    pollStatus();
+    this.paymentStatusPollTimer = setInterval(pollStatus, this.paymentStatusPollIntervalMs);
+  }
+
+  private stopPaymentStatusPolling(): void {
+    if (!this.paymentStatusPollTimer) return;
+
+    clearInterval(this.paymentStatusPollTimer);
+    this.paymentStatusPollTimer = null;
   }
 
   private resetPaymentState(): void {

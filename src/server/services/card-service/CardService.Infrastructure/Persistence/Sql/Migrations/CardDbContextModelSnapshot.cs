@@ -109,6 +109,10 @@ namespace CardService.Infrastructure.Persistence.Sql.Migrations
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("EncryptedCardNumber")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
                     b.Property<int>("ExpMonth")
                         .HasColumnType("int");
 

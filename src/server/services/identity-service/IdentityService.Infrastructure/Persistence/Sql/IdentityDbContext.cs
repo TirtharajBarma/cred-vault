@@ -4,13 +4,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IdentityService.Infrastructure.Persistence.Sql;
 
+// IdentityUser (class)
+//        ↓
+// DbSet<IdentityUser>  → table access
+//        ↓
+// OnModelCreating      → table configuration
+//        ↓
+// ModelBuilder         → builds schema
+//        ↓
+// DbContextOptions     → connects to DB
+//        ↓
+// Database
+
 public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : DbContext(options)
 {
     public DbSet<IdentityUser> Users => Set<IdentityUser>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder modelBuilder)  // OnModelCreating -> builder obj to define db structure
     {
-        modelBuilder.Entity<IdentityUser>(entity =>
+        modelBuilder.Entity<IdentityUser>(entity =>                     // modelBuilder -> to configure entities and db schemas
         {
             entity.ToTable("identity_users");
             entity.HasKey(x => x.Id);
@@ -20,14 +32,14 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.EmailVerificationOtp).HasMaxLength(16);
             entity.Property(x => x.PasswordResetOtp).HasMaxLength(16);
             entity.Property(x => x.Status)
-                .HasConversion(value => StatusToDb(value), value => DbToStatus(value))
+                .HasConversion(value => StatusToDb(value), value => DbToStatus(value))  // StatusToDb -> convert enum to string : SbToStatus -> convert string to enum
                 .IsRequired()
                 .HasMaxLength(64);
             entity.Property(x => x.Role)
                 .HasConversion(value => RoleToDb(value), value => DbToRole(value))
                 .IsRequired()
                 .HasMaxLength(64);
-            entity.HasIndex(x => x.Email).IsUnique();
+            entity.HasIndex(x => x.Email).IsUnique();       // no duplicate emails
         });
     }
 

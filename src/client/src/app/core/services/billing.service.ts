@@ -25,11 +25,11 @@ export interface Bill {
 }
 
 export enum BillStatus {
-  Pending = 1,
-  Paid = 2,
-  Overdue = 3,
-  Cancelled = 4,
-  PartiallyPaid = 5
+  Pending = 0,
+  Paid = 1,
+  Overdue = 2,
+  Cancelled = 3,
+  PartiallyPaid = 4
 }
 
 @Injectable({

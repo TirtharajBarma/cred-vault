@@ -66,18 +66,37 @@
                     </div>
                   </div>
 
-                  <div class="relative z-10">
-                    <p class="text-3xl font-display font-medium tracking-[0.2em] mb-6">
-                      •••• •••• •••• {{ c.last4 }}
+                  <div class="relative z-10 pb-1">
+                    <button
+                      type="button"
+                      class="absolute right-0 top-0 inline-flex h-10 items-center gap-1 rounded-2xl border border-white/20 bg-white/10 px-3 text-white/90 backdrop-blur-md transition-all duration-200 hover:border-white/35 hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      (click)="toggleCardNumberVisibility()"
+                      [disabled]="isRevealingCardNumber()"
+                      [attr.aria-label]="isFullCardNumberVisible() ? 'Hide full card number' : 'Show full card number'">
+                      <span class="material-symbols-outlined text-[20px] leading-none">
+                        {{ isFullCardNumberVisible() ? 'visibility_off' : 'visibility' }}
+                      </span>
+                      <span class="text-[10px] font-bold uppercase tracking-wider">{{ isFullCardNumberVisible() ? 'Hide' : 'Show' }}</span>
+                    </button>
+
+                    <p class="pr-24 text-3xl font-display font-medium tracking-[0.2em] mb-6">
+                      {{ displayCardNumber() }}
                     </p>
-                    <div class="flex justify-between items-end">
+
+                    @if (isRevealingCardNumber()) {
+                      <p class="absolute bottom-12 left-0 right-0 pr-2 text-[10px] font-medium tracking-wide text-white/75 truncate">Revealing card number...</p>
+                    } @else if (revealCardNumberError()) {
+                      <p class="absolute bottom-12 left-0 right-0 pr-2 text-[10px] font-medium tracking-wide text-amber-100/90 truncate">{{ revealCardNumberError() }}</p>
+                    }
+
+                    <div class="flex justify-between items-end pt-1">
                       <div>
                         <p class="text-[10px] uppercase tracking-widest opacity-50 mb-1">Card Holder</p>
-                        <p class="text-sm font-bold tracking-wider uppercase">{{ c.cardholderName || 'Card Holder' }}</p>
+                        <p class="text-sm font-bold tracking-wider uppercase leading-none">{{ c.cardholderName || 'Card Holder' }}</p>
                       </div>
                       <div class="text-right">
                         <p class="text-[10px] uppercase tracking-widest opacity-50 mb-1">Expires</p>
-                        <p class="text-sm font-bold tracking-wider">{{ c.expMonth | number:'2.0' }}/{{ (c.expYear % 100) | number:'2.0' }}</p>
+                        <p class="text-sm font-bold tracking-wider leading-none">{{ c.expMonth | number:'2.0' }}/{{ (c.expYear % 100) | number:'2.0' }}</p>
                       </div>
                     </div>
                   </div>
@@ -105,7 +124,7 @@
                   <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
                     <div class="flex-1">
                       <p class="text-[10px] font-black uppercase tracking-[0.25em] text-[#615e5c] mb-2">Bill Due</p>
-                      <p class="text-3xl font-black text-[#1b1c1c] mb-2">{{ bill.dueDateUtc | date:'MMM dd, yyyy' }}</p>
+                      <p class="text-3xl font-black text-[#1b1c1c] mb-2">{{ bill.dueDateUtc | istDate:'MMM dd, yyyy' }}</p>
                       <div class="flex items-center gap-3">
                         <span [class]="'text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider ' + getBillStatusClass(bill.status)">
                           {{ getBillStatusLabel(bill.status) }}
@@ -155,12 +174,12 @@
                   <p class="text-[10px] font-black text-[#615e5c] uppercase tracking-widest">
                       Health Score
                   </p>
-                  <span class="group relative inline-block shrink-0">
-                    <span class="w-4 h-4 rounded-full bg-primary/20 text-[#8a5100] text-[10px] font-bold flex items-center justify-center cursor-pointer">?</span>
-                    <span class="absolute bottom-full right-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-48 bg-charcoal text-white text-[10px] leading-relaxed p-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                      <span class="font-bold text-[#8a5100]">What is this?</span><br>
-                      Your credit utilization = (Balance ÷ Credit Limit) × 100<br>
-                      <span class="text-[#615e5c]">Keep it below 30% for best score.</span>
+                  <span class="group relative inline-flex shrink-0 items-center">
+                    <span class="size-5 rounded-full border border-[#d8c3b2]/70 bg-white text-[11px] font-black text-[#8a5100] flex items-center justify-center cursor-pointer shadow-sm transition-all duration-200 group-hover:scale-105 group-hover:shadow-md">?</span>
+                    <span class="pointer-events-none absolute bottom-full right-0 z-50 mb-3 w-72 max-w-[82vw] rounded-2xl border border-[#e9dfd6] bg-gradient-to-b from-[#fffdfb] to-white p-4 text-[12px] leading-relaxed text-[#3f3a35] opacity-0 shadow-[0_18px_40px_-12px_rgba(27,28,28,0.28)] transition-all duration-200 translate-y-1 group-hover:translate-y-0 group-hover:opacity-100 md:left-1/2 md:right-auto md:-translate-x-1/2">
+                      <span class="block text-[13px] font-black tracking-wide text-[#8a5100]">Health Score Guide</span>
+                      <span class="mt-2 block">Credit utilization = (Outstanding Balance / Credit Limit) * 100</span>
+                      <span class="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">Best range: below 30%</span>
                     </span>
                   </span>
                 </div>
@@ -190,11 +209,11 @@
                       <div class="flex-1 min-w-0">
                         <h4 class="font-bold text-[#1b1c1c] truncate text-lg">{{ getTransactionTitle(tx) }}</h4>
                         <p class="text-xs font-semibold text-[#615e5c] mt-1">
-                          {{ tx.dateUtc | date:'EEEE, hh:mm a' }}
+                          {{ tx.dateUtc | istDate:'EEEE, hh:mm a' }}
                         </p>
                       </div>
                       <div class="text-right shrink-0">
-                        <p [class]="'font-black text-xl ' + (getNormalizedTransactionType(tx.type) === 1 ? 'text-red-500' : 'text-emerald-500')">
+                        <p [class]="'font-black text-xl ' + (getNormalizedTransactionType(tx.type) === 0 ? 'text-red-500' : 'text-emerald-500')">
                           {{ getSignedAmountPrefix(tx.type) }}{{ tx.amount | currency:'INR' }}
                         </p>
                         <p class="text-[10px] font-bold text-[#615e5c] uppercase tracking-widest mt-1">
@@ -363,7 +382,7 @@
                 <p class="text-xs font-bold uppercase tracking-widest text-[#615e5c] mb-1">Amount Due</p>
                 <p class="text-4xl font-black text-[#1b1c1c]">{{ getSelectedBillOutstanding() | currency:'INR' }}</p>
               </div>
-              <span class="px-3 py-1 bg-[#8a5100]/10 text-[#8a5100] text-xs font-bold rounded-full">Due {{ currentBill()!.dueDateUtc | date:'MMM dd' }}</span>
+              <span class="px-3 py-1 bg-[#8a5100]/10 text-[#8a5100] text-xs font-bold rounded-full">Due {{ currentBill()!.dueDateUtc | istDate:'MMM dd' }}</span>
             </div>
             <div class="pt-4 border-t border-[#d8c3b2]/20">
               <div class="flex justify-between text-sm">
@@ -386,13 +405,17 @@
               </button>
               <button
                 (click)="paymentType.set('min')"
+                [disabled]="!canSelectMinimumDue(currentBill())"
                 class="flex-1 p-5 rounded-2xl border-2 transition-all text-left"
-                [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50'"
+                [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50 disabled:cursor-not-allowed disabled:opacity-50'"
               >
                 <p class="font-bold text-[#1b1c1c] text-lg">Minimum Due</p>
                 <p class="text-sm text-[#534437] mt-1">{{ getPaymentAmount(currentBill(), 'min') | currency:'INR' }}</p>
               </button>
             </div>
+            @if (!canSelectMinimumDue(currentBill())) {
+              <p class="mt-2 text-xs text-[#8a5100]">Minimum due can only be paid once. Pay the full remaining amount next.</p>
+            }
           </div>
 
           @if (availablePoints() > 0) {
@@ -409,9 +432,10 @@
                     <div>
                       <p class="font-bold text-lg text-[#1b1c1c]">Rewards Points</p>
                       <p class="text-sm text-[#534437]">
-                        <span class="font-semibold">{{ availablePoints() | number:'1.0-0' }} points</span>
+                        <span class="font-semibold">{{ availableRedeemablePoints() | number:'1.0-0' }} points</span>
                         <span class="text-[#615e5c]">= {{ rewardValue() | currency:'INR' }}</span>
                       </p>
+                      <p class="text-[11px] text-[#8b8681]">Account balance: {{ availablePoints() | number:'1.2-2' }} pts</p>
                     </div>
                   </div>
                   <label class="relative inline-flex cursor-pointer items-center">
@@ -430,8 +454,8 @@
                       </div>
                       <div class="bg-[#f0edeb] rounded-xl p-4">
                         <p class="text-xs font-medium uppercase tracking-wide text-[#615e5c]">Remaining</p>
-                        <p class="text-xl font-bold text-[#1b1c1c] mt-1">{{ availablePoints() - maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
-                        <p class="text-sm text-[#534437]">={{ (availablePoints() - maxRedeemablePoints()) * pointsToRupeeRate | currency:'INR' }}</p>
+                        <p class="text-xl font-bold text-[#1b1c1c] mt-1">{{ availableRedeemablePoints() - maxRedeemablePoints() | number:'1.0-0' }} <span class="text-sm font-normal">pts</span></p>
+                        <p class="text-sm text-[#534437]">={{ (availableRedeemablePoints() - maxRedeemablePoints()) * pointsToRupeeRate | currency:'INR' }}</p>
                       </div>
                     </div>
                     <div class="flex justify-between items-center p-4 bg-[#8a5100]/10 rounded-xl">

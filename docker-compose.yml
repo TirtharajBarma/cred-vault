@@ -1,0 +1,183 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: credvault-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Sql@Password!123
+      - MSSQL_PID=Developer
+    ports:
+      - "1434:1433"
+    volumes:
+      - project_sqlserver_data:/var/opt/mssql
+      - sqlserver_data:/var/opt/mssql/legacy
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Sql@Password!123" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  identity-service:
+    build:
+      context: ./src/server
+      dockerfile: services/identity-service/IdentityService.API/Dockerfile
+    container_name: credvault-identity-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5001
+      - ConnectionStrings__IdentityDb=Server=sqlserver,1433;Database=credvault_identity;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+    ports:
+      - "5001:5001"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  card-service:
+    build:
+      context: ./src/server
+      dockerfile: services/card-service/CardService.API/Dockerfile
+    container_name: credvault-card-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5002
+      - ConnectionStrings__CardDb=Server=sqlserver,1433;Database=credvault_cards;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Services__BillingService__BaseUrl=http://billing-service:5003/
+    ports:
+      - "5002:5002"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  billing-service:
+    build:
+      context: ./src/server
+      dockerfile: services/billing-service/BillingService.API/Dockerfile
+    container_name: credvault-billing-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5003
+      - ConnectionStrings__BillingDb=Server=sqlserver,1433;Database=credvault_billing;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Services__CardService__BaseUrl=http://card-service:5002/
+      - Services__IdentityService__BaseUrl=http://identity-service:5001/
+    ports:
+      - "5003:5003"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+
+  payment-service:
+    build:
+      context: ./src/server
+      dockerfile: services/payment-service/PaymentService.API/Dockerfile
+    container_name: credvault-payment-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5004
+      - ConnectionStrings__PaymentDb=Server=sqlserver,1433;Database=credvault_payments;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Services__BillingService=http://billing-service:5003
+      - Services__IdentityService__BaseUrl=http://identity-service:5001/
+    ports:
+      - "5004:5004"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      billing-service:
+        condition: service_started
+      card-service:
+        condition: service_started
+      identity-service:
+        condition: service_started
+
+  notification-service:
+    build:
+      context: ./src/server
+      dockerfile: services/notification-service/NotificationService.API/Dockerfile
+    container_name: credvault-notification-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5005
+      - ConnectionStrings__NotificationDb=Server=sqlserver,1433;Database=credvault_notifications;User Id=sa;Password=Sql@Password!123;Encrypt=False;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Services__IdentityService__BaseUrl=http://identity-service:5001/
+    ports:
+      - "5005:5005"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+
+  gateway:
+    build:
+      context: ./src/server
+      dockerfile: services/gateway/Gateway.API/Dockerfile
+    container_name: credvault-gateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5006
+      - Ocelot__ConfigFile=ocelot.Docker.json
+    ports:
+      - "5006:5006"
+    depends_on:
+      identity-service:
+        condition: service_started
+      card-service:
+        condition: service_started
+      billing-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: credvault-rabbitmq
+    hostname: e763e30e4c60
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_NODENAME=rabbit@e763e30e4c60
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  project_sqlserver_data:
+  sqlserver_data:
+  rabbitmq_data:

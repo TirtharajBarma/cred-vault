@@ -11,7 +11,7 @@ namespace CardService.Application.Commands.Transactions;
 public record AddCardTransactionCommand(
     Guid UserId, 
     Guid CardId, 
-    TransactionType Type, 
+    CardTransactionType Type, 
     decimal Amount, 
     string? Description, 
     DateTime? DateUtc,
@@ -47,12 +47,13 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
         var dateUtc = request.DateUtc ?? DateTime.UtcNow;
         var isDuplicate = await cardRepository.HasDuplicateTransactionAsync(
             request.CardId, request.Type, request.Amount, request.Description ?? string.Empty, dateUtc, cancellationToken);
+        
         if (isDuplicate)
         {
             throw new ConflictException("A duplicate transaction already exists.");
         }
 
-        if (request.Type == TransactionType.Purchase)
+        if (request.Type == CardTransactionType.Purchase)
         {
             if (card.OutstandingBalance + request.Amount > card.CreditLimit)
             {
@@ -63,7 +64,7 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
         }
         else
         {
-            card.OutstandingBalance = Math.Max(card.OutstandingBalance - request.Amount, 0);
+            card.OutstandingBalance = Math.Max(card.OutstandingBalance - request.Amount, 0);        // can't go to negative outstanding ba'ace
         }
 
         var txn = new CardTransaction
@@ -79,8 +80,9 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
 
         card.UpdatedAtUtc = DateTime.UtcNow;
 
-        await cardRepository.AddTransactionAsync(txn, cancellationToken);
-        await cardRepository.UpdateAsync(card, cancellationToken);
+        await cardRepository.AddTransactionAsync(txn, cancellationToken);    //! IMP -> it doesn't save immediately [not saving to db only adding to memory]
+        await cardRepository.UpdateAsync(card, cancellationToken);           //! IMP -> works together [saving to memory]
+        // atomicity -> dangerous scenario : transaction added but maybe card didn't update properly
 
         logger.LogInformation("Added transaction {TransactionId} to Card {CardId}.", txn.Id, card.Id);
 

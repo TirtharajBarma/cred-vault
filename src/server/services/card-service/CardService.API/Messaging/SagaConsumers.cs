@@ -17,13 +17,14 @@ public class CardDeductionSagaConsumer(
 {
     public async Task Consume(ConsumeContext<ICardDeductionRequested> context)
     {
-        var message = context.Message;
+        var message = context.Message;          // [cardId, amt, correlationId]
 
         logger.LogInformation("CardDeductionSagaConsumer: CorrelationId={CorrelationId}, CardId={CardId}, Amount={Amount}",
             message.CorrelationId, message.CardId, message.Amount);
 
         try
         {
+            // checking for Idempotency -> does transaction already exist for same Saga request via correlationID
             if (await dbContext.CardTransactions.AnyAsync(x => x.Description == $"Saga:{message.CorrelationId}"))
             {
                 logger.LogInformation("Card deduction already processed: CorrelationId={CorrelationId}", message.CorrelationId);
@@ -57,8 +58,8 @@ public class CardDeductionSagaConsumer(
             // The bill amount IS based on current outstanding balance, so this check would always fail
             // when OutstandingBalance > CreditLimit (which happens after multiple charges)
 
-            var oldBalance = card.OutstandingBalance;
-            card.OutstandingBalance = card.OutstandingBalance - message.Amount;
+            var oldBalance = card.OutstandingBalance;       
+            card.OutstandingBalance = card.OutstandingBalance - message.Amount;         //! reduce outstanding balance
             card.UpdatedAtUtc = DateTime.UtcNow;
 
             dbContext.CardTransactions.Add(new CardTransaction
@@ -66,7 +67,7 @@ public class CardDeductionSagaConsumer(
                 Id = Guid.NewGuid(),
                 CardId = card.Id,
                 UserId = card.UserId,
-                Type = TransactionType.Payment,
+                Type = CardTransactionType.Payment,
                 Amount = message.Amount,
                 Description = $"Saga:{message.CorrelationId}",
                 DateUtc = DateTime.UtcNow

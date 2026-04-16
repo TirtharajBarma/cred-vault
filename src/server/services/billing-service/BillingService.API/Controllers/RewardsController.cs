@@ -19,7 +19,6 @@ namespace BillingService.API.Controllers;
 /// - GET /tiers: View available reward tiers (for user reference)
 /// - GET /account: Get user's reward account and points balance
 /// - GET /transactions: Get user's reward transaction history
-/// - POST /redeem: Redeem points for bill payment or account credit
 ///
 /// Admin endpoints (requires admin role):
 /// - POST /tiers: Create new reward tier
@@ -44,18 +43,11 @@ public class RewardsController(IMediator mediator) : BaseApiController
         public DateTime? EffectiveToUtc { get; set; }
     }
 
-    public sealed class RedeemRewardsRequest
-    {
-        public int Points { get; set; }
-        public string Target { get; set; } = "Bill";
-        public Guid? BillId { get; set; }
-    }
-
     public sealed class InternalRedeemRewardsRequest
     {
         public Guid UserId { get; set; }
         public int Points { get; set; }
-        public string Target { get; set; } = "Bill";
+        public string Target { get; set; } = "Bill";        // where should be the "point go" -> pay a bill OR add to balance
         public Guid? BillId { get; set; }
     }
 
@@ -91,7 +83,8 @@ public class RewardsController(IMediator mediator) : BaseApiController
             request.MinimumSpend,
             request.PointsPerDollar,
             request.EffectiveFromUtc,
-            request.EffectiveToUtc);
+            request.EffectiveToUtc
+        );
 
         var result = await mediator.Send(command, cancellationToken);
         
@@ -121,7 +114,8 @@ public class RewardsController(IMediator mediator) : BaseApiController
             request.MinimumSpend,
             request.PointsPerDollar,
             request.EffectiveFromUtc,
-            request.EffectiveToUtc);
+            request.EffectiveToUtc
+        );
 
         var result = await mediator.Send(command, cancellationToken);
         
@@ -191,41 +185,6 @@ public class RewardsController(IMediator mediator) : BaseApiController
     }
 
     /// <summary>
-    /// Redeem user's reward points.
-    /// Can redeem for bill payment (requires BillId) or account credit.
-    /// </summary>
-    /// <param name="request">RedeemRewardsRequest with Points, Target (Bill/Account), BillId</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>ApiResponse with redemption result</returns>
-    [HttpPost("redeem")]
-    public async Task<IActionResult> RedeemRewards(
-        [FromBody] RedeemRewardsRequest request,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null) return UnauthorizedResponse();
-
-        var target = request.Target?.ToLower() switch
-        {
-            "account" => RedeemRewardsTarget.Account,
-            "bill" => RedeemRewardsTarget.Bill,
-            _ => RedeemRewardsTarget.Bill
-        };
-
-        var command = new RedeemRewardsCommand(
-            userId.Value,
-            request.Points,
-            target,
-            request.BillId);
-
-        var result = await mediator.Send(command, cancellationToken);
-        
-        if (!result.Success) return BadRequest(result);
-
-        return Ok(result);
-    }
-
-    /// <summary>
     /// Internal: Redeem rewards for a user (called by other services).
     /// Used when paying bills - deducts points from user account.
     /// </summary>
@@ -252,7 +211,8 @@ public class RewardsController(IMediator mediator) : BaseApiController
             request.UserId,
             request.Points,
             target,
-            request.BillId);
+            request.BillId
+        );
 
         var result = await mediator.Send(command, cancellationToken);
         

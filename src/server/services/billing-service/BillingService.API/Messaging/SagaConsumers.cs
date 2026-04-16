@@ -13,7 +13,7 @@ public class BillUpdateSagaConsumer(
 {
     public async Task Consume(ConsumeContext<IBillUpdateRequested> context)
     {
-        var message = context.Message;
+        var message = context.Message;          // actual event data
 
         logger.LogInformation("BillUpdateSagaConsumer: CorrelationId={CorrelationId}, BillId={BillId}, Amount={Amount}",
             message.CorrelationId, message.BillId, message.Amount);
