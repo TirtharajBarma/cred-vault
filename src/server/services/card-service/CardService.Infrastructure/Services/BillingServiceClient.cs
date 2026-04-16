@@ -18,7 +18,6 @@ public class BillingServiceClient : IBillingServiceClient
         _httpClient = httpClient;
         var billingServiceBaseUrl = configuration["Services:BillingService:BaseUrl"] ?? "http://localhost:5003";
         _httpClient.BaseAddress = new Uri(billingServiceBaseUrl);
-        _httpClient.BaseAddress = new Uri(BillingServiceBaseUrl);
         _logger = logger;
     }
 

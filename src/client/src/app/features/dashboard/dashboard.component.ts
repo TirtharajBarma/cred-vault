@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { AdminService } from '../../core/services/admin.service';
 import { AuthService } from '../../core/services/auth.service';
+import { WalletService, WalletInfo, WalletTransaction } from '../../core/services/wallet.service';
 import { CreditCard, CardTransaction, TransactionType } from '../../core/models/card.models';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -15,7 +16,7 @@ import { formatIstDate, getUtcTimestamp } from '../../core/utils/date-time.util'
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, IstDatePipe],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, IstDatePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -23,11 +24,14 @@ export class DashboardComponent implements OnInit {
   private dashboardService = inject(DashboardService);
   private adminService = inject(AdminService);
   private authService = inject(AuthService);
+  private walletService = inject(WalletService);
   private fb = inject(FormBuilder);
 
   cards = signal<CreditCard[]>([]);
   transactions = signal<CardTransaction[]>([]);
   issuers = signal<any[]>([]);
+  wallet = signal<WalletInfo | null>(null);
+  walletTransactions = signal<WalletTransaction[]>([]);
   isLoading = signal(true);
   
   user = this.authService.currentUser;
@@ -40,6 +44,13 @@ export class DashboardComponent implements OnInit {
   addCardForm: FormGroup;
   isSubmitting = signal(false);
   errorMessage = signal<string | null>(null);
+
+  showTopUpModal = signal(false);
+  topUpAmount = signal<number>(0);
+  topUpDescription = signal<string>('');
+  isTopUpSubmitting = signal(false);
+  topUpError = signal<string | null>(null);
+  topUpSuccess = signal<string | null>(null);
 
   constructor() {
     this.addCardForm = this.fb.group({
@@ -68,9 +79,14 @@ export class DashboardComponent implements OnInit {
       catchError(() => of({ success: false, data: [] }))
     );
 
+    const wallet$ = this.walletService.getMyWallet().pipe(
+      catchError(() => of({ success: false, data: null }))
+    );
+
     forkJoin({
       cards: cards$,
-      transactions: transactions$
+      transactions: transactions$,
+      wallet: wallet$
     }).subscribe({
       next: (res: any) => {
         if (res.cards.success) {
@@ -78,6 +94,9 @@ export class DashboardComponent implements OnInit {
         }
         if (res.transactions.success) {
           this.transactions.set(res.transactions.data || []);
+        }
+        if (res.wallet.success) {
+          this.wallet.set(res.wallet.data);
         }
         this.isLoading.set(false);
       },
@@ -229,10 +248,10 @@ export class DashboardComponent implements OnInit {
   }
 
   getNormalizedTransactionType(type: TransactionType | string | number): TransactionType {
-    if (type === TransactionType.Purchase || type === 1 || type === '1' || type === 'Purchase') return TransactionType.Purchase;
-    if (type === TransactionType.Payment || type === 2 || type === '2' || type === 'Payment') return TransactionType.Payment;
-    if (type === TransactionType.Refund || type === 3 || type === '3' || type === 'Refund') return TransactionType.Refund;
-    return TransactionType.Purchase;
+    if (type === 0 || type === '0' || type === 'Purchase') return 0;
+    if (type === 1 || type === '1' || type === 'Payment') return 1;
+    if (type === 2 || type === '2' || type === 'Refund') return 2;
+    return 0;
   }
 
   getTransactionTitle(tx: CardTransaction): string {
@@ -260,7 +279,7 @@ export class DashboardComponent implements OnInit {
   }
 
   getTransactionFlowLabel(type: TransactionType | string | number): string {
-    return this.getNormalizedTransactionType(type) === TransactionType.Purchase ? 'Debit' : 'Credit';
+    return this.getNormalizedTransactionType(type) === 0 ? 'Debit' : 'Credit';
   }
 
   getTransactionTypeLabel(type: TransactionType | string | number): string {
@@ -271,7 +290,7 @@ export class DashboardComponent implements OnInit {
   }
 
   getSignedAmountPrefix(type: TransactionType | string | number): string {
-    return this.getNormalizedTransactionType(type) === TransactionType.Purchase ? '-' : '+';
+    return this.getNormalizedTransactionType(type) === 0 ? '-' : '+';
   }
 
   private getMonthYear(dateUtc: string): string {
@@ -415,5 +434,85 @@ export class DashboardComponent implements OnInit {
         this.deleteErrorMessage.set(backendMessage || 'Unable to delete this card right now. Please try again.');
       }
     });
+  }
+
+  toggleTopUpModal(): void {
+    this.showTopUpModal.set(!this.showTopUpModal());
+    this.topUpError.set(null);
+    this.topUpSuccess.set(null);
+    this.topUpAmount.set(0);
+    this.topUpDescription.set('');
+  }
+
+  submitTopUp(): void {
+    const amount = this.topUpAmount();
+    if (!amount || amount <= 0) {
+      this.topUpError.set('Please enter a valid amount greater than zero.');
+      return;
+    }
+
+    if (amount > 50000) {
+      this.topUpError.set('Maximum top-up amount is ₹50,000 per transaction.');
+      return;
+    }
+
+    this.isTopUpSubmitting.set(true);
+    this.topUpError.set(null);
+    this.topUpSuccess.set(null);
+
+    this.walletService.topUp({ amount, description: this.topUpDescription() || 'Wallet top-up' }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.topUpSuccess.set(`Successfully topped up ₹${amount.toLocaleString('en-IN')}. New balance: ₹${(res.data?.newBalance || 0).toLocaleString('en-IN')}`);
+          this.wallet.update(w => w ? { ...w, balance: res.data?.newBalance || w.balance } : w);
+          setTimeout(() => this.toggleTopUpModal(), 2000);
+        } else {
+          this.topUpError.set(res.message || 'Failed to top up wallet.');
+        }
+        this.isTopUpSubmitting.set(false);
+      },
+      error: (err) => {
+        this.topUpError.set(err?.error?.message || 'Failed to top up wallet. Please try again.');
+        this.isTopUpSubmitting.set(false);
+      }
+    });
+  }
+
+  getWalletBalance(): number {
+    return this.wallet()?.balance || 0;
+  }
+
+  hasWallet(): boolean {
+    return this.wallet()?.hasWallet || false;
+  }
+
+  getWalletTransactionTypeName(type: number): string {
+    switch (type) {
+      case 1: return 'Top Up';
+      case 2: return 'Payment';
+      case 3: return 'Refund';
+      case 4: return 'Withdrawal';
+      default: return 'Transaction';
+    }
+  }
+
+  getWalletTransactionIcon(type: number): string {
+    switch (type) {
+      case 1: return 'add_circle';
+      case 2: return 'payments';
+      case 3: return 'settings_backup_restore';
+      case 4: return 'send';
+      default: return 'receipt';
+    }
+  }
+
+  getWalletTransactionClass(type: number): string {
+    switch (type) {
+      case 1: return 'text-green-600';
+      case 2: return 'text-[#8a5100]';
+      case 3: return 'text-green-600';
+      case 4: return 'text-red-500';
+      default: return 'text-[#615e5c]';
+    }
   }
 }

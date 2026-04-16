@@ -5,6 +5,7 @@ using System.Text.Json;
 using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using PaymentService.Application.Services;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
@@ -32,6 +33,7 @@ public class InitiatePaymentCommandHandler(
     IPublishEndpoint publishEndpoint,
     ISendEndpointProvider sendEndpointProvider,
     IHttpClientFactory httpClientFactory,           // call other services
+    IWalletService walletService,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<InitiatePaymentCommandHandler> logger) : IRequestHandler<InitiatePaymentCommand, InitiatePaymentResult>
 {
@@ -112,6 +114,19 @@ public class InitiatePaymentCommandHandler(
             logger.LogWarning("Payment rejected: Full payment amount {Amount} does not match outstanding {Outstanding} for Bill {BillId}",
                 finalAmount, outstandingAmount, request.BillId);
             return new InitiatePaymentResult(false, null, $"Full payment must equal outstanding balance ({outstandingAmount:0.00})");
+        }
+
+        // Ensure wallet has enough balance before OTP flow starts.
+        var wallet = await walletService.GetWalletAsync(request.UserId, cancellationToken);
+        var walletBalance = wallet?.Balance ?? 0m;
+        if (walletBalance < finalAmount)
+        {
+            logger.LogWarning("Payment rejected: insufficient wallet balance. UserId={UserId}, Balance={Balance}, Required={Required}",
+                request.UserId, walletBalance, finalAmount);
+            return new InitiatePaymentResult(
+                false,
+                null,
+                $"Insufficient wallet balance. Available: {walletBalance:0.00}, required: {finalAmount:0.00}. Please top up first.");
         }
 
         var otpCode = GenerateOtp();

@@ -25,9 +25,9 @@ export interface CreditCard {
 }
 
 export enum TransactionType {
-  Purchase = 1,
-  Payment = 2,
-  Refund = 3
+  Purchase = 0,
+  Payment = 1,
+  Refund = 2
 }
 
 export interface CardTransaction {

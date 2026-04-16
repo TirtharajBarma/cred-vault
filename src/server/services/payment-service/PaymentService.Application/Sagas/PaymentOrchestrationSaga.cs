@@ -9,7 +9,6 @@ namespace PaymentService.Application.Sagas;
 
 public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestrationSagaState>
 {
-    // all states of process -> 10
     public new State Initial { get; private set; } = null!;
     public State AwaitingOtpVerification { get; private set; } = null!;
     public State AwaitingPaymentConfirmation { get; private set; } = null!;
@@ -18,10 +17,10 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
     public State AwaitingCardDeduction { get; private set; } = null!;
     public State Completed { get; private set; } = null!;
     public State Compensating { get; private set; } = null!;
+    public State AwaitingWalletRefund { get; private set; } = null!;
     public State Compensated { get; private set; } = null!;
     public State Failed { get; private set; } = null!;
 
-    // events -> 15
     public Event<IStartPaymentOrchestration> StartOrchestration { get; private set; } = null!;
     public Event<IOtpVerified> OtpVerified { get; private set; } = null!;
     public Event<IOtpFailed> OtpFailed { get; private set; } = null!;
@@ -37,6 +36,8 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
     public Event<IRevertPaymentFailed> RevertPaymentFailed { get; private set; } = null!;
     public Event<IRewardRedemptionSucceeded> RewardRedemptionSucceeded { get; private set; } = null!;
     public Event<IRewardRedemptionFailed> RewardRedemptionFailed { get; private set; } = null!;
+    public Event<IWalletRefundSucceeded> WalletRefundSucceeded { get; private set; } = null!;
+    public Event<IWalletRefundFailed> WalletRefundFailed { get; private set; } = null!;
 
     public PaymentOrchestrationSaga()
     {
@@ -58,6 +59,8 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
         Event(() => RevertPaymentFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
         Event(() => RewardRedemptionSucceeded, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
         Event(() => RewardRedemptionFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
+        Event(() => WalletRefundSucceeded, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
+        Event(() => WalletRefundFailed, x => x.CorrelateById(ctx => ctx.Message.CorrelationId));
 
         //! ctx.Message -> incoming req : ctx.Saga -> saga obj(to be saved in DB)
         Initially(
@@ -89,6 +92,7 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.OtpVerified = true;
                     ctx.Saga.OtpCode = null;
                     ctx.Saga.OtpExpiresAtUtc = null;
+                    ctx.Saga.WalletDeducted = true;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
                 .TransitionTo(AwaitingPaymentConfirmation)
@@ -345,16 +349,15 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
                     ctx.Saga.PaymentProcessed = false;
                     ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
                 })
-                .TransitionTo(Compensated)
-                .PublishAsync(ctx => ctx.Init<IPaymentFailed>(new
+                .TransitionTo(AwaitingWalletRefund)
+                .PublishAsync(ctx => ctx.Init<IWalletRefundRequested>(new
                 {
+                    CorrelationId = ctx.Saga.CorrelationId,
                     PaymentId = ctx.Saga.PaymentId,
                     ctx.Saga.UserId,
-                    Email = ctx.Saga.Email ?? string.Empty,
-                    FullName = ctx.Saga.FullName ?? "User",
                     ctx.Saga.Amount,
-                    Reason = ctx.Saga.CompensationReason ?? "Payment failed and compensated",
-                    FailedAt = DateTime.UtcNow
+                    Reason = ctx.Saga.CompensationReason ?? "Payment failed - refunding to wallet",
+                    RequestedAt = DateTime.UtcNow
                 })),
             When(RevertPaymentFailed)
                 .Then(ctx =>
@@ -399,7 +402,59 @@ public class PaymentOrchestrationSaga : MassTransitStateMachine<PaymentOrchestra
 
         During(Compensated,
             Ignore(RevertBillSucceeded),
-            Ignore(RevertPaymentSucceeded)
+            Ignore(RevertPaymentSucceeded),
+            Ignore(WalletRefundSucceeded)
+        );
+
+        During(AwaitingWalletRefund,
+            When(WalletRefundSucceeded)
+                .Then(ctx =>
+                {
+                    ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
+                })
+                .TransitionTo(Compensated)
+                .PublishAsync(ctx => ctx.Init<IPaymentFailed>(new
+                {
+                    PaymentId = ctx.Saga.PaymentId,
+                    ctx.Saga.UserId,
+                    Email = ctx.Saga.Email ?? string.Empty,
+                    FullName = ctx.Saga.FullName ?? "User",
+                    ctx.Saga.Amount,
+                    Reason = $"{ctx.Saga.CompensationReason ?? "Payment failed"}. Refund of ₹{ctx.Message.RefundedAmount} credited to your wallet.",
+                    FailedAt = DateTime.UtcNow
+                })),
+            When(WalletRefundFailed)
+                .Then(ctx =>
+                {
+                    ctx.Saga.CompensationAttempts++;
+                    ctx.Saga.CompensationReason += $" | Wallet refund failed: {ctx.Message.Reason}";
+                    ctx.Saga.UpdatedAtUtc = DateTime.UtcNow;
+                })
+                .If(ctx => ctx.Saga.CompensationAttempts >= 5,
+                    x => x.TransitionTo(Failed)
+                        .PublishAsync(ctx => ctx.Init<IPaymentFailed>(new
+                        {
+                            PaymentId = ctx.Saga.PaymentId,
+                            ctx.Saga.UserId,
+                            Email = ctx.Saga.Email ?? string.Empty,
+                            FullName = ctx.Saga.FullName ?? "User",
+                            ctx.Saga.Amount,
+                            Reason = $"Compensation failed after 5 attempts: {ctx.Saga.CompensationReason}. Please contact support for refund.",
+                            FailedAt = DateTime.UtcNow
+                        }))
+                )
+                .If(ctx => ctx.Saga.CompensationAttempts < 5,
+                    x => x.TransitionTo(AwaitingWalletRefund)
+                        .PublishAsync(ctx => ctx.Init<IWalletRefundRequested>(new
+                        {
+                            CorrelationId = ctx.Saga.CorrelationId,
+                            PaymentId = ctx.Saga.PaymentId,
+                            ctx.Saga.UserId,
+                            ctx.Saga.Amount,
+                            Reason = $"Retry: {ctx.Saga.CompensationReason}",
+                            RequestedAt = DateTime.UtcNow
+                        }))
+                )
         );
 
         During(Failed,

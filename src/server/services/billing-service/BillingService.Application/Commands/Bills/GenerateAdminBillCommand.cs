@@ -253,7 +253,7 @@ public class GenerateAdminBillCommandHandler(
 
         var txns = await GetCardTransactionsAsync(bill.CardId, auth, ct);
         var lines = txns
-            .Where(t => t.Type == 1 && t.DateUtc > lowerBoundUtc && t.DateUtc <= now)       // only include Type 1 -> purchases
+            .Where(t => t.Type == 0 && t.DateUtc > lowerBoundUtc && t.DateUtc <= now)       // include purchases only
             .OrderBy(t => t.DateUtc)
             .Select(t => new StatementTransaction
             {
@@ -262,9 +262,9 @@ public class GenerateAdminBillCommandHandler(
                 SourceTransactionId = t.Id,
                 Type = t.Type switch                                        // convert enum [int] -> strings
                 {
-                    1 => "Purchase",
-                    2 => "Payment",
-                    3 => "Refund",
+                    0 => "Purchase",
+                    1 => "Payment",
+                    2 => "Refund",
                     _ => "Unknown"
                 },
                 Amount = t.Amount,

@@ -378,6 +378,12 @@ export class BillsComponent implements OnInit {
     return Math.min(outstanding, Number(bill.minDue));
   }
 
+  canSelectMinimumDue(bill: Bill | null): boolean {
+    if (!bill) return false;
+    if (this.getBillOutstandingAmount(bill) <= 0) return false;
+    return this.getBillAmountPaid(bill) <= 0;
+  }
+
   getSelectedBillOutstanding(): number {
     return this.getPaymentAmount(this.selectedBill(), 'full');
   }
@@ -401,10 +407,15 @@ export class BillsComponent implements OnInit {
   }
 
   private normalizeBillStatus(status: number | string): BillStatus {
-    if (status === BillStatus.Pending || status === 1 || status === '1' || status === 'Pending') return BillStatus.Pending;
-    if (status === BillStatus.Paid || status === 2 || status === '2' || status === 'Paid') return BillStatus.Paid;
-    if (status === BillStatus.Overdue || status === 3 || status === '3' || status === 'Overdue') return BillStatus.Overdue;
-    if (status === BillStatus.PartiallyPaid || status === 5 || status === '5' || status === 'PartiallyPaid') return BillStatus.PartiallyPaid;
+    if (status === BillStatus.Pending || status === 0 || status === '0' || status === 'Pending') return BillStatus.Pending;
+    if (status === BillStatus.Paid || status === 1 || status === '1' || status === 'Paid') return BillStatus.Paid;
+    if (status === BillStatus.Overdue || status === 2 || status === '2' || status === 'Overdue') return BillStatus.Overdue;
+    if (status === BillStatus.PartiallyPaid || status === 4 || status === '4' || status === 'PartiallyPaid') return BillStatus.PartiallyPaid;
+
+    // Backward compatibility for old frontend-mapped numeric statuses.
+    if (status === 3 || status === '3' || status === 'Cancelled') return BillStatus.Cancelled;
+    if (status === 5 || status === '5') return BillStatus.PartiallyPaid;
+
     return BillStatus.Cancelled;
   }
 
@@ -474,6 +485,12 @@ export class BillsComponent implements OnInit {
     }
     
     const amount = this.getPaymentAmount(bill, this.paymentType());
+
+    if (this.paymentType() === 'min' && !this.canSelectMinimumDue(bill)) {
+      this.errorMessage.set('Minimum due can only be paid once. Please pay the full remaining amount.');
+      this.paymentType.set('full');
+      return;
+    }
 
     if (amount <= 0) {
       this.errorMessage.set('This bill is already settled.');

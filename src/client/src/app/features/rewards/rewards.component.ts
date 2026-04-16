@@ -174,16 +174,16 @@ export class RewardsComponent implements OnInit {
       return { label: 'Reversed', cssClass: 'bg-gray-500/10 text-gray-500' };
     }
     switch (tx.type) {
-      case 1: return { label: 'Earned', cssClass: 'bg-emerald-500/10 text-emerald-600' };
-      case 2: return { label: 'Adjusted', cssClass: 'bg-blue-500/10 text-blue-600' };
-      case 3: return { label: 'Redeemed', cssClass: 'bg-red-500/10 text-red-600' };
-      case 4: return { label: 'Reversed', cssClass: 'bg-gray-500/10 text-gray-500' };
+      case 0: return { label: 'Earned', cssClass: 'bg-emerald-500/10 text-emerald-600' };
+      case 1: return { label: 'Adjusted', cssClass: 'bg-blue-500/10 text-blue-600' };
+      case 2: return { label: 'Redeemed', cssClass: 'bg-red-500/10 text-red-600' };
+      case 3: return { label: 'Reversed', cssClass: 'bg-gray-500/10 text-gray-500' };
       default: return { label: 'Unknown', cssClass: 'bg-gray-500/10 text-gray-500' };
     }
   }
 
   getTransactionPointsDisplay(tx: RewardTransaction): string {
-    const prefix = (tx.type === 3 || tx.type === 4 || tx.reversedAtUtc) ? '-' : '';
+    const prefix = (tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) ? '-' : '';
     return `${prefix}${tx.points}`;
   }
 

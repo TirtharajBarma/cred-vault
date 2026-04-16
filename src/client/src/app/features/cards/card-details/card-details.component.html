@@ -213,7 +213,7 @@
                         </p>
                       </div>
                       <div class="text-right shrink-0">
-                        <p [class]="'font-black text-xl ' + (getNormalizedTransactionType(tx.type) === 1 ? 'text-red-500' : 'text-emerald-500')">
+                        <p [class]="'font-black text-xl ' + (getNormalizedTransactionType(tx.type) === 0 ? 'text-red-500' : 'text-emerald-500')">
                           {{ getSignedAmountPrefix(tx.type) }}{{ tx.amount | currency:'INR' }}
                         </p>
                         <p class="text-[10px] font-bold text-[#615e5c] uppercase tracking-widest mt-1">
@@ -405,13 +405,17 @@
               </button>
               <button
                 (click)="paymentType.set('min')"
+                [disabled]="!canSelectMinimumDue(currentBill())"
                 class="flex-1 p-5 rounded-2xl border-2 transition-all text-left"
-                [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50'"
+                [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50 disabled:cursor-not-allowed disabled:opacity-50'"
               >
                 <p class="font-bold text-[#1b1c1c] text-lg">Minimum Due</p>
                 <p class="text-sm text-[#534437] mt-1">{{ getPaymentAmount(currentBill(), 'min') | currency:'INR' }}</p>
               </button>
             </div>
+            @if (!canSelectMinimumDue(currentBill())) {
+              <p class="mt-2 text-xs text-[#8a5100]">Minimum due can only be paid once. Pay the full remaining amount next.</p>
+            }
           </div>
 
           @if (availablePoints() > 0) {

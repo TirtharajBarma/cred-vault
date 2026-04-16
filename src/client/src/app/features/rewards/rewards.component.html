@@ -211,7 +211,7 @@
                       @let typeInfo = getTransactionTypeLabel(tx);
                       <span class="px-3 py-1 rounded-full text-[0.6rem] font-bold uppercase tracking-wider" [class]="typeInfo.cssClass">{{ typeInfo.label }}</span>
                     </td>
-                    <td class="px-8 py-6 text-sm font-extrabold text-right" [class]="(tx.type === 3 || tx.type === 4 || tx.reversedAtUtc) ? 'text-red-500' : 'text-emerald-600'">
+                    <td class="px-8 py-6 text-sm font-extrabold text-right" [class]="(tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) ? 'text-red-500' : 'text-emerald-600'">
                       {{ getTransactionPointsDisplay(tx) | number }}
                     </td>
                   </tr>

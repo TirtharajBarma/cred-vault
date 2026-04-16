@@ -59,3 +59,47 @@ public sealed class TransactionRepository(PaymentDbContext dbContext) : ITransac
         await dbContext.Transactions.AddAsync(transaction);
     }
 }
+
+public sealed class WalletRepository(PaymentDbContext dbContext) : IWalletRepository
+{
+    public async Task<UserWallet?> GetByUserIdAsync(Guid userId)
+    {
+        return await dbContext.UserWallets
+            .FirstOrDefaultAsync(x => x.UserId == userId);
+    }
+
+    public async Task<UserWallet?> GetByIdAsync(Guid id)
+    {
+        return await dbContext.UserWallets
+            .Include(x => x.Transactions)
+            .FirstOrDefaultAsync(x => x.Id == id);
+    }
+
+    public async Task<IEnumerable<WalletTransaction>> GetTransactionsAsync(Guid walletId, int skip = 0, int take = 20)
+    {
+        return await dbContext.WalletTransactions
+            .Where(x => x.WalletId == walletId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+    }
+
+    public async Task AddAsync(UserWallet wallet)
+    {
+        await dbContext.UserWallets.AddAsync(wallet);
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task UpdateAsync(UserWallet wallet)
+    {
+        dbContext.UserWallets.Update(wallet);
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task AddTransactionAsync(WalletTransaction transaction)
+    {
+        await dbContext.WalletTransactions.AddAsync(transaction);
+        await dbContext.SaveChangesAsync();
+    }
+}

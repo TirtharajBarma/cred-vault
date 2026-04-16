@@ -10,9 +10,11 @@ using PaymentService.Infrastructure.Messaging;
 using PaymentService.Infrastructure.BackgroundJobs;
 using PaymentService.Application.Common;
 using PaymentService.Application.Commands.Payments;
+using PaymentService.Application.Services;
 using FluentValidation;
 using Shared.Contracts.Extensions;
 using Shared.Contracts.Middleware;
+using Shared.Contracts.Events.Identity;
 using MediatR;
 using MassTransit;
 using Serilog;
@@ -52,15 +54,17 @@ try
 
     builder.Services.AddDbContext<PaymentDbContext>(o =>
     {
-        o.UseSqlServer(builder.Configuration.GetConnectionString("PaymentDb"));     // register EF
-        // connects to SQL server
+        o.UseSqlServer(builder.Configuration.GetConnectionString("PaymentDb"),
+            x => x.MigrationsAssembly("PaymentService.Infrastructure"));
         o.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     });
 
     builder.Services.AddHttpClient();
     builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
-    builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PaymentDbContext>());       // DbContext is UnitOfWork
+    builder.Services.AddScoped<IWalletRepository, WalletRepository>();
+    builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PaymentDbContext>());
+    builder.Services.AddScoped<IWalletService, WalletService>();
     
     builder.Services.AddHostedService<PaymentExpirationBackgroundJob>();        // background job
 
@@ -77,9 +81,11 @@ try
         x.AddConsumer<PaymentCompletedConsumer>();
         x.AddConsumer<PaymentFailedConsumer>();
         x.AddConsumer<UserDeletedConsumer>();
+        x.AddConsumer<UserRegisteredConsumer>();
         x.AddConsumer<PaymentProcessConsumer>();
         x.AddConsumer<RevertPaymentConsumer>();
         x.AddConsumer<RewardRedemptionConsumer>();
+        x.AddConsumer<WalletRefundConsumer>();
         x.AddSagaStateMachine<PaymentOrchestrationSaga, PaymentOrchestrationSagaState>()
             .EntityFrameworkRepository(r => r.ExistingDbContext<PaymentDbContext>());
 
@@ -105,6 +111,7 @@ try
                 e.ConfigureConsumer<PaymentProcessConsumer>(ctx);
                 e.ConfigureConsumer<RevertPaymentConsumer>(ctx);
                 e.ConfigureConsumer<RewardRedemptionConsumer>(ctx);
+                e.ConfigureConsumer<WalletRefundConsumer>(ctx);
             });
 
             cfg.ReceiveEndpoint("payment-domain-event", e =>
@@ -114,6 +121,7 @@ try
                 e.ConfigureConsumer<PaymentCompletedConsumer>(ctx);
                 e.ConfigureConsumer<PaymentFailedConsumer>(ctx);
                 e.ConfigureConsumer<UserDeletedConsumer>(ctx);
+                e.ConfigureConsumer<UserRegisteredConsumer>(ctx);
             });
         });
     });
