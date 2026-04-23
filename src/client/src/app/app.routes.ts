@@ -60,6 +60,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/bills/bills.component').then(m => m.BillsComponent)
   },
   {
+    path: 'bills/wallet',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/bills/wallet-activity/wallet-activity.component').then(m => m.WalletActivityComponent)
+  },
+  {
     path: 'rewards',
     canActivate: [authGuard],
     loadComponent: () => import('./features/rewards/rewards.component').then(m => m.RewardsComponent)

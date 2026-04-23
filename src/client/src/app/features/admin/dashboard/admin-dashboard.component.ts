@@ -61,7 +61,7 @@ export class AdminDashboardComponent implements OnInit {
           activeUsers: userStats.activeUsers || 0,
           suspendedUsers: userStats.suspendedUsers || 0,
           pendingUsers: userStats.pendingUsers || 0,
-          activeIssuers: issuers.filter((i: any) => i.isActive).length,
+          activeIssuers: issuers.length,
           rewardTiers: tiers.length,
           systemUptime: '99.98%'
         });

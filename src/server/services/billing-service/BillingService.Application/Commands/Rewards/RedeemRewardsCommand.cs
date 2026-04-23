@@ -10,7 +10,8 @@ public record RedeemRewardsCommand(
     Guid UserId,
     int Points,
     RedeemRewardsTarget Target,         // where to apply
-    Guid? TargetId                      // which bill
+    Guid? TargetId,                     // which bill
+    bool ApplyToBillAmount = true
 ) : IRequest<ApiResponse<RedeemRewardsResult>>;
 
 public enum RedeemRewardsTarget
@@ -91,7 +92,7 @@ public class RedeemRewardsCommandHandler(
                 {
                     return new ApiResponse<RedeemRewardsResult> { Success = false, Message = "Bill ID is required for bill redemption." };
                 }
-                return await HandleBillRedemption(account, request.TargetId.Value, request.Points, dollarValue, now, cancellationToken);
+                return await HandleBillRedemption(account, request.TargetId.Value, request.Points, dollarValue, now, request.ApplyToBillAmount, cancellationToken);
 
             default:
                 return new ApiResponse<RedeemRewardsResult> { Success = false, Message = "Invalid redemption target." };
@@ -154,6 +155,7 @@ public class RedeemRewardsCommandHandler(
         int points,
         decimal dollarValue,
         DateTime now,
+        bool applyToBillAmount,
         CancellationToken cancellationToken)
     {
         var bill = await billRepository.GetByIdAndUserIdAsync(billId, account.UserId, cancellationToken);
@@ -162,10 +164,11 @@ public class RedeemRewardsCommandHandler(
             return new ApiResponse<RedeemRewardsResult> { Success = false, Message = "Bill not found." };
         }
 
-        if (bill.Status == BillStatus.Paid || bill.Status == BillStatus.Cancelled)
+        if (!applyToBillAmount || bill.Status == BillStatus.Paid || bill.Status == BillStatus.Cancelled)
         {
             // Bill already paid via other means (e.g., SAGA), just deduct points and record transaction
-            logger.LogInformation("Bill {BillId} already {Status}, deducting points only", billId, bill.Status);
+            logger.LogInformation("Bill {BillId} redemption without bill adjustment. ApplyToBillAmount={ApplyToBillAmount}, Status={Status}",
+                billId, applyToBillAmount, bill.Status);
 
             account.PointsBalance -= points;
             account.UpdatedAtUtc = now;
@@ -202,16 +205,16 @@ public class RedeemRewardsCommandHandler(
 
         // user pay will rewards
         var paymentAmount = dollarValue;
-        var existingPaid = bill.AmountPaid ?? 0;
+        var existingPaid = bill.AmountPaid ?? 0;            // how much you already you paid before
         var proposedTotalPaid = existingPaid + paymentAmount;
-        var remainingBeforePayment = Math.Max(0, bill.Amount - existingPaid);
+        var remainingBeforePayment = Math.Max(0, bill.Amount - existingPaid);       // yet to pay
 
         if (remainingBeforePayment <= 0)
         {
             return new ApiResponse<RedeemRewardsResult> { Success = false, Message = "Bill is already fully paid." };
         }
 
-        var finalPaidAmount = Math.Min(bill.Amount, proposedTotalPaid);
+        var finalPaidAmount = Math.Min(bill.Amount, proposedTotalPaid);         // no payment more than bill amt
         var remainingAfterPayment = Math.Max(0, bill.Amount - finalPaidAmount);
 
         bill.AmountPaid = finalPaidAmount;

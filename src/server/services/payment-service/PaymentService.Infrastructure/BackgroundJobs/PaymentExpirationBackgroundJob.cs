@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using MassTransit;
 using PaymentService.Domain.Enums;
 using PaymentService.Infrastructure.Persistence.Sql;
+using Shared.Contracts.Events.Saga;
 
 namespace PaymentService.Infrastructure.BackgroundJobs;
 
@@ -36,38 +38,78 @@ public class PaymentExpirationBackgroundJob : BackgroundService
                 _logger.LogError(ex, "Error in Payment Expiration Background Job");
             }
 
-            await Task.Delay(_interval, stoppingToken);
+            await Task.Delay(_interval, stoppingToken);     // wait 1 minute before next run
         }
     }
 
     private async Task ExpireOldPaymentsAsync(CancellationToken ct)
     {
-        // scope -> a short-lived container  : 
-        using var scope = _serviceProvider.CreateScope();                           // create a new DI scope
-        var context = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();     // gets your DbContext -> sage usage, proper lifecycle
+        // scope -> a short-lived container  :
+        using var scope = _serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+        var sendEndpointProvider = scope.ServiceProvider.GetRequiredService<ISendEndpointProvider>();
 
         var now = DateTime.UtcNow;
-        
-        var expiredPayments = await context.Payments            // find expired payment
-            .Where(p => p.Status == PaymentStatus.Initiated 
-                     && p.OtpExpiresAtUtc.HasValue 
-                     && p.OtpExpiresAtUtc.Value < now)
+
+        // Find saga instances that are still waiting OTP beyond expiry.
+        var expiredAwaitingSagaIds = await context.PaymentOrchestrationSagas
+            .Where(s => s.CurrentState == "AwaitingOtpVerification"
+                     && s.OtpExpiresAtUtc.HasValue
+                     && s.OtpExpiresAtUtc.Value < now)
+            .Select(s => s.CorrelationId)
             .ToListAsync(ct);
 
-        if (expiredPayments.Count == 0)
+        if (expiredAwaitingSagaIds.Count == 0)
             return;
 
-        _logger.LogInformation("Found {Count} expired payments to mark as Expired", expiredPayments.Count);
+        var paymentsToExpire = await context.Payments
+            .Where(p => expiredAwaitingSagaIds.Contains(p.Id)
+                     && p.Status == PaymentStatus.Initiated)
+            .ToListAsync(ct);
 
-        foreach (var payment in expiredPayments)
+        foreach (var payment in paymentsToExpire)
         {
             payment.Status = PaymentStatus.Expired;
             payment.FailureReason = $"Payment expired - OTP not verified within time limit. Expired at: {payment.OtpExpiresAtUtc}";
+            payment.OtpCode = null;
+            payment.OtpExpiresAtUtc = null;
             payment.UpdatedAtUtc = now;
         }
 
-        await context.SaveChangesAsync(ct);
-        
-        _logger.LogInformation("Marked {Count} payments as Expired", expiredPayments.Count);
+        if (paymentsToExpire.Count > 0)
+        {
+            await context.SaveChangesAsync(ct);
+            _logger.LogInformation("Marked {Count} payments as Expired", paymentsToExpire.Count);
+        }
+
+        // Drive the saga state out of AwaitingOtpVerification for both newly expired
+        // and previously expired records that were left hanging.
+        var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("queue:payment-orchestration"));
+
+        var notifiedCount = 0;
+        foreach (var correlationId in expiredAwaitingSagaIds)
+        {
+            var payment = await context.Payments.AsNoTracking().FirstOrDefaultAsync(p => p.Id == correlationId, ct);
+            if (payment == null)
+                continue;
+
+            if (payment.Status is PaymentStatus.Initiated or PaymentStatus.Expired)
+            {
+                await endpoint.Send<IOtpFailed>(new
+                {
+                    CorrelationId = payment.Id,
+                    PaymentId = payment.Id,
+                    Reason = "OTP verification timed out",
+                    FailedAt = now
+                }, ct);
+
+                notifiedCount++;
+            }
+        }
+
+        if (notifiedCount > 0)
+        {
+            _logger.LogInformation("Published IOtpFailed for {Count} expired OTP saga(s)", notifiedCount);
+        }
     }
 }

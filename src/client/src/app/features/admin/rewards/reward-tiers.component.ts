@@ -325,6 +325,6 @@ export class RewardTiersComponent implements OnInit {
   getCashbackDisplay(rate: number | null | undefined): string {
     if (!rate || rate === 0) return '0%';
     const pct = (rate * 100).toFixed(2).replace(/\.?0+$/, '');
-    return pct;
+    return `${pct}%`;
   }
 }

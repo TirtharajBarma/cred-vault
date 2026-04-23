@@ -9,7 +9,7 @@ namespace BillingService.API.Messaging;
 public class BillUpdateSagaConsumer(
     IMediator mediator,
     ILogger<BillUpdateSagaConsumer> logger
-) : IConsumer<IBillUpdateRequested>
+) : IConsumer<IBillUpdateRequested>         // saga
 {
     public async Task Consume(ConsumeContext<IBillUpdateRequested> context)
     {

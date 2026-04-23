@@ -12,6 +12,7 @@ using MediatR;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace CardService.API.Controllers;
 
@@ -65,6 +66,9 @@ public class CardsController(IMediator mediator, ICardRepository cardRepository,
         }
 
         var encryptedCardNumber = cardNumberProtector.Protect(digits);          // built-in function -> .Protect()
+        var emailClaim = User.FindFirstValue(ClaimTypes.Email)                  // backup - if standard claim not found -> try raw claim
+            ?? User.FindFirstValue("email")
+            ?? string.Empty;
 
         var result = await mediator.Send(
             new CreateCardCommand(
@@ -75,7 +79,8 @@ public class CardsController(IMediator mediator, ICardRepository cardRepository,
                 request.CardNumber,
                 request.IssuerId,
                 request.IsDefault,
-                encryptedCardNumber
+                encryptedCardNumber,
+                emailClaim
             ),
             cancellationToken);
 
@@ -143,7 +148,7 @@ public class CardsController(IMediator mediator, ICardRepository cardRepository,
         var userId = GetUserIdFromToken();
         if (userId is null) return UnauthorizedResponse();
 
-        var isAdmin = User.IsInRole("admin");
+        var isAdmin = User.IsInRole("admin");       // admin can fetch any user's card
 
         var command = new AddCardTransactionCommand(
             UserId: userId.Value,

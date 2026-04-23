@@ -10,6 +10,8 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<PaymentOrchestrationSagaState> PaymentOrchestrationSagas => Set<PaymentOrchestrationSagaState>();
+    public DbSet<UserWallet> UserWallets => Set<UserWallet>();
+    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,6 +70,41 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
             entity.Property(x => x.CardDeductionError).HasMaxLength(500);
             entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
             entity.Property(x => x.RewardsAmount).HasColumnType("decimal(18,2)");
+        });
+
+        modelBuilder.Entity<UserWallet>(entity =>
+        {
+            entity.ToTable("UserWallets");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.UserId).IsRequired();
+            entity.Property(x => x.Balance).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.TotalTopUps).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.TotalSpent).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            entity.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        modelBuilder.Entity<WalletTransaction>(entity =>
+        {
+            entity.ToTable("WalletTransactions");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Type).IsRequired().HasConversion<int>();
+            entity.Property(x => x.Amount).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.BalanceAfter).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+
+            entity.HasOne(x => x.Wallet)
+                .WithMany(x => x.Transactions)
+                .HasForeignKey(x => x.WalletId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.WalletId);
+            entity.HasIndex(x => x.CreatedAtUtc);
         });
     }
 }

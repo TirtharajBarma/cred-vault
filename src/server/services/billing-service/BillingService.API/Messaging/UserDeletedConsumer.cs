@@ -31,8 +31,9 @@ public class UserDeletedConsumer(BillingDbContext db, ILogger<UserDeletedConsume
                 var rewardTransactions = await db.RewardTransactions
                     .Where(x => x.RewardAccountId == rewardAccount.Id)
                     .ToListAsync(context.CancellationToken);
-                db.RewardTransactions.RemoveRange(rewardTransactions);
+                db.RewardTransactions.RemoveRange(rewardTransactions);      // .RemoveRange() -> delete multiple records
 
+                // then delete the rewards account
                 db.RewardAccounts.Remove(rewardAccount);
             }
 

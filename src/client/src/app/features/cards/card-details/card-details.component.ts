@@ -154,7 +154,7 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     for (const tx of monthTxs) {
       const normalizedType = this.getNormalizedTransactionType(tx.type);
 
-      if (normalizedType === 1) {
+      if (normalizedType === 0) {
         const desc = (tx.description || '').toLowerCase();
         let category = 'Services';
 
@@ -286,7 +286,7 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     this.submitSuccess.set(false);
 
     this.dashboardService.addTransaction(c.id, {
-      type: 1, // Purchase
+      type: 0, // Purchase
       amount: amount,
       description: desc,
       dateUtc: new Date().toISOString()
@@ -377,18 +377,18 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
 
   getTransactionIcon(type: number): string {
     switch (this.getNormalizedTransactionType(type)) {
-      case 1: return 'shopping_cart';
-      case 2: return 'account_balance_wallet';
-      case 3: return 'keyboard_return';
+      case 0: return 'shopping_cart';
+      case 1: return 'account_balance_wallet';
+      case 2: return 'keyboard_return';
       default: return 'payments';
     }
   }
 
-  getNormalizedTransactionType(type: number | string): 1 | 2 | 3 {
-    if (type === 1 || type === '1' || type === 'Purchase') return 1;
-    if (type === 2 || type === '2' || type === 'Payment') return 2;
-    if (type === 3 || type === '3' || type === 'Refund') return 3;
-    return 1;
+  getNormalizedTransactionType(type: number | string): 0 | 1 | 2 {
+    if (type === 0 || type === '0' || type === 'Purchase') return 0;
+    if (type === 1 || type === '1' || type === 'Payment') return 1;
+    if (type === 2 || type === '2' || type === 'Refund') return 2;
+    return 0;
   }
 
   getTransactionTitle(tx: CardTransaction): string {
@@ -399,7 +399,7 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
       return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
     }
 
-    if (lowered.startsWith('saga:') && this.getNormalizedTransactionType(tx.type) === 2) {
+    if (lowered.startsWith('saga:') && this.getNormalizedTransactionType(tx.type) === 1) {
       return `Bill Statement of ${this.getMonthYear(tx.dateUtc)}`;
     }
 
@@ -407,18 +407,18 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
   }
 
   getTransactionFlowLabel(type: number | string): string {
-    return this.getNormalizedTransactionType(type) === 1 ? 'Debit' : 'Credit';
+    return this.getNormalizedTransactionType(type) === 0 ? 'Debit' : 'Credit';
   }
 
   getTransactionTypeLabel(type: number | string): string {
     const normalized = this.getNormalizedTransactionType(type);
-    if (normalized === 1) return 'Purchase';
-    if (normalized === 2) return 'Payment';
+    if (normalized === 0) return 'Purchase';
+    if (normalized === 1) return 'Payment';
     return 'Refund';
   }
 
   getSignedAmountPrefix(type: number | string): string {
-    return this.getNormalizedTransactionType(type) === 1 ? '-' : '+';
+    return this.getNormalizedTransactionType(type) === 0 ? '-' : '+';
   }
 
   private getMonthYear(dateUtc: string): string {
@@ -476,6 +476,25 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     return Math.min(outstanding, Number(bill.minDue));
   }
 
+  getRewardsDeductionAmount(bill: Bill | null, type: 'full' | 'min'): number {
+    if (!bill || !this.useRewards()) return 0;
+    const paymentAmount = this.getPaymentAmount(bill, type);
+    const deduction = Math.min(this.maxRedeemablePoints() * this.pointsToRupeeRate, paymentAmount);
+    return Number(deduction.toFixed(2));
+  }
+
+  getNetPayableAmount(bill: Bill | null, type: 'full' | 'min'): number {
+    const paymentAmount = this.getPaymentAmount(bill, type);
+    const netPayable = paymentAmount - this.getRewardsDeductionAmount(bill, type);
+    return Number(Math.max(0, netPayable).toFixed(2));
+  }
+
+  canSelectMinimumDue(bill: Bill | null): boolean {
+    if (!bill) return false;
+    if (this.getBillOutstandingAmount(bill) <= 0) return false;
+    return this.getBillAmountPaid(bill) <= 0;
+  }
+
   getSelectedBillOutstanding(): number {
     return this.getPaymentAmount(this.currentBill(), 'full');
   }
@@ -517,6 +536,13 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     if (!card || !bill) return;
 
     const amount = this.getPaymentAmount(bill, this.paymentType());
+
+    if (this.paymentType() === 'min' && !this.canSelectMinimumDue(bill)) {
+      this.paymentError.set('Minimum due can only be paid once. Please pay the full remaining amount.');
+      this.paymentType.set('full');
+      return;
+    }
+
     if (amount <= 0) {
       this.paymentError.set('This bill is already settled.');
       return;
@@ -550,8 +576,11 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
           this.paymentStage.set('initiated');
         }
       },
-      error: () => {
-        this.paymentError.set('Network error. Please try again.');
+      error: (err: any) => {
+        const backendMessage = err?.error?.message
+          || err?.error?.data?.message
+          || err?.message;
+        this.paymentError.set(backendMessage || 'Network error. Please try again.');
         this.paymentStage.set('initiated');
       }
     });
@@ -577,7 +606,7 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
           this.showSuccessModal.set(true);
 
           const bill = this.currentBill();
-          this.paidAmount.set(this.getPaymentAmount(bill, this.paymentType()));
+          this.paidAmount.set(this.getNetPayableAmount(bill, this.paymentType()));
 
           if (paymentId) {
             this.startPaymentStatusPolling(paymentId);
@@ -672,6 +701,20 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     this.canResendOtp.set(true);
     this.useRewards.set(false);
     this.paymentType.set('full');
+  }
+
+  getEffectiveBillStatus(bill: Bill): number {
+    const outstanding = Math.max(0, Number(bill.amount) - Number(bill.amountPaid || 0));
+    if (outstanding <= 0) return BillStatus.Paid;
+
+    const paidAmount = Number(bill.amountPaid || 0);
+    const dueDate = new Date(bill.dueDateUtc);
+    const now = new Date();
+
+    if (dueDate.getTime() < now.getTime()) return BillStatus.Overdue;
+    if (paidAmount > 0) return BillStatus.PartiallyPaid;
+
+    return BillStatus.Pending;
   }
 
   getBillStatusLabel(status: number): string {

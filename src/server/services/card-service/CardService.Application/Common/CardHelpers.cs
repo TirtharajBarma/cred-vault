@@ -90,4 +90,43 @@ public static class CardHelpers
     {
         return day is >= 1 and <= 31;
     }
+
+    /// <summary>
+    /// Validates card number using Luhn algorithm (checksum validation).
+    /// Used to detect typos and invalid card numbers before processing.
+    /// </summary>
+    /// <param name="digits">Card number digits only</param>
+    /// <returns>True if valid Luhn checksum</returns>
+    public static bool IsValidLuhn(string digits)
+    {
+        if (string.IsNullOrWhiteSpace(digits) || digits.Length < 13)
+        {
+            return false;
+        }
+
+        var sum = 0;
+        var alternate = false;
+
+        for (var i = digits.Length - 1; i >= 0; i--)
+        {
+            if (!int.TryParse(digits[i].ToString(), out var digit))
+            {
+                return false;
+            }
+
+            if (alternate)
+            {
+                digit *= 2;
+                if (digit > 9)
+                {
+                    digit -= 9;
+                }
+            }
+
+            sum += digit;
+            alternate = !alternate;
+        }
+
+        return sum % 10 == 0;
+    }
 }

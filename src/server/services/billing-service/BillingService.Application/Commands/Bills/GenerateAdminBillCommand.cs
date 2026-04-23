@@ -65,7 +65,7 @@ public class GenerateAdminBillCommandHandler(
             return new() { Success = false, Message = "A pending bill already exists for this card" };
         }
 
-        // min due calculate [10% or 10 which is higher]
+        // min due calculate [10% or INR 10 which is higher]
         var minDue = Math.Max(Math.Round(card.OutstandingBalance * 0.10m, 2, MidpointRounding.AwayFromZero), 10.00m);       // calculate min due
         var now = DateTime.UtcNow;
 
@@ -83,12 +83,14 @@ public class GenerateAdminBillCommandHandler(
 
         await bills.AddAsync(bill, ct);     // -> prepares data to save
         await EnsureStatementForBillAsync(bill, card, request.AuthorizationHeader, now, ct);
-        await uow.SaveChangesAsync(ct);                                         //! actual save all DB changes at once
+        await uow.SaveChangesAsync(ct);         //! actual save all DB changes at once
+        
         logger.LogInformation("Bill created: {BillId}, Amount={Amount}, DueDate={DueDate}", bill.Id, bill.Amount, bill.DueDateUtc);
 
         // calls identify Services to get Email and Name : (_, -> ignore the value)
         //! NOTIFY other services that bill is generated
         var (userOk, user, _) = await GetUserAsync(request.UserId, request.AuthorizationHeader, ct);        //! header come from controller -> pass into another function
+        
         var userEmail = userOk && user != null ? user.Email : null;     // if API success AND user exist -> use email
         var userName = userOk && user != null ? user.FullName : null;
 
@@ -100,6 +102,7 @@ public class GenerateAdminBillCommandHandler(
         }
 
         await publisher.Publish<IBillGenerated>(new { BillId = bill.Id, UserId = bill.UserId, Email = userEmail, FullName = userName, CardId = bill.CardId, Amount = bill.Amount, DueDate = bill.DueDateUtc, GeneratedAt = bill.CreatedAtUtc }, ct);
+        
         logger.LogInformation("Published IBillGenerated for {BillId}", bill.Id);
 
         return new() { Success = true, Message = "Bill generated", Data = bill };
@@ -243,17 +246,18 @@ public class GenerateAdminBillCommandHandler(
         await statements.AddAsync(statement, ct);
 
         var userBills = await bills.GetByUserIdAsync(bill.UserId, ct);          // find previous bills
-        var previousBill = userBills                                            // last bills for same card
+        var previousBill = userBills                                            // last previous bills for this same card
             .Where(b => b.CardId == bill.CardId && b.Id != bill.Id)
             .OrderByDescending(b => b.CreatedAtUtc)
             .FirstOrDefault();
 
         // Prefer transactions after the previous settled cycle to avoid leaking old items.
+        // from which date should be start picking transaction -> 
         var lowerBoundUtc = previousBill?.PaidAtUtc ?? previousBill?.CreatedAtUtc ?? bill.BillingDateUtc;
 
         var txns = await GetCardTransactionsAsync(bill.CardId, auth, ct);
         var lines = txns
-            .Where(t => t.Type == 1 && t.DateUtc > lowerBoundUtc && t.DateUtc <= now)       // only include Type 1 -> purchases
+            .Where(t => t.Type == 0 && t.DateUtc > lowerBoundUtc && t.DateUtc <= now)       // include purchases only, only new ones, upto current time
             .OrderBy(t => t.DateUtc)
             .Select(t => new StatementTransaction
             {
@@ -262,9 +266,9 @@ public class GenerateAdminBillCommandHandler(
                 SourceTransactionId = t.Id,
                 Type = t.Type switch                                        // convert enum [int] -> strings
                 {
-                    1 => "Purchase",
-                    2 => "Payment",
-                    3 => "Refund",
+                    0 => "Purchase",
+                    1 => "Payment",
+                    2 => "Refund",
                     _ => "Unknown"
                 },
                 Amount = t.Amount,

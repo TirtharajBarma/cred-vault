@@ -1,5 +1,6 @@
 using MassTransit;
 using Microsoft.Extensions.Logging;
+using PaymentService.Application.Services;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Interfaces;
 using Shared.Contracts.Events.Saga;
@@ -10,8 +11,9 @@ public class PaymentProcessConsumer(
     IPaymentRepository paymentRepository,
     ITransactionRepository transactionRepository,
     IUnitOfWork unitOfWork,
+    IWalletService walletService,
     ILogger<PaymentProcessConsumer> logger
-) : IConsumer<IPaymentProcessRequested>
+) : IConsumer<IPaymentProcessRequested>                 // saga
 {
     public async Task Consume(ConsumeContext<IPaymentProcessRequested> context)
     {
@@ -49,12 +51,37 @@ public class PaymentProcessConsumer(
                 return;
             }
 
+
+            // wallet deduction happens
+            var walletDeducted = await walletService.DeductAsync(
+                message.UserId,
+                message.Amount,
+                message.PaymentId,
+                $"Bill payment for Bill {message.PaymentId}"
+            );
+
+            if (!walletDeducted)
+            {
+                logger.LogWarning("Wallet deduction failed for PaymentId={PaymentId}, UserId={UserId}, Amount={Amount}",
+                    message.PaymentId, message.UserId, message.Amount);
+                
+                await context.Publish<IPaymentProcessFailed>(new
+                {
+                    CorrelationId = message.CorrelationId,
+                    PaymentId = message.PaymentId,
+                    Reason = "Insufficient wallet balance",
+                    FailedAt = DateTime.UtcNow
+                });
+                return;
+            }
+
             payment.Status = PaymentStatus.Processing;
             payment.UpdatedAtUtc = DateTime.UtcNow;
             await paymentRepository.UpdateAsync(payment);
             await unitOfWork.SaveChangesAsync(context.CancellationToken);
 
-            logger.LogInformation("Payment processed successfully: PaymentId={PaymentId}", message.PaymentId);
+            logger.LogInformation("Payment processed successfully: PaymentId={PaymentId}, Wallet deducted: {Amount}",
+                message.PaymentId, message.Amount);
 
             await context.Publish<IPaymentProcessSucceeded>(new
             {

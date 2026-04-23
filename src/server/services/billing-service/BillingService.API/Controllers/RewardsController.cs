@@ -49,6 +49,7 @@ public class RewardsController(IMediator mediator) : BaseApiController
         public int Points { get; set; }
         public string Target { get; set; } = "Bill";        // where should be the "point go" -> pay a bill OR add to balance
         public Guid? BillId { get; set; }
+        public bool ApplyToBillAmount { get; set; } = true;     // condition -> points reduce bill amt : false
     }
 
     /// <summary>
@@ -211,7 +212,8 @@ public class RewardsController(IMediator mediator) : BaseApiController
             request.UserId,
             request.Points,
             target,
-            request.BillId
+            request.BillId,                     // which bill to apply
+            request.ApplyToBillAmount
         );
 
         var result = await mediator.Send(command, cancellationToken);

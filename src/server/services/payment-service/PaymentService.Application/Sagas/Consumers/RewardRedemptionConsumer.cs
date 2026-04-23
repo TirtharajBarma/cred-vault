@@ -9,7 +9,7 @@ public class RewardRedemptionConsumer(
     IHttpClientFactory httpClientFactory,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<RewardRedemptionConsumer> logger
-) : IConsumer<IRewardRedemptionRequested>
+) : IConsumer<IRewardRedemptionRequested>           // send by saga
 {
     public async Task Consume(ConsumeContext<IRewardRedemptionRequested> context)
     {
@@ -47,7 +47,8 @@ public class RewardRedemptionConsumer(
                     UserId = message.UserId,
                     Points = pointsToRedeem,
                     Target = "Bill",
-                    BillId = message.BillId
+                    BillId = message.BillId,
+                    ApplyToBillAmount = false
                 })
             };
 

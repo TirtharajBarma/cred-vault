@@ -157,8 +157,8 @@ import { formatIstDate } from '../../../core/utils/date-time.util';
                   <div class="flex justify-between">
                     <span class="text-gray-500">Status</span>
                     <span class="px-2 py-0.5 rounded text-xs font-semibold"
-                          [class]="getBillStatusClass(bill()?.status ?? bill()?.Status)">
-                      {{ getBillStatusLabel(bill()?.status ?? bill()?.Status) }}
+                          [class]="getBillStatusClass(getEffectiveBillStatus(bill()))">
+                      {{ getBillStatusLabel(getEffectiveBillStatus(bill())) }}
                     </span>
                   </div>
                   @if (bill()?.paidAt || bill()?.paidAtUtc) {
@@ -412,20 +412,42 @@ export class AdminStatementDetailComponent implements OnInit {
     return includeTime ? `${formatted} IST` : formatted;
   }
 
+  getEffectiveBillStatus(billObj: any): number {
+    if (!billObj) return 0;
+    
+    const amount = Number(billObj.amount ?? billObj.Amount ?? 0);
+    const amountPaid = Number(billObj.amountPaid ?? billObj.AmountPaid ?? 0);
+    const status = Number(billObj.status ?? billObj.Status ?? 0);
+    const dueDateStr = billObj.dueDate ?? billObj.dueDateUtc ?? billObj.DueDate;
+
+    const outstanding = Math.max(0, amount - amountPaid);
+    if (outstanding <= 0 && amount > 0) return 1; // Paid
+
+    if (dueDateStr) {
+      const dueDate = new Date(dueDateStr);
+      const now = new Date();
+      if (dueDate.getTime() < now.getTime() && outstanding > 0) return 2; // Overdue
+    }
+
+    if (amountPaid > 0) return 4; // Partially Paid
+
+    return status;
+  }
+
   getBillStatusLabel(status: number): string {
     const labels: Record<number, string> = {
-      1: 'Pending', 2: 'Paid', 3: 'Overdue', 4: 'Cancelled', 5: 'Partially Paid'
+      0: 'Pending', 1: 'Paid', 2: 'Overdue', 3: 'Cancelled', 4: 'Partially Paid'
     };
     return labels[status] || 'Unknown';
   }
 
   getBillStatusClass(status: number): string {
     const classes: Record<number, string> = {
-      1: 'bg-amber-100 text-amber-700',
-      2: 'bg-emerald-100 text-emerald-700',
-      3: 'bg-red-100 text-red-700',
-      4: 'bg-gray-100 text-gray-700',
-      5: 'bg-blue-100 text-blue-700'
+      0: 'bg-amber-100 text-amber-700',
+      1: 'bg-emerald-100 text-emerald-700',
+      2: 'bg-red-100 text-red-700',
+      3: 'bg-gray-100 text-gray-700',
+      4: 'bg-blue-100 text-blue-700'
     };
     return classes[status] || 'bg-gray-100 text-gray-700';
   }

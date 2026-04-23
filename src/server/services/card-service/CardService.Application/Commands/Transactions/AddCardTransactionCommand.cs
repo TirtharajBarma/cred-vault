@@ -27,10 +27,12 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
         
         if (request.IsAdmin)
         {
+            // admin can fetch any user card
             card = await cardRepository.GetByIdAsync(request.CardId, cancellationToken);
         }
         else
         {
+            // fetch card only if cardId match + it's belong to that user
             card = await cardRepository.GetByUserAndIdAsync(request.UserId, request.CardId, cancellationToken);
         }
 
@@ -80,7 +82,10 @@ public sealed class AddCardTransactionCommandHandler(ICardRepository cardReposit
 
         card.UpdatedAtUtc = DateTime.UtcNow;
 
+        // add transaction
         await cardRepository.AddTransactionAsync(txn, cancellationToken);    //! IMP -> it doesn't save immediately [not saving to db only adding to memory]
+
+        // update card balance
         await cardRepository.UpdateAsync(card, cancellationToken);           //! IMP -> works together [saving to memory]
         // atomicity -> dangerous scenario : transaction added but maybe card didn't update properly
 

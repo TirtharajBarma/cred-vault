@@ -208,7 +208,7 @@
               </div>
               <!-- Amount -->
               <div class="text-right shrink-0">
-                <p [class]="'font-black text-xl ' + (getNormalizedTransactionType(tx.type) === 1 ? 'text-red-500' : 'text-emerald-500')">
+                <p [class]="'font-black text-xl ' + (getNormalizedTransactionType(tx.type) === 0 ? 'text-red-500' : 'text-emerald-500')">
                   {{ getSignedAmountPrefix(tx.type) }}{{ tx.amount | currency:'INR' }}
                 </p>
                 <p class="text-[10px] font-bold text-[#615e5c] uppercase tracking-widest mt-1">
@@ -449,3 +449,4 @@
     </div>
   </div>
 }
+

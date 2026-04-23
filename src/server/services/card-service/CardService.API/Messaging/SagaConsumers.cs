@@ -62,6 +62,7 @@ public class CardDeductionSagaConsumer(
             card.OutstandingBalance = card.OutstandingBalance - message.Amount;         //! reduce outstanding balance
             card.UpdatedAtUtc = DateTime.UtcNow;
 
+            // save directly
             dbContext.CardTransactions.Add(new CardTransaction
             {
                 Id = Guid.NewGuid(),

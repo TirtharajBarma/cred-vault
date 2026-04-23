@@ -97,6 +97,18 @@ public sealed class SqlRewardRepository(BillingDbContext dbContext) : IRewardRep
         await dbContext.RewardTransactions.AddAsync(transaction, cancellationToken);
     }
 
+    public async Task<decimal> GetNetEarnedPointsForBillAsync(Guid billId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RewardTransactions
+            .Where(x => x.BillId == billId)
+            .SumAsync(x => x.Type == RewardTransactionType.Reversed
+                ? -x.Points
+                : (x.Type == RewardTransactionType.Earned || x.Type == RewardTransactionType.Adjusted
+                    ? x.Points
+                    : 0m), cancellationToken);
+    }
+    // if transaction is reversed -> subtract point else add point
+
     public async Task<bool> HasTransactionForBillAsync(Guid billId, CancellationToken cancellationToken = default)
     {
         return await dbContext.RewardTransactions

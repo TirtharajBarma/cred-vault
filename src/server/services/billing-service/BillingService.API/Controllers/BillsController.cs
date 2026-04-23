@@ -99,15 +99,39 @@ public class BillsController(IMediator mediator) : BaseApiController
 
         if (!result.Success)
         {
-            if (result.Message == "UserId and CardId are required." || result.Message == "Card network is invalid." || result.Message.Contains("Outstanding balance is 0"))
+            if (result.Message == "UserId and CardId are required." || result.Message == "Invalid card network" || result.Message == "No balance to bill")
                 return BadRequest(result);
-            if (result.Message == "Card not found.")
+            if (result.Message == "Card not found")
                 return NotFound(result);
+            if (result.Message == "A pending bill already exists for this card")
+                return Conflict(result);
             
             return StatusCode(StatusCodes.Status503ServiceUnavailable, result);
         }
 
-        return StatusCode(StatusCodes.Status201Created, result);
+        var bill = result.Data;
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
+        {
+            Success = true,
+            Message = result.Message,
+            Data = bill is null
+                ? null
+                : new
+                {
+                    bill.Id,
+                    bill.UserId,
+                    bill.CardId,
+                    bill.Amount,
+                    bill.MinDue,
+                    bill.Currency,
+                    bill.BillingDateUtc,
+                    bill.DueDateUtc,
+                    bill.Status,
+                    bill.CreatedAtUtc,
+                    bill.UpdatedAtUtc
+                },
+            TraceId = HttpContext.TraceIdentifier
+        });
     }
 
     /// <summary>

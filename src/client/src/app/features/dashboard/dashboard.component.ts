@@ -143,6 +143,13 @@ export class DashboardComponent implements OnInit {
       return;
     }
 
+    const selectedIssuerId = String(issuerIdCtrl?.value ?? '');
+    const networkValidation = this.validateCardNetworkForIssuer(normalizedCardNumber, selectedIssuerId);
+    if (!networkValidation.valid) {
+      this.errorMessage.set(networkValidation.message);
+      return;
+    }
+
     if (expYear < currentYear) {
       this.errorMessage.set('Expiry year cannot be in the past.');
       return;
@@ -189,6 +196,13 @@ export class DashboardComponent implements OnInit {
       return;
     }
 
+    const selectedIssuerId = String(this.addCardForm.value.issuerId || '');
+    const networkValidation = this.validateCardNetworkForIssuer(normalizedCardNumber, selectedIssuerId);
+    if (!networkValidation.valid) {
+      this.errorMessage.set(networkValidation.message);
+      return;
+    }
+
     const payload = {
       ...this.addCardForm.value,
       cardNumber: normalizedCardNumber
@@ -219,6 +233,54 @@ export class DashboardComponent implements OnInit {
     return (value || '').replace(/\D/g, '');
   }
 
+  private getDetectedCardNetwork(cardNumber: string): 'Visa' | 'Mastercard' | 'Unknown' {
+    if (!/^\d{16}$/.test(cardNumber)) return 'Unknown';
+
+    if (cardNumber.startsWith('4')) return 'Visa';
+
+    const firstTwo = Number(cardNumber.slice(0, 2));
+    const firstFour = Number(cardNumber.slice(0, 4));
+    if ((firstTwo >= 51 && firstTwo <= 55) || (firstFour >= 2221 && firstFour <= 2720)) {
+      return 'Mastercard';
+    }
+
+    return 'Unknown';
+  }
+
+  private getIssuerNetwork(issuerId: string): 'Visa' | 'Mastercard' | 'Unknown' {
+    const issuer = this.issuers().find(item => item.id === issuerId);
+    const raw = issuer?.network;
+
+    if (raw === 'Visa' || raw === 1 || raw === '1') return 'Visa';
+    if (raw === 'Mastercard' || raw === 2 || raw === '2') return 'Mastercard';
+
+    return 'Unknown';
+  }
+
+  private validateCardNetworkForIssuer(
+    cardNumber: string,
+    issuerId: string
+  ): { valid: boolean; message: string } {
+    const detected = this.getDetectedCardNetwork(cardNumber);
+    if (detected === 'Unknown') {
+      return { valid: false, message: 'Enter a valid Visa or Mastercard card number.' };
+    }
+
+    const issuerNetwork = this.getIssuerNetwork(issuerId);
+    if (issuerNetwork === 'Unknown') {
+      return { valid: false, message: 'Selected issuer network is invalid. Please choose another issuer.' };
+    }
+
+    if (detected !== issuerNetwork) {
+      return {
+        valid: false,
+        message: `Card number looks like ${detected}, but selected issuer is ${issuerNetwork}. Please choose a matching issuer.`
+      };
+    }
+
+    return { valid: true, message: '' };
+  }
+
   getTransactionIcon(type: TransactionType): string {
     switch (this.getNormalizedTransactionType(type)) {
       case TransactionType.Purchase: return 'shopping_cart';
@@ -229,10 +291,10 @@ export class DashboardComponent implements OnInit {
   }
 
   getNormalizedTransactionType(type: TransactionType | string | number): TransactionType {
-    if (type === TransactionType.Purchase || type === 1 || type === '1' || type === 'Purchase') return TransactionType.Purchase;
-    if (type === TransactionType.Payment || type === 2 || type === '2' || type === 'Payment') return TransactionType.Payment;
-    if (type === TransactionType.Refund || type === 3 || type === '3' || type === 'Refund') return TransactionType.Refund;
-    return TransactionType.Purchase;
+    if (type === 0 || type === '0' || type === 'Purchase') return 0;
+    if (type === 1 || type === '1' || type === 'Payment') return 1;
+    if (type === 2 || type === '2' || type === 'Refund') return 2;
+    return 0;
   }
 
   getTransactionTitle(tx: CardTransaction): string {
@@ -260,7 +322,7 @@ export class DashboardComponent implements OnInit {
   }
 
   getTransactionFlowLabel(type: TransactionType | string | number): string {
-    return this.getNormalizedTransactionType(type) === TransactionType.Purchase ? 'Debit' : 'Credit';
+    return this.getNormalizedTransactionType(type) === 0 ? 'Debit' : 'Credit';
   }
 
   getTransactionTypeLabel(type: TransactionType | string | number): string {
@@ -271,7 +333,7 @@ export class DashboardComponent implements OnInit {
   }
 
   getSignedAmountPrefix(type: TransactionType | string | number): string {
-    return this.getNormalizedTransactionType(type) === TransactionType.Purchase ? '-' : '+';
+    return this.getNormalizedTransactionType(type) === 0 ? '-' : '+';
   }
 
   private getMonthYear(dateUtc: string): string {

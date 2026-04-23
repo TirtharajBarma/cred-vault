@@ -6,6 +6,7 @@ import { BillingService, Bill, BillStatus } from '../../core/services/billing.se
 import { DashboardService } from '../../core/services/dashboard.service';
 import { PaymentService } from '../../core/services/payment.service';
 import { RewardsService, StatementService, Statement } from '../../core/services/rewards.service';
+import { WalletService } from '../../core/services/wallet.service';
 import { CreditCard } from '../../core/models/card.models';
 import { IstDatePipe } from '../../shared/pipes/ist-date.pipe';
 import { DateInput, getIstEpochDay, getUtcTimestamp, parseUtcDate } from '../../core/utils/date-time.util';
@@ -31,10 +32,13 @@ export class BillsComponent implements OnInit {
   private paymentService = inject(PaymentService);
   private rewardsService = inject(RewardsService);
   private statementService = inject(StatementService);
+  private walletService = inject(WalletService);
   private router = inject(Router);
 
   bills = signal<Bill[]>([]);
   cards = signal<CreditCard[]>([]);
+  walletBalance = signal(0);
+  hasWallet = signal(false);
   isLoading = signal(true);
   filterStatus = signal<number | 'due' | null>(null);
   currentPage = signal(1);
@@ -378,6 +382,25 @@ export class BillsComponent implements OnInit {
     return Math.min(outstanding, Number(bill.minDue));
   }
 
+  getRewardsDeductionAmount(bill: Bill | null, type: 'full' | 'min'): number {
+    if (!bill || !this.useRewards()) return 0;
+    const paymentAmount = this.getPaymentAmount(bill, type);
+    const deduction = Math.min(this.maxRedeemablePoints() * this.pointsToRupeeRate, paymentAmount);
+    return Number(deduction.toFixed(2));
+  }
+
+  getNetPayableAmount(bill: Bill | null, type: 'full' | 'min'): number {
+    const paymentAmount = this.getPaymentAmount(bill, type);
+    const netPayable = paymentAmount - this.getRewardsDeductionAmount(bill, type);
+    return Number(Math.max(0, netPayable).toFixed(2));
+  }
+
+  canSelectMinimumDue(bill: Bill | null): boolean {
+    if (!bill) return false;
+    if (this.getBillOutstandingAmount(bill) <= 0) return false;
+    return this.getBillAmountPaid(bill) <= 0;
+  }
+
   getSelectedBillOutstanding(): number {
     return this.getPaymentAmount(this.selectedBill(), 'full');
   }
@@ -401,10 +424,15 @@ export class BillsComponent implements OnInit {
   }
 
   private normalizeBillStatus(status: number | string): BillStatus {
-    if (status === BillStatus.Pending || status === 1 || status === '1' || status === 'Pending') return BillStatus.Pending;
-    if (status === BillStatus.Paid || status === 2 || status === '2' || status === 'Paid') return BillStatus.Paid;
-    if (status === BillStatus.Overdue || status === 3 || status === '3' || status === 'Overdue') return BillStatus.Overdue;
-    if (status === BillStatus.PartiallyPaid || status === 5 || status === '5' || status === 'PartiallyPaid') return BillStatus.PartiallyPaid;
+    if (status === BillStatus.Pending || status === 0 || status === '0' || status === 'Pending') return BillStatus.Pending;
+    if (status === BillStatus.Paid || status === 1 || status === '1' || status === 'Paid') return BillStatus.Paid;
+    if (status === BillStatus.Overdue || status === 2 || status === '2' || status === 'Overdue') return BillStatus.Overdue;
+    if (status === BillStatus.PartiallyPaid || status === 4 || status === '4' || status === 'PartiallyPaid') return BillStatus.PartiallyPaid;
+
+    // Backward compatibility for old frontend-mapped numeric statuses.
+    if (status === 3 || status === '3' || status === 'Cancelled') return BillStatus.Cancelled;
+    if (status === 5 || status === '5') return BillStatus.PartiallyPaid;
+
     return BillStatus.Cancelled;
   }
 
@@ -475,6 +503,12 @@ export class BillsComponent implements OnInit {
     
     const amount = this.getPaymentAmount(bill, this.paymentType());
 
+    if (this.paymentType() === 'min' && !this.canSelectMinimumDue(bill)) {
+      this.errorMessage.set('Minimum due can only be paid once. Please pay the full remaining amount.');
+      this.paymentType.set('full');
+      return;
+    }
+
     if (amount <= 0) {
       this.errorMessage.set('This bill is already settled.');
       return;
@@ -525,7 +559,7 @@ export class BillsComponent implements OnInit {
         if (res.success) {
           this.showOtpModal.set(false);
           this.showSuccessModal.set(true);
-          this.paidAmount.set(this.getPaymentAmount(this.selectedBill(), this.paymentType()));
+          this.paidAmount.set(this.getNetPayableAmount(this.selectedBill(), this.paymentType()));
           this.loadData();
         } else {
           this.otpError.set(res.message || 'Invalid OTP');
@@ -553,6 +587,7 @@ export class BillsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadData();
+    this.loadWalletBalance();
   }
 
   loadData(): void {
@@ -564,12 +599,32 @@ export class BillsComponent implements OnInit {
           next: (res) => {
             this.bills.set(res.data || []);
             this.isLoading.set(false);
+            this.loadWalletBalance();
           },
           error: () => this.isLoading.set(false)
         });
       },
       error: () => this.isLoading.set(false)
     });
+  }
+
+  loadWalletBalance(): void {
+    this.walletService.getBalance().subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.walletBalance.set(Number(res.data.balance || 0));
+          this.hasWallet.set(Boolean(res.data.hasWallet));
+        }
+      },
+      error: () => {
+        this.walletBalance.set(0);
+        this.hasWallet.set(false);
+      }
+    });
+  }
+
+  openWalletActivity(): void {
+    this.router.navigate(['/bills/wallet']);
   }
 
   setFilter(status: number | 'due' | null): void {

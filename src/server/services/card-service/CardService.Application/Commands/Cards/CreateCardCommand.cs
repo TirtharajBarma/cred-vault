@@ -11,7 +11,16 @@ using Microsoft.Extensions.Logging;
 
 namespace CardService.Application.Commands.Cards;
 
-public sealed record CreateCardCommand(Guid UserId, string CardholderName, int ExpMonth, int ExpYear, string CardNumber, Guid IssuerId, bool IsDefault, string EncryptedCardNumber) : IRequest<CardResult>;
+public sealed record CreateCardCommand(
+    Guid UserId,
+    string CardholderName,
+    int ExpMonth,
+    int ExpYear,
+    string CardNumber,
+    Guid IssuerId,
+    bool IsDefault,
+    string EncryptedCardNumber,
+    string? UserEmail = null) : IRequest<CardResult>;
 
 public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndpoint publisher, ILogger<CreateCardCommandHandler> logger) : IRequestHandler<CreateCardCommand, CardResult>
 {
@@ -54,7 +63,13 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
         if (digits.Length < 13 || digits.Length > 19)
         {
             logger.LogWarning("CreateCard rejected: invalid card number length {Length}", digits.Length);
-            return new() { Success = false, Message = "Invalid card number length" };
+            return new() { Success = false, ErrorCode = "ValidationError", Message = "Invalid card number length" };
+        }
+
+        if (!CardHelpers.IsValidLuhn(digits))
+        {
+            logger.LogWarning("CreateCard rejected: failed Luhn checksum validation");
+            return new() { Success = false, ErrorCode = "ValidationError", Message = "Invalid card number" };
         }
 
         var issuer = await cards.GetIssuerByIdAsync(request.IssuerId, ct);
@@ -94,7 +109,7 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
         await cards.AddAsync(card, ct);
         logger.LogInformation("Card created: {CardId}, UserId={UserId}, Last4={Last4}", card.Id, request.UserId, last4);
 
-        var userEmail = $"user-{request.UserId}@credvault.local";
+        var userEmail = request.UserEmail?.Trim() ?? string.Empty;
         var userName = request.CardholderName.Trim();
 
         await publisher.Publish<ICardAdded>(new { CardId = card.Id, UserId = card.UserId, Email = userEmail, FullName = userName, CardNumberLast4 = card.Last4, CardHolderName = card.CardholderName, AddedAt = card.CreatedAtUtc }, ct);

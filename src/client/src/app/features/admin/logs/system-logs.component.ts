@@ -9,17 +9,19 @@ import { formatIstDate } from '../../../core/utils/date-time.util';
   selector: 'app-system-logs',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './system-logs.component.html'
+  templateUrl: './system-logs.component.html',
 })
 export class SystemLogsComponent implements OnInit {
   private adminService = inject(AdminService);
   private router = inject(Router);
   Math = Math;
-  
+
   isLoading = signal(true);
   auditLogs = signal<any[]>([]);
   notificationLogs = signal<any[]>([]);
   activeTab = signal<'audit' | 'activity'>('audit');
+
+  private userCache = new Map<string, string>();
 
   // Pagination
   currentPage = signal(1);
@@ -40,10 +42,10 @@ export class SystemLogsComponent implements OnInit {
 
   fetchData() {
     this.isLoading.set(true);
-    
+
     const params: any = {
       page: this.currentPage(),
-      pageSize: this.pageSize()
+      pageSize: this.pageSize(),
     };
 
     if (this.traceIdFilter()) {
@@ -53,31 +55,67 @@ export class SystemLogsComponent implements OnInit {
     this.adminService.getAuditLogs(params).subscribe({
       next: (res: any) => {
         const data = res.data?.data || res.data || {};
-        const logs = Array.isArray(data?.logs) ? data.logs : (Array.isArray(data) ? data : []);
+        const logs = Array.isArray(data?.logs) ? data.logs : Array.isArray(data) ? data : [];
 
         if (this.currentPage() === 1) {
           this.auditLogs.set(logs);
         } else {
-          this.auditLogs.update(current => [...current, ...logs]);
+          this.auditLogs.update((current) => [...current, ...logs]);
         }
 
         this.totalAuditLogs.set(data.total || logs.length);
         this.hasMoreLogs.set(logs.length >= this.pageSize());
+        this.prefetchUserNames(logs);
         this.isLoading.set(false);
       },
       error: (err) => {
         console.error('Failed to fetch audit logs:', err);
         this.isLoading.set(false);
-      }
+      },
     });
+  }
+
+  private prefetchUserNames(logs: any[]) {
+    const userIds = new Set<string>();
+
+    for (const log of logs) {
+      const userId = log?.userId || log?.UserId;
+      if (userId && this.isGuid(userId) && !this.userCache.has(userId)) {
+        userIds.add(userId);
+      }
+    }
+
+    console.log('[SystemLogs] Prefetching userIds:', Array.from(userIds));
+    if (userIds.size === 0) return;
+
+    for (const userId of userIds) {
+      this.adminService.getUserDetails(userId).subscribe({
+        next: (res: any) => {
+          const user = res?.data?.data || res?.data;
+          const displayName = user?.fullName || user?.email || userId;
+          console.log('[SystemLogs] Cached user:', userId, '->', displayName);
+          this.userCache.set(userId, displayName);
+        },
+        error: () => {
+          this.userCache.set(userId, userId);
+        },
+      });
+    }
+  }
+
+  private isGuid(value: unknown): boolean {
+    if (!value) return false;
+    const text = String(value).trim();
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return guidRegex.test(text);
   }
 
   fetchNotificationLogs() {
     this.isLoading.set(true);
-    
+
     const params: any = {
       page: this.currentPage(),
-      pageSize: this.pageSize()
+      pageSize: this.pageSize(),
     };
 
     if (this.emailFilter()) {
@@ -87,12 +125,12 @@ export class SystemLogsComponent implements OnInit {
     this.adminService.getNotificationLogs(params).subscribe({
       next: (res: any) => {
         const data = res.data?.data || res.data || {};
-        const logs = Array.isArray(data?.logs) ? data.logs : (Array.isArray(data) ? data : []);
+        const logs = Array.isArray(data?.logs) ? data.logs : Array.isArray(data) ? data : [];
 
         if (this.currentPage() === 1) {
           this.notificationLogs.set(logs);
         } else {
-          this.notificationLogs.update(current => [...current, ...logs]);
+          this.notificationLogs.update((current) => [...current, ...logs]);
         }
 
         this.totalNotificationLogs.set(data.total || logs.length);
@@ -102,7 +140,7 @@ export class SystemLogsComponent implements OnInit {
       error: (err) => {
         console.error('Failed to fetch notification logs:', err);
         this.isLoading.set(false);
-      }
+      },
     });
   }
 
@@ -112,7 +150,7 @@ export class SystemLogsComponent implements OnInit {
     this.currentPage.set(1);
     this.auditLogs.set([]);
     this.notificationLogs.set([]);
-    
+
     if (tab === 'activity') {
       this.fetchNotificationLogs();
     } else {
@@ -142,7 +180,7 @@ export class SystemLogsComponent implements OnInit {
   }
 
   loadMore() {
-    this.currentPage.update(p => p + 1);
+    this.currentPage.update((p) => p + 1);
     if (this.activeTab() === 'audit') {
       this.fetchData();
     } else {
@@ -196,7 +234,11 @@ export class SystemLogsComponent implements OnInit {
 
     if (fullName) return fullName;
     if (email) return email;
-    if (userId) return String(userId);
+    if (userId) {
+      const cachedName = this.userCache.get(userId);
+      if (cachedName) return cachedName;
+      return String(userId);
+    }
 
     return 'System';
   }
@@ -288,7 +330,7 @@ export class SystemLogsComponent implements OnInit {
         { label: 'Entity ID', value: log?.entityId || '-' },
         { label: 'Trace ID', value: log?.traceId || '-' },
         { label: 'Time', value: this.formatDateTime(log?.createdAtUtc) },
-        { label: 'Context', value: this.getAuditContext(log) }
+        { label: 'Context', value: this.getAuditContext(log) },
       ];
     }
 
@@ -301,7 +343,7 @@ export class SystemLogsComponent implements OnInit {
       { label: 'Trace ID', value: log?.traceId || '-' },
       { label: 'Time', value: this.formatDateTime(log?.createdAtUtc) },
       { label: 'Context', value: this.getNotificationContext(log) },
-      { label: 'Error', value: log?.errorMessage || '-' }
+      { label: 'Error', value: log?.errorMessage || '-' },
     ];
   }
 

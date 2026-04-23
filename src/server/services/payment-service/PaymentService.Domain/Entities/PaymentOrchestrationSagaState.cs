@@ -34,6 +34,8 @@ public sealed class PaymentOrchestrationSagaState : SagaStateMachineInstance
     public string? CompensationReason { get; set; }
     public int CompensationAttempts { get; set; }
 
+    public bool WalletDeducted { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

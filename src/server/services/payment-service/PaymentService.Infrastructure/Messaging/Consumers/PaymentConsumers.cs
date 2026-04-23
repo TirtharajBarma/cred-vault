@@ -52,7 +52,7 @@ public class PaymentCompletedConsumer(IPaymentRepository payments, ITransactionR
     }
 }
 
-public class PaymentFailedConsumer(IPaymentRepository payments, IUnitOfWork uow, ILogger<PaymentFailedConsumer> logger) : IConsumer<IPaymentFailed>
+public class PaymentFailedConsumer(IPaymentRepository payments, IUnitOfWork uow, ILogger<PaymentFailedConsumer> logger) : IConsumer<IPaymentFailed>     // saga
 {
     public async Task Consume(ConsumeContext<IPaymentFailed> context)
     {

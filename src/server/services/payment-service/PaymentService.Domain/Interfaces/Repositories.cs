@@ -17,6 +17,16 @@ public interface ITransactionRepository
     Task AddAsync(Transaction transaction);
 }
 
+public interface IWalletRepository
+{
+    Task<UserWallet?> GetByUserIdAsync(Guid userId);
+    Task<UserWallet?> GetByIdAsync(Guid id);
+    Task<IEnumerable<WalletTransaction>> GetTransactionsAsync(Guid walletId, int skip = 0, int take = 20);
+    Task AddAsync(UserWallet wallet);
+    Task UpdateAsync(UserWallet wallet);
+    Task AddTransactionAsync(WalletTransaction transaction);
+}
+
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

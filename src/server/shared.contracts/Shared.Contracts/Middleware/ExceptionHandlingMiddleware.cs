@@ -41,13 +41,13 @@ public class ExceptionHandlingMiddleware
         context.Response.StatusCode = ex.StatusCode;
         context.Response.ContentType = "application/problem+json";
 
-        var problem = new ProblemDetails
+        var problem = new ProblemDetails        // standard error message format
         {
             Title = ex.Message,
             Detail = ex.Details,
             Status = ex.StatusCode,
-            Instance = context.Request.Path,
-            Extensions = new Dictionary<string, object?>
+            Instance = context.Request.Path,            // which api caused this error?
+            Extensions = new Dictionary<string, object?>        // custom fields
             {
                 ["errorCode"] = ex.ErrorCode
             }
@@ -67,6 +67,7 @@ public class ExceptionHandlingMiddleware
             TraceId = context.TraceIdentifier    //  ← ASP.NET auto-generates this
         };
 
+        // send response to client
         await context.Response.WriteAsJsonAsync(response, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase

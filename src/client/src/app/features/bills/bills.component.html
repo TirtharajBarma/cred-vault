@@ -55,17 +55,28 @@
         }
       </article>
 
-      <article class="mist-blur group relative overflow-hidden rounded-[2rem] bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] transition-all hover:-translate-y-1 md:p-8">
-        <div class="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-[#8a5100]/5"></div>
-        <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Reliability Score</label>
-        <div class="mb-2 text-4xl font-extrabold tracking-tight">99.8%</div>
-        <div class="flex items-center gap-1">
-          <div class="flex">
-            @for (i of [1, 2, 3, 4, 5]; track i) {
-              <span class="material-symbols-outlined fill-icon text-xs text-[#8a5100]">star</span>
+      <article
+        (click)="openWalletActivity()"
+        class="mist-blur group relative overflow-hidden rounded-[2rem] bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] transition-all hover:-translate-y-1 md:p-8 cursor-pointer"
+      >
+        <div class="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-[#8a5100]/5 transition-all group-hover:scale-125"></div>
+        <div class="absolute right-5 top-5 rounded-full bg-[#8a5100]/10 p-2">
+          <span class="material-symbols-outlined text-[#8a5100]">account_balance_wallet</span>
+        </div>
+        <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Wallet Balance</label>
+        <div class="mb-2 text-4xl font-extrabold tracking-tight">{{ walletBalance() | currency:'INR' }}</div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-xs font-semibold text-[#534437]">
+            @if (hasWallet()) {
+              Active wallet available
+            } @else {
+              Wallet not initialized
             }
-          </div>
-          <span class="ml-2 text-xs text-[#534437]">Elite Status</span>
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#8a5100]">
+            View Activity
+            <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span>
+          </span>
         </div>
       </article>
     </section>
@@ -280,13 +291,17 @@
             </button>
             <button 
               (click)="paymentType.set('min')"
+              [disabled]="!canSelectMinimumDue(selectedBill())"
               class="flex-1 p-5 rounded-2xl border-2 transition-all text-left"
-              [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50'"
+              [ngClass]="paymentType() === 'min' ? 'border-[#8a5100] bg-[#8a5100]/10' : 'border-[#d8c3b2]/30 hover:border-[#8a5100]/50 disabled:cursor-not-allowed disabled:opacity-50'"
             >
               <p class="font-bold text-[#1b1c1c] text-lg">Minimum Due</p>
               <p class="text-sm text-[#534437] mt-1">{{ getPaymentAmount(selectedBill(), 'min') | currency:'INR' }}</p>
             </button>
           </div>
+          @if (!canSelectMinimumDue(selectedBill())) {
+            <p class="mt-2 text-xs text-[#8a5100]">Minimum due can only be paid once. Pay the full remaining amount next.</p>
+          }
         </div>
 
         <!-- Rewards Redemption Toggle -->
@@ -333,10 +348,10 @@
                   <div class="flex justify-between items-center p-4 bg-[#8a5100]/10 rounded-xl">
                     <span class="font-semibold text-[#1b1c1c]">You Pay</span>
                     <span class="text-2xl font-black text-[#8a5100]">
-                      @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) <= 0) {
+                      @if (getNetPayableAmount(selectedBill(), paymentType()) <= 0) {
                         Fully Paid
                       } @else {
-                        {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) | currency:'INR' }}
+                        {{ getNetPayableAmount(selectedBill(), paymentType()) | currency:'INR':'symbol':'1.2-2' }}
                       }
                     </span>
                   </div>
@@ -363,13 +378,13 @@
           } @else {
             <span class="material-symbols-outlined">payments</span>
             @if (useRewards() && maxRedeemablePoints() > 0) {
-              @if (getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) <= 0) {
+              @if (getNetPayableAmount(selectedBill(), paymentType()) <= 0) {
                 Fully Paid
               } @else {
-                Pay {{ getPaymentAmount(selectedBill(), paymentType()) - (maxRedeemablePoints() * pointsToRupeeRate) | currency:'INR' }} (with {{ maxRedeemablePoints() }} pts)
+                Pay {{ getNetPayableAmount(selectedBill(), paymentType()) | currency:'INR':'symbol':'1.2-2' }} (with {{ maxRedeemablePoints() }} pts)
               }
             } @else {
-              Pay {{ getPaymentAmount(selectedBill(), paymentType()) | currency:'INR' }}
+              Pay {{ getPaymentAmount(selectedBill(), paymentType()) | currency:'INR':'symbol':'1.2-2' }}
             }
           }
         </button>
@@ -489,7 +504,7 @@
           <span class="material-symbols-outlined text-5xl text-emerald-600">check_circle</span>
         </div>
         <h2 class="text-3xl font-black text-[#1b1c1c] mb-2">Payment Successful!</h2>
-        <p class="text-[#534437] mb-8">Your payment of {{ paidAmount() | currency:'INR' }} has been processed</p>
+        <p class="text-[#534437] mb-8">Your payment of {{ paidAmount() | currency:'INR':'symbol':'1.2-2' }} has been processed</p>
         
         <button 
           (click)="closeSuccessModal()"

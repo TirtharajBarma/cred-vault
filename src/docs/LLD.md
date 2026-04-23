@@ -1,117 +1,477 @@
 # Enterprise Low-Level Design (LLD) Specification
 
-**System:** CredVault Credit Card Management Platform  
-**Prepared for:** Core Engineering, Architecture, QA, and Integration Teams  
-**Document Version:** 4.1 (Enterprise Detailed Specification)  
-**Date:** 2026-04-13  
+**System Name:** CredVault Credit Card Management Platform  
+**Target Audience:** Core Engineering, Architecture, DBA Teams, Quality Assurance (QA), and Integration Teams  
+**Document Version:** 5.0 (Enterprise Standard Specification)  
+**Date:** 2026-04-14  
 
-> [!NOTE]
-> This expansive document represents the absolute source of truth for the CredVault ecosystem. It details software patterns, bounded contexts, database schemas, object relations, distributed event messaging, complex Saga State Machine interactions, and strict API contracts.
+> [!NOTE] 
+> This document remains the authoritative engineering contract for the CredVault ecosystem. It prescribes software patterns, bounded contexts (via Docker containers), physical database schemas, distributed event messaging, complex Saga State Machine orchestration, and unified API paradigms.
 
 ---
 
-# Table of Contents
+## 1. Document Control
+
+| Version | Date | Author | Description of Changes |
+|---------|------|--------|------------------------|
+| 4.1     | 2026-04-13 | Architecture Team | Microservice splitting and MassTransit integration. |
+| 5.0     | 2026-04-14 | Lead Architect | Enterprise standardization, enhanced diagram legibility, rich component contexts, and robust database documentation. |
+
+---
+
+## Table of Contents
 1. [Executive Summary & Design Principles](#1-executive-summary--design-principles)
-2. [Macro Use Case & Actor Topologies](#2-macro-use-case--actor-topologies)
-3. [Software Class Models & Components](#3-software-class-models--components)
-4. [Enterprise Database Architecture (Detailed DB Schemas)](#4-enterprise-database-architecture-detailed-db-schemas)
-5. [Event Broker Architecture (RabbitMQ)](#5-event-broker-architecture-rabbitmq)
-6. [Distributed Workflows & Saga Pattern Sequences](#6-distributed-workflows--saga-pattern-sequences)
-7. [Core Business Logic Flow Instructions (Pseudocode)](#7-core-business-logic-flow-instructions-pseudocode)
-8. [Unified API Request/Response Envelopes](#8-unified-api-requestresponse-envelopes)
-9. [Error Mapping & Technical Defect Tracking](#9-error-mapping--technical-defect-tracking)
+2. [Component Architecture Diagram](#2-component-architecture-diagram)
+3. [Enterprise Database Architecture (Detailed DB Schemas)](#3-enterprise-database-architecture-detailed-db-schemas)
+4. [Event Broker Architecture (RabbitMQ)](#4-event-broker-architecture-rabbitmq)
+5. [Distributed Workflows & Saga Pattern Sequences](#5-distributed-workflows--saga-pattern-sequences)
+6. [Core Business Logic Flow Instructions (Pseudocode)](#6-core-business-logic-flow-instructions-pseudocode)
+7. [Deployment Architecture](#7-deployment-architecture)
 
 ---
 
 ## 1. Executive Summary & Design Principles
 
-CredVault relies on a highly scalable, isolated microservices setup emphasizing **Command Query Responsibility Segregation (CQRS)**, **Clean Architecture**, and **Event-Driven messaging** for eventual consistency.
+CredVault enforces highly decoupled architecture mapped strictly to independent sub-domains. It leverages **Command Query Responsibility Segregation (CQRS)**, **Clean Layered Architecture**, and asynchronous **Event-Driven Messaging** for distributed data consistency.
 
 ### 1.1 Structural Implementation Patterns
-| Pattern Achieved | How It Is Implemented | Strategic Benefit |
+| Pattern Achieved | Implementation Mechanism | Strategic Trade-off / Benefit |
 |---|---|---|
-| **Clean Architecture** | Enforced project separation: `Domain`, `Application`, `Infrastructure`, `Presentation`. | Business logic is decoupled from ASP.NET specifics. |
-| **CQRS** | Utilizing `MediatR` for discrete `CommandHandlers` (Writes) and `QueryHandlers` (Reads). | Clear boundaries of read/write side-effects and performance tuning. |
-| **Saga State Machine** | Implemented using `MassTransit` state saga orchestration over `RabbitMQ`. | Resolves the dual-write problem across independent databases. |
-| **API Gateway Routing** | `Ocelot` JSON configuration proxy bounding upstream/downstream maps. | Client UI remains abstracted from port collisions or routing. |
+| **Clean Architecture** | Rigid horizontal project separation: `Domain` (entities), `Application` (use cases), `Infrastructure` (data), `Presentation` (API). | Business logic is completely decoupled from ASP.NET specifics or EF Core ORMs. |
+| **CQRS Pattern** | Leveraging `MediatR` to isolate `CommandHandlers` (mutating Writes) from `QueryHandlers` (read-only queries). | Performance tuning can be scaled asymmetrically; enables future database read-replicas. |
+| **Saga State Machine** | Orchestrated by `MassTransit` over `RabbitMQ`, functioning as a central coordinator for complex distributed transactions. | Solves the dual-write cross-database problem, providing out-of-box compensation (rollback) logic. |
+| **API Gateway Routing** | Reverses proxying via `Ocelot`, defining static upstream URLs against dynamic downstream container internal IPs. | Shields client UI (Angular) from internal port collisions and service topology changes. |
 
 ---
 
-## 2. Macro Use Case & Actor Topologies
+## 2. Component Architecture Diagram
 
-The below diagram visually isolates Actor relationships along a perfectly crafted horizontal mapping line into the bounded context subgraphs, providing a beautiful overview of system capabilities.
+The Component Model demonstrates how functional sub-domains interface via the Shared Gateway and Event Bus.
 
 ```mermaid
 flowchart LR
-    %% Actors
-    User(["👨‍💼 End User Actor"])
-    Admin(["🛠️ System Admin Actor"])
+    %% External Nodes
+    UI([📱 Angular Client UI])
+    GW{🚪 Ocelot API Gateway}
 
-    %% System Boundaries
-    subgraph Identity[Identity Service]
-        direction TB
-        R(["Register Profile & OTP"])
-        L(["Login & Authorize"])
-        P(["Update JWT Profile"])
-        M(["Elevate User Roles"])
+    %% Core Services Boundary
+    subgraph Microservices_Layer [Microservices Layer]
+        ID[Identity Service Controller]
+        CD[Card Service Controller]
+        BL[Billing Service Controller]
+        PM[Payment Service Controller]
+        NT[Notification Engine Worker]
     end
 
-    subgraph Card[Card Service]
-        direction TB
-        AC(["Register Credit Card"])
-        VC(["View Available Cards"])
-        CT(["Fetch Transactions"])
+    %% Abstractions
+    subgraph Contracts [Domain Abstraction]
+        SH[[Shared.Contracts Library]]
     end
 
-    subgraph Billing[Billing Service]
-        direction TB
-        S(["Fetch PDF Statements"])
-        PT(["Inspect Reward Points"])
-        RT(["Configure Tier Margins"])
+    %% Infrastructure
+    subgraph Infra [State & Message Infrastructure]
+        MQ[[RabbitMQ Event Bus]]
+        SQL[(Distributed SQL Server)]
     end
 
-    subgraph Payment[Payment Service]
-        direction TB
-        IP(["Initiate Distributed Payment"])
-        VP(["Validate Payment 2FA OTP"])
+    %% Gateway Routing
+    UI ==>|REST HTTPS: 5006| GW
+    GW -->|/api/identity/*| ID
+    GW -->|/api/cards/*| CD
+    GW -->|/api/billing/*| BL
+    GW -->|/api/payments/*| PM
+
+    %% Contract Coupling
+    ID -.->|depends on| SH
+    CD -.->|depends on| SH
+    BL -.->|depends on| SH
+    PM -.->|depends on| SH
+    NT -.->|depends on| SH
+
+    %% Data Connections
+    ID -->|EF Core DbContext| SQL
+    CD -->|EF Core DbContext| SQL
+    BL -->|EF Core DbContext| SQL
+    PM -->|EF Core DbContext| SQL
+    NT -->|Dapper Read-Only| SQL
+
+    %% Bus Connections
+    ID --->|Publishes Events| MQ
+    CD <-->|Pub/Sub Constraints| MQ
+    BL <-->|Pub/Sub Constraints| MQ
+    PM --->|Orchestrates Sagas| MQ
+    NT <---|Consumes Email Triggers| MQ
+
+    %% Styling
+    classDef Client fill:#8e44ad,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef Gate fill:#e67e22,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef Service fill:#2980b9,stroke:#fff,stroke-width:2px,color:#fff;
+    class UI Client
+    class GW Gate
+    class ID,CD,BL,PM,NT Service
+```
+
+*Figure 2.1: Macro Component Diagram. The UI interacts solely with the generic `Ocelot` endpoint. Independent microservices communicate asynchronously via RabbitMQ using standardized structures contained deeply within `Shared.Contracts`.*
+
+---
+
+## 3. Enterprise Database Architecture (Detailed DB Schemas)
+
+Data ownership is extremely strict. Every bounded context relies on an isolated schema. **Cross-database SQL Joins are fundamentally illegal in this architecture.** Primary keys (GUIDs) act as logical foreign keys across service boundaries.
+
+### 3.1 Card Bounded Context (`credvault_cards`)
+This context strictly manages the user's financial instruments, decoupling card details from identity or payments.
+
+```mermaid
+erDiagram
+    CardIssuers {
+        uniqueidentifier Id PK
+        string Name "e.g. HDFC, Chase"
+        int Network "Enum: Visa/MasterCard"
+    }
+
+    CreditCards {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId "Logical FK to Identity"
+        uniqueidentifier IssuerId FK
+        string CardholderName "Exact matching name"
+        string MaskedNumber "**** 1234"
+        string EncryptedCardNumber "AES-256 string"
+        decimal CreditLimit
+        decimal OutstandingBalance
+        datetime CreatedAtUtc
+    }
+
+    CardTransactions {
+        uniqueidentifier Id PK
+        uniqueidentifier CardId FK
+        int Type "Enum: Charge / Payment"
+        decimal Amount
+        datetime DateUtc
+    }
+
+    CardIssuers ||--o{ CreditCards : "issues"
+    CreditCards ||--o{ CardTransactions : "contains"
+```
+*Figure 3.1: Card Schema. Evaluates strict limits based on the outstanding vs credit limit boundaries. Encrypted fields are exclusively handled in transit.*
+
+### 3.2 Billing Bounded Context (`credvault_billing`)
+Calculates cyclic interest, outstanding dues, and aggregates customer reward properties.
+
+```mermaid
+erDiagram
+    Bills {
+        uniqueidentifier Id PK
+        uniqueidentifier CardId "Logical FK to Card"
+        decimal Amount "Total outstanding"
+        decimal MinDue
+        datetime DueDateUtc
+        int Status "Enum: Partial, Paid, Owed"
+    }
+
+    RewardAccounts {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId "Logical FK"
+        decimal PointsBalance
+        datetime UpdatedAtUtc
+    }
+
+    RewardTransactions {
+        uniqueidentifier Id PK
+        uniqueidentifier RewardAccountId FK
+        decimal Points
+        int Type "Enum: Credited, Redeemed"
+    }
+
+    Statements {
+        uniqueidentifier Id PK
+        uniqueidentifier BillId FK
+        string StatementPeriod
+        decimal ClosingBalance
+    }
+
+    RewardAccounts ||--o{ RewardTransactions : "tracks"
+    Bills ||--o{ RewardTransactions : "sources"
+    Bills ||--o{ Statements : "mapped to"
+```
+*Figure 3.2: Billing Schema. `Bills` serves as the primary root aggregate containing generated Statements and calculating required minimums.*
+
+### 3.3 Payments Isolation Context (`credvault_payments`)
+The source of absolute truth for Top-Ups and distributed Bill Payment sagas.
+
+```mermaid
+erDiagram
+    Payments {
+        uniqueidentifier Id PK
+        uniqueidentifier UserId
+        uniqueidentifier BillId
+        decimal Amount
+        int Status "AwaitingOTP, Processed, Failed"
+        string OtpCode "Hashed Verification"
+    }
+
+    PaymentOrchestrationSagas {
+        uniqueidentifier CorrelationId PK "Saga Tracking GUID"
+        uniqueidentifier PaymentId "Logical Context"
+        string CurrentState "State Machine Node"
+        bool OtpVerified "Flags"
+        bool CardDeducted "Flags"
+        int CompensationAttempts "Retry counts"
+    }
+
+    Payments ||--o| PaymentOrchestrationSagas : "orchestrated by"
+```
+*Figure 3.3: Payment Schema. Notice the existence of the physical Saga state log (`PaymentOrchestrationSagas`). This table functions as a persistent lock for long-running workflows.*
+
+---
+
+## 4. Event Broker Architecture (RabbitMQ)
+
+Credvault adheres strictly to decoupling services over Rabbit MQ. Two distinct messaging paradigms exist:
+1. **Domain Events (Pub/Sub):** Fire & Forget notifications (e.g. `UserRegistered`, `StatementGenerated`). The Publisher does not care who consumes it.
+2. **Distributed Requests (Saga Orchestration):** Managed exclusively by the Payment Saga Orchestrator handling deterministic point-to-point calls over RabbitMQ.
+
+```mermaid
+flowchart TB
+    %% Core Engines
+    subgraph Publisher_Services [Services Emitting Events]
+        IS[Identity Engine]
+        CS[Card Engine]
+        PS[Payment Orchestrator]
     end
 
-    %% Routing Actor -> Nodes
-    User --- R
-    User --- L
-    User --- P
-    User --- AC
-    User --- VC
-    User --- CT
-    User --- S
-    User --- PT
-    User --- IP
-    User --- VP
+    %% Message Bus Server
+    subgraph Broker [RabbitMQ Server Topology]
+        direction TB
+        
+        %% Topic Exchanges
+        subgraph Exchanges Layer
+            E_ID(identity-topic-exchange)
+            E_PAY(payment-saga-exchange)
+        end
+        
+        %% Queue Binding
+        subgraph Target Queues
+            Q_NOTIF[notif-email-queue]
+            Q_SAGA[payment-orchestration-queue]
+            Q_PROC[card-deduct-queue]
+        end
 
-    Admin --- M
-    Admin --- RT
+        E_ID --->|Routing Key: user.*| Q_NOTIF
+        E_PAY --->|Routing Key: saga.command.*| Q_SAGA & Q_PROC
+    end
 
+    %% Emitting Connections
+    IS --> E_ID
+    PS --> E_PAY
+    CS --> E_PAY
+
+    %% Consumption Workers
+    Q_NOTIF -->|Async Consumes| NS[Notification SMTP Workers]
+    Q_SAGA -->|Async Consumes| SG[Saga Process Workers]
+    Q_PROC -->|Async Validates| CA[Card Deduction Executers]
+```
+*Figure 4.1: Message Broker Map. Displays how topic-based exchanges fan out messages to strictly bounded target queues, feeding worker microservices.*
+
+---
+
+## 5. Distributed Workflows & Saga Pattern Sequences
+
+The Saga State Machine orchestrates multiple separate database changes into **One Atomic Pseudo-Transaction**. Failure at any step triggers immediate compensation backwards.
+
+### 5.1 Strict Execution Happy-Path (Orchestrated)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Angular Frontend
+    participant PA as Payment Orchestrator (Saga)
+    participant BI as Billing Service
+    participant CA as Card Service
+
+    UI->>PA: Initiate Payment (BillId, Ext. Wallet)
+    activate PA
+    PA->>PA: Transition Saga to "Generating OTP"
+    PA-->>UI: 2FA Required (Returns PaymentId)
+    deactivate PA
+
+    UI->>PA: Submit OTP (PaymentId, "1248")
+    activate PA
+    PA->>PA: Validated. Transition to "Processing"
+    
+    Note over PA, CA: Distributed Execution begins over RabbitMQ
+
+    PA->>BI: Command -> Update Bill Paid Amount
+    BI-->>PA: RabbitMQ Ack -> `IBillUpdateSucceeded`
+    
+    PA->>CA: Command -> Deduct Wallet/Card Outstanding
+    CA-->>PA: RabbitMQ Ack -> `ICardDeductionSucceeded`
+    
+    PA->>PA: Transition Saga to "Completed"
+    PA-->>UI: Payment Finalized Success
+    deactivate PA
+```
+*Figure 5.1: Happy Path Saga. Illustrates a clean top-down execution whereby the user's OTP passes and all downstream database contexts execute their updates natively.*
+
+### 5.2 The Compensation Retry Block (Orchestrated Failover)
+If downstream infrastructure rejects an update (e.g. Card system is offline), preceding steps must be inherently reversed.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PA as Payment Orchestrator (Saga)
+    participant BI as Billing Service
+    participant CA as Card Service
+
+    PA->>CA: Command -> Deduct Wallet/Card
+    activate CA
+    CA--XPA: Error Payload -> `ICardDeductionFailed`
+    deactivate CA
+
+    Note over PA: Serious Failure. Transition to COMPENSATING state.
+
+    PA->>BI: Command -> Revert Bill Updates (Sub Amount)
+    activate BI
+    BI-->>PA: RabbitMQ Ack -> `IRevertBillUpdateSucceeded`
+    deactivate BI
+
+    PA->>PA: Transition to "Failed". End Saga.
+```
+*Figure 5.2: Compensation Flow. The orchestrator explicitly acts as a cleanup system, deploying reverse-commands to undo everything that previously succeeded, thus maintaining global consistency.*
+
+---
+
+## 6. Core Business Logic Flow Instructions (Pseudocode)
+
+### 6.1 Payment Validation Constraints
+All payment commands must pass the following rigorous logical checks before a Saga is even allowed to initiate.
+
+```text
+FUNCTION ValidateInitiatePaymentRequest(UserContext, IncomingBillId, RequestedAmount):
+    
+    Define Bill Entity = DB.Bills.FirstOrDefault(id == IncomingBillId)
+    
+    // Assertion 1: Existence & Ownership
+    IF Bill Entity IS NULL -> Return HTTP 404 (Not Found)
+    IF Bill.UserId != UserContext.Id -> Return HTTP 403 (Forbidden Cross-Tenant Violation)
+
+    // Assertion 2: Mathematical Dues Validations
+    Define OutstandingDelta = MAX(0, Bill.Amount - Bill.AmountPaid)
+    IF OutstandingDelta <= 0 -> Return HTTP 400 (Bill Already Cleared)
+    IF RequestedAmount <= 0 -> Return HTTP 400 (Amount must be positive)
+    IF RequestedAmount > OutstandingDelta -> Return HTTP 400 (Overpayment not permitted)
+
+    // Final Setup -> Execute
+    Set OTP = GenerateSecureRandom(6)
+    Save Initial Payment Stub (AwaitingOTP, Insert OTP Hash)
+    Return HTTP 200 (Challenge Token)
+END FUNCTION
 ```
 
 ---
 
-## 3. Software Class Models & Components
+## 7. Deployment Architecture (Docker Infrastructure)
 
-### 3.1 Core Class Controller Flow: Payment Orchestrator
-The `Payment Orchestrator` represents the most complicated aspect of the software structure. The following explicit class view shows how controllers hit commands, hit sagas, and dispatch out messages.
+Containers execute exclusively within an internal bridged network (`credvault-network`). External traffic is entirely restricted minus the gateway's `:5006` proxy port.
 
+```mermaid
+flowchart TB
+    %% External Internet Space
+    subgraph WAN [Public External Zone]
+        EXT_UI[📱 Web / Mobile Client]
+    end
+
+    %% Host Machine Context
+    subgraph Host [Docker Deamon Host]
+        
+        %% Core Network
+        subgraph Net [credvault-network Docker Bridge]
+            GWC[🚀 Ocelot Gateway :5006]
+            IDC[🛡️ Identity Container]
+            CDC[💳 Card Container]
+            BLC[🧾 Billing Container]
+            PMC[💸 Payment Container]
+            NTC[📨 Notification Container]
+            
+            MQC[🐇 RabbitMQ Mgt :15672]
+            SQLC[🗄️ SQL Server Engine :1433]
+        end
+
+        %% Hosted Volume Mounts
+        subgraph Volumes [Docker Persistent Volumes]
+            VSQL[(project_sqlserver_data)]
+            VMQ[(rabbitmq_data)]
+        end
+    end
+
+    %% Network Entry
+    EXT_UI -->|HTTPS TCP 5006| GWC
+
+    %% Static Container Mapping
+    GWC -->|identity-api:80| IDC
+    GWC -->|card-api:80| CDC
+    GWC -->|billing-api:80| BLC
+    GWC -->|payment-api:80| PMC
+
+    %% Infrastructure Dependencies
+    IDC & CDC & BLC & PMC & NTC --> SQLC
+    IDC & CDC & BLC & PMC & NTC --> MQC
+
+    %% Disk Persistence mappings
+    SQLC === VSQL
+    MQC === VMQ
+```
+*Figure 7.1: Deployment Infrastructure Diagram. Demonstrates exactly how Docker Compose assembles the network graph, ensuring stateful servers save to local persistent volumes outliving container ephemerality.*
+
+---
+
+## 8. Detailed System Diagrams (Class, State, Activity, Service Flow)
+
+To fully complete the enterprise architecture requirements, the following models detail class structures, lifecycles, and low-level flows.
+
+### 8.1 Class Diagrams
+
+**Identity Service Class Diagram**
+```mermaid
+classDiagram
+    class IdentityController {
+        +RegisterUser(RegisterDto)
+        +Login(LoginDto)
+        +VerifyOtp(OtpDto)
+    }
+
+    class UserService {
+        +CreateUserAsync(User)
+        +ValidateCredentialsAsync(email, password)
+        +GenerateJwtAsync(User)
+    }
+
+    class UserRepository {
+        +GetByEmailAsync(email)
+        +AddAsync(User)
+        +UpdateAsync(User)
+    }
+
+    class TokenService {
+        +CreateToken(User)
+        +ValidateToken(tokenString)
+    }
+
+    IdentityController --> UserService
+    UserService --> UserRepository
+    UserService --> TokenService
+```
+*Figure 8.1: Identity Service Class Diagram mapping internal controllers to domain managers.*
+
+**Payment Service Class Diagram**
 ```mermaid
 classDiagram
     class PaymentsController {
       +InitiatePayment(request)
       +VerifyOtp(request)
-      +ResendOtp()
-      +GetMyPayments()
     }
 
     class InitiatePaymentCommandHandler {
       +Handle(command, cancellationToken)
-      -FetchBillAsync()
       -MarkStuckPaymentsFailedAsync()
       -GenerateOtp()
     }
@@ -126,416 +486,87 @@ classDiagram
     class PaymentOrchestrationSaga {
       +StateMachineTransitions()
       +Event<IStartPaymentOrchestration> StartEvent
-      +Event<IOtpVerified> OtpSuccessEvent
     }
 
-    class PaymentProcessConsumer {
-      +Consume(IPaymentProcessRequested msg)
-    }
-
-    class RewardRedemptionConsumer {
-      +Consume(IRewardRedemptionRequested msg)
-    }
-
-    PaymentsController --> InitiatePaymentCommandHandler : Routes standard HTTP
-    InitiatePaymentCommandHandler --> PaymentRepository : Validations & Setup
-    InitiatePaymentCommandHandler --> PaymentOrchestrationSaga : Dispatches Start Event
-    PaymentOrchestrationSaga --> PaymentProcessConsumer : Triggers distributed behavior
-    PaymentOrchestrationSaga --> RewardRedemptionConsumer : Modulates external reward system
+    PaymentsController --> InitiatePaymentCommandHandler
+    InitiatePaymentCommandHandler --> PaymentRepository
+    InitiatePaymentCommandHandler --> PaymentOrchestrationSaga
 ```
+*Figure 8.2: Payment Service Class Diagram highlighting CQRS segregation and State Machine bindings.*
 
----
-
-## 4. Enterprise Database Architecture (Detailed DB Schemas)
-
-Data ownership is extremely strict. A component has exclusive access to its schema. Any cross-database joins are illegal. Relationships are constructed "logically" using Application-Level Foreign key checks across boundaries.
-
-### 4.1 Card Bounded Context (`credvault_cards`)
+### 8.2 State Diagram (Payment Lifecycle)
 
 ```mermaid
-erDiagram
-    CardIssuers {
-        uniqueidentifier Id PK
-        string Name
-        int Network
-        datetime CreatedAtUtc
-        datetime UpdatedAtUtc
-    }
+stateDiagram-v2
+    [*] --> AwaitingOtp
+    AwaitingOtp --> OtpVerified: Verify OTP Success
+    AwaitingOtp --> Expired: OTP Timeout
+    AwaitingOtp --> Failed: Invalid OTP limit reached
 
-    CreditCards {
-        uniqueidentifier Id PK
-        uniqueidentifier UserId
-        uniqueidentifier IssuerId FK
-        string CardholderName
-        string Last4
-        string MaskedNumber
-        string EncryptedCardNumber
-        int ExpMonth
-        int ExpYear
-        decimal CreditLimit
-        decimal OutstandingBalance
-        int BillingCycleStartDay
-        bool IsDefault
-        bool IsVerified
-        datetime VerifiedAtUtc
-        bool IsDeleted
-        datetime DeletedAtUtc
-        datetime CreatedAtUtc
-        datetime UpdatedAtUtc
-    }
+    OtpVerified --> Processing
+    Processing --> BillUpdated: Bill update success
+    BillUpdated --> RewardsRedeemed: Rewards redemption success
+    BillUpdated --> CardDeducted: No rewards path
+    RewardsRedeemed --> CardDeducted
 
-    CardTransactions {
-        uniqueidentifier Id PK
-        uniqueidentifier CardId FK
-        uniqueidentifier UserId
-        int Type
-        decimal Amount
-        string Description
-        datetime DateUtc
-        datetime CreatedAtUtc
-    }
+    CardDeducted --> Completed
 
-    CardIssuers ||--o{ CreditCards : "issues"
-    CreditCards ||--o{ CardTransactions : "contains"
+    Processing --> Compensating: Any downstream failure
+    Compensating --> Failed: Compensation complete
+
+    Completed --> [*]
+    Failed --> [*]
+    Expired --> [*]
 ```
+*Figure 8.3: State Diagram visualizing the progression of a distributed transation in a 2FA environment.*
 
-### 4.2 Billing & Rewards Context (`credvault_billing`)
+### 8.3 Activity Diagram (Payment Process)
 
 ```mermaid
-erDiagram
-    Bills {
-        uniqueidentifier Id PK
-        uniqueidentifier UserId
-        uniqueidentifier CardId
-        int CardNetwork
-        uniqueidentifier IssuerId
-        decimal Amount
-        decimal MinDue
-        string Currency
-        datetime BillingDateUtc
-        datetime DueDateUtc
-        int Status
-        datetime CreatedAtUtc
-        datetime UpdatedAtUtc
-        datetime PaidAtUtc
-        decimal AmountPaid
-    }
-
-    RewardAccounts {
-        uniqueidentifier Id PK
-        uniqueidentifier UserId
-        uniqueidentifier RewardTierId FK
-        decimal PointsBalance
-        datetime CreatedAtUtc
-        datetime UpdatedAtUtc
-    }
-
-    RewardTransactions {
-        uniqueidentifier Id PK
-        uniqueidentifier RewardAccountId FK
-        uniqueidentifier BillId FK
-        decimal Points
-        int Type
-        datetime CreatedAtUtc
-        datetime ReversedAtUtc
-    }
-
-    Statements {
-        uniqueidentifier Id PK
-        uniqueidentifier UserId
-        uniqueidentifier CardId
-        uniqueidentifier BillId FK
-        string StatementPeriod
-        string CardLast4
-        string CardNetwork
-        string IssuerName
-        decimal ClosingBalance
-        decimal MinimumDue
-        decimal AmountPaid
-        datetime GeneratedAtUtc
-        datetime DueDateUtc
-        datetime PaidAtUtc
-        int Status
-    }
-
-    StatementTransactions {
-        uniqueidentifier Id PK
-        uniqueidentifier StatementId FK
-        string Type
-        decimal Amount
-        string Description
-        datetime DateUtc
-    }
-
-    RewardAccounts ||--o{ RewardTransactions : "tracks"
-    Bills ||--o{ RewardTransactions : "sources"
-    Statements ||--o{ StatementTransactions : "embeds"
-    Bills ||--o{ Statements : "mapped to"
+flowchart TD
+    Start([Start]) --> A[User selects bill and payment type]
+    A --> B[System validates bill ownership & amount]
+    B --> C{Valid request?}
+    C -- No --> X[Return validation error] --> End([End])
+    C -- Yes --> D[Generate OTP and create payment record]
+    D --> E[User submits OTP]
+    E --> F{OTP valid?}
+    F -- No --> Y[Reject verification] --> End
+    F -- Yes --> G[Start Distributed Saga]
+    G --> H[Update bill paid amount]
+    H --> I{Rewards selected?}
+    I -- Yes --> J[Redeem rewards points]
+    I -- No --> K[Skip rewards]
+    J --> L[Deduct wallet/card]
+    K --> L
+    L --> M{All steps successful?}
+    M -- Yes --> N[Mark payment completed]
+    M -- No --> O[Trigger compensation]
+    N --> End
+    O --> End
 ```
+*Figure 8.4: Activity flowchart highlighting logical conditions triggering external compensation handlers.*
 
-### 4.3 Payments Isolation Context (`credvault_payments`)
+### 8.4 Service Flow Diagram (All Microservices)
 
 ```mermaid
-erDiagram
-    Payments {
-        uniqueidentifier Id PK
-        uniqueidentifier UserId
-        uniqueidentifier CardId
-        uniqueidentifier BillId
-        decimal Amount
-        int PaymentType
-        int Status
-        string FailureReason
-        string OtpCode
-        datetime OtpExpiresAtUtc
-        datetime CreatedAtUtc
-        datetime UpdatedAtUtc
-    }
+flowchart LR
+    UI[Client UI] --> GW[API Gateway]
 
-    Transactions {
-        uniqueidentifier Id PK
-        uniqueidentifier PaymentId FK
-        uniqueidentifier UserId
-        decimal Amount
-        int Type
-        string Description
-        datetime CreatedAtUtc
-    }
+    GW --> ID[Identity Service]
+    GW --> CD[Card Service]
+    GW --> BL[Billing Service]
+    GW --> PM[Payment Service]
 
-    PaymentOrchestrationSagas {
-        uniqueidentifier CorrelationId PK
-        uniqueidentifier UserId
-        uniqueidentifier PaymentId
-        uniqueidentifier CardId
-        uniqueidentifier BillId
-        decimal Amount
-        string CurrentState
-        string FullName
-        string Email
-        string PaymentType
-        bool OtpVerified
-        bool PaymentProcessed
-        bool CardDeducted
-        bool BillUpdated
-        bool RewardsRedeemed
-        decimal RewardsAmount
-        int CompensationAttempts
-        string PaymentError
-        datetime CreatedAtUtc
-    }
-
-    Payments ||--o{ Transactions : "bundles"
-```
-
-### 4.4 Identity Core Context (`credvault_identity`)
-
-```mermaid
-erDiagram
-    identity_users {
-        uniqueidentifier Id PK
-        string FullName
-        string Email
-        string PasswordHash
-        string Role
-        string Status
-        bool IsEmailVerified
-        string EmailVerificationOtp
-        datetime EmailVerificationOtpExpiresAtUtc
-        string PasswordResetOtp
-        datetime PasswordResetOtpExpiresAtUtc
-        datetime CreatedAtUtc
-        datetime UpdatedAtUtc
-    }
-```
-
----
-
-## 5. Event Broker Architecture (RabbitMQ)
-
-Credvault adheres strictly to decoupling services over Rabbit MQ. Two distinct paradigms exist:
-- **Domain Event Pattern:** (Publish/Subscriber - Fire & Forget). Primarily leveraged by `NotificationService` reading off single events (e.g. `IPaymentFailed`).
-- **Distributed Request/Response Pattern:** Managed exclusively by the Saga Orchestrator in `payment-orchestration`, handling deterministic point-to-point calls over RabbitMQ.
-
-```mermaid
-flowchart TB
-    %% Services 
-    subgraph Publisher Services
-        IS[Identity Service]
-        CS[Card Service]
-        BS[Billing Service]
-        PS[Payment Service]
-    end
-
-    %% Broker
-    subgraph Message Broker Server
-        direction TB
-        
-        %% Exchanges
-        subgraph Exchanges Layer
-            E_ID(identity-exchange)
-            E_CARD(card-exchange)
-            E_BILL(billing-exchange)
-            E_PAY(payment-exchange)
-        end
-        
-        %% Queues
-        subgraph Destination Queues
-            Q_NOTIF[notification-domain-event]
-            Q_CARD[card-domain-event]
-            Q_BILL[billing-domain-event]
-            Q_SAGA[payment-orchestration]
-            Q_PROC[payment-process]
-        end
-
-        %% Routing
-        E_ID ---> Q_NOTIF
-        E_CARD ---> Q_NOTIF & Q_SAGA
-        E_BILL ---> Q_NOTIF & Q_SAGA
-        E_PAY ---> Q_SAGA & Q_PROC & Q_NOTIF
-    end
-
-    %% Maps
-    IS --> E_ID
-    CS --> E_CARD
-    BS --> E_BILL
-    PS --> E_PAY
-
-    %% Consumers
-    Q_NOTIF --> NS[Notification Email Workers]
-    Q_SAGA --> SG[Saga Coordinate Workers]
-```
-
----
-
-## 6. Distributed Workflows & Saga Pattern Sequences
-
-The Saga State Machine forces 4 specific sub-actions to resolve into ONE atomic operation for the user. Failure at any level reverts the previous blocks recursively up the chain.
-
-### 6.1 Strict Execution Happy-Path (Orchestrated)
-```mermaid
-sequenceDiagram
-    participant UI as Angular Frontend
-    participant GW as Ocelot API Gateway
-    participant PA as Payment Orchestrator
-    participant BI as Billing Worker
-    participant RW as Rewards Worker
-    participant CA as Card Deduct Worker
-
-    UI->>GW: POST /api/payments/initiate
-    GW-->>PA: Route request
-    PA->>PA: Spawn Saga & generate OTP
-    PA-->>UI: Require 2FA Challenge
-
-    UI->>GW: POST /api/payments/{id}/verify-otp
-    GW-->>PA: Trigger OTP Confirm Event
-    PA->>PA: Validated!
-
-    Note over PA, CA: Dsitributed Atomicity Execution Begins via RabbitMQ
-
-    PA->>BI: Publish `IBillUpdateRequested`
-    BI-->>PA: Acknowledge `IBillUpdateSucceeded`
+    PM -->|IStartPaymentOrchestration| MQ[(RabbitMQ)]
+    MQ -->|IBillUpdateRequested| BL
+    MQ -->|IRewardRedemptionRequested| BL
+    MQ -->|ICardDeductionRequested| CD
     
-    opt Has Outstanding Rewards Points
-        PA->>RW: Publish `IRewardRedemptionRequested`
-        RW-->>PA: Acknowledge `IRewardRedemptionSucceeded`
-    end
-
-    PA->>CA: Publish `ICardDeductionRequested`
-    CA-->>PA: Acknowledge `ICardDeductionSucceeded`
+    ID -->|UserRegistered| MQ
+    BL -->|BillGenerated| MQ
+    PM -->|PaymentCompleted| MQ
     
-    Note over PA: State changes to COMPLETED. Success finalized.
+    MQ -->|SendEmail| NT[Notification Service]
 ```
-
-### 6.2 The Compensation Retry Block (Orchestrated Failover)
-If `ICardDeductionRequested` errors out due to unavailable dependencies, the orchestrator begins compensating behaviors to prevent dangling ledger records.
-
-```mermaid
-sequenceDiagram
-    participant PA as Payment Orchestrator
-    participant CA as Card Deduct Worker
-    participant BI as Billing Worker
-    participant PR as Payment Persistance
-
-    PA->>CA: Publish `ICardDeductionRequested`
-    CA-->>PA: Error Payload `ICardDeductionFailed`
-
-    Note over PA: State changes to COMPENSATING. Recursing upwards...
-
-    PA->>BI: Publish `IRevertBillUpdateRequested` (Re-open bill)
-    BI-->>PA: Acknowledge `IRevertBillUpdateSucceeded`
-    
-    PA->>PR: Publish `IRevertPaymentRequested` (Void internal transaction)
-    PR-->>PA: Acknowledge `IRevertPaymentSucceeded`
-
-    PA->>PA: Finalize State -> FAILED.
-```
-
----
-
-## 7. Core Business Logic Flow Instructions (Pseudocode)
-
-### 7.1 Detailed Payment Validation Command Requirements
-The `InitiatePaymentCommandHandler` must assert extremely rigid validation.
-
-```text
-function EvaluateInitiatePayment(userContext, CardId, BillId, TargetAmount):
-    Execute MarkExpiredStuckPaymentsAsync(userId, BillId) -- ensure no phantom sagas remain.
-    
-    bill = GET Database.Bills(BillId)
-    if bill is NULL: throw NotFound()
-    if bill.UserId != userContext.Id: throw UnauthorizedAccess("Entity mismatch")
-    if bill.CardId != CardId: throw CrossBoundaryValidation("Card/Bill drift detected")
-
-    outstandingDelta = MAX(0, bill.Amount - bill.AmountPaid)
-    if outstandingDelta == 0: throw ValidationException("Bill zeroed out")
-    if TargetAmount > outstandingDelta: throw OverpaymentException("Requested too much")
-    
-    if Validation clears:
-        OTP = GenerateCryptoRNG(6)
-        PaymentRecord = CREATE Payment in Status "AwaitingOTP"
-        PUBLISH IStartPaymentOrchestration (PaymentRecord)
-        return HTTP 200 OK -> PaymentID & Challenge
-```
-
----
-
-## 8. Unified API Request/Response Envelopes
-
-Every microservice exposes its surface through the global `:5006` gateway. 
-
-### 8.1 Required Standard Response Wrapper Payload
-```json
-{
-  "success": true,               // Essential boolean trigger for Frontend RxJs observation  
-  "message": "Dynamic payload message defining outcome",
-  "errorCode": "null or string for translation sets",
-  "data": {                      // The core response body structure
-      "id": "c1f...4d"
-  },
-  "traceId": "0HNHTGXXXXX"       // Sentry/ELK tracing ID for diagnostic correlation
-}
-```
-
-### 8.2 Standard HTTP Errors Map
-- `200 OK / 201 Created` : Success behaviors.
-- `400 Bad Request`: Usually caught in the `FluentValidation` intercept pipeline.
-- `401 Unauthorized`: Rejections in the Bearer JWT.
-- `403 Forbidden`: Passed Authentication but role-claim (like `Admin`) is falsy.
-- `404 Not Found`: Internal `DbSet` queries yielding nulls.
-- `500 Server Error`: Global `ExceptionHandlingMiddleware.cs` wrapped outputs preventing stack-trace leaks into the UI.
-
----
-
-## 9. Error Mapping & Technical Defect Tracking
-
-### 9.1 Known Missing RabbitMQ Implementations
-| Defect Location | Feature Title | Technical Context | Impact Level |
-|---|---|---|---|
-| **Identity Service** | `IUserDeleted` Global Propagation | Administrative UI can delete user context. The Identity service wipes the DB. However, there is NO event publisher for `IUserDeleted`. | **CRITICAL BUG**. Orphaned invoices, payments, and credit cards will sit dead in isolated context databases taking up space. |
-| **Billing Service** | `IBillOverdueDetected` Event Consumer | A CRON job sweeps and successfully publishes `IBillOverdueDetected` to the broker accurately. However, the Notification Service is not wired to consume this! | **LOW**. The architecture is sound but the business value is lost. No emails are actively warning users they've breached late timelines. |
-
-### 9.2 Broker Retry Toleration Models
-When events are rejected:
-- First strike: Fast-retry applied within 5 seconds.
-- Multi-strike: Messages are pushed to `.error` deadlock queues to be reviewed.
-- Saga Fault exception: 3 attempts internally programmed in MassTransit before dropping back into `Compensated` mapping. 
+*Figure 8.5: High-level Service Flow detailing the interaction boundaries mediated via Gateway and Broker topology.*
