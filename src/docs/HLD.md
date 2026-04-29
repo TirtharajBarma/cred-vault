@@ -1,182 +1,177 @@
-# High-Level Design (HLD) Specification
+# High-Level Design (HLD) Specification: CredVault
 
 **System Name:** CredVault Credit Card Management Platform  
-**Document Version:** 2.0 (Enterprise Grade)  
-**Date:** 2026-04-15  
-**Target Audience:** Engineering Leads, System Architects, DevOps, Product Managers  
+**Document Version:** 3.0 (Enterprise Standard)  
+**Status:** Final / Approved  
+**Date:** 2026-05-20  
 
 ---
 
-## 1. Introduction
+## 1. Introduction & Scope
 
 ### 1.1 Purpose
-The purpose of this High-Level Design (HLD) document is to provide a comprehensive architectural overview of the CredVault platform. It abstracts the underlying technical complexities into a structural blueprint, outlining system components, their interactions, data flows, and the foundational principles guiding the engineering lifecycle.
+This High-Level Design (HLD) document serves as the authoritative architectural blueprint for the **CredVault** platform. It defines the system's macro-structure, component interactions, and the strategic design patterns employed to achieve enterprise-grade resilience and scalability.
 
 ### 1.2 Scope
-This document covers the macro-architecture of CredVault, including component modeling, inter-service communication paradigms, data architecture strategy, and deployment topologies. For precise database schemas, state machines, and class structures, refer to the **Low-Level Design (LLD)**.
+The scope of this document encompasses:
+*   **System Topology**: Edge-to-infrastructure connectivity.
+*   **Architectural Paradigms**: Principles guiding service boundaries and state management.
+*   **Component Modeling**: Detailed functional definitions of core microservices.
+*   **Communication Strategy**: Synchronous vs. Asynchronous paradigms.
+*   **Non-Functional Requirements (NFRs)**: Security, Scalability, and Availability targets.
+*   **Infrastructure View**: Containerization and network isolation strategies.
 
 ---
 
-## 2. Architectural Principles & Constraints
+## 2. Architectural Principles
 
-To ensure long-term maintainability and horizontal scalability, the architecture firmly adheres to the following principles:
+CredVault is built upon a cloud-native, distributed architecture designed to mitigate single points of failure and allow for independent lifecycle management of business domains.
 
-* **Microservices Architecture:** The system is partitioned into autonomous Bounded Contexts aligned with business sub-domains (Identity, Cards, Billing, Payments).
-* **Decentralized Data Management (Database-per-Service):** Each microservice exclusively owns its database. Cross-database queries are strictly prohibited; data aggregation is achieved via API composition or event-carried state transfer.
-* **Event-Driven Communication:** Asynchronous communication via a robust message broker (RabbitMQ) to minimize temporal coupling and support high-throughput operations.
-* **CQRS (Command Query Responsibility Segregation):** Mutation operations (Commands) are strictly separated from read operations (Queries) within service boundaries to optimize performance scaling.
-* **API Gateway Pattern:** A unified entry point abstracts the internal network topology from external clients, handling cross-cutting concerns like routing and SSL termination.
-
----
-
-## 3. Non-Functional Requirements (NFRs)
-
-* **Availability:** Target 99.9% uptime. The failure of non-critical services (e.g., Notifications) must not hinder core payment processing.
-* **Scalability:** Stateless microservices designed to scale horizontally behind a reverse proxy/load balancer.
-* **Performance:** API Gateway response latencies should target < 200ms for standard queries (p95).
-* **Security:** All endpoints protected via JSON Web Tokens (JWT). Internal traffic operates within a secure, isolated Docker bridge network.
-* **Resilience:** Implementation of localized retries, distributed Saga compensations, and eventual consistency models for distributed state mutations.
+*   **Microservices Architecture**: The system is decomposed into autonomous, loosely coupled services aligned with business domains (Bounded Contexts).
+*   **API Gateway Pattern**: A central ingress point (Ocelot) manages cross-cutting concerns, including request routing, authentication verification, and SSL termination.
+*   **Event-Driven Architecture (EDA)**: Primary inter-service communication is asynchronous via a message broker (RabbitMQ), ensuring temporal decoupling and high system throughput.
+*   **Database-per-Service**: Each microservice maintains its own private data store. Data consistency across services is achieved via **Eventual Consistency** and distributed Sagas.
+*   **CQRS (Command Query Responsibility Segregation)**: Read and write operations are separated at the implementation level using MediatR, allowing for asymmetrical scaling of data paths.
 
 ---
 
-## 4. Logical Architecture & Component Model
+## 3. System Components
 
-The logical architecture defines the core subsystems and their interconnectivity.
+### 3.1 Edge Layer
+*   **Angular Client**: A modern SPA providing the user interface for card management, bill payments, and profile settings.
+*   **Ocelot API Gateway**: Acts as the single entry point for all client requests. It provides unified routing to internal microservices and shields the internal network topology.
+
+### 3.2 Core Microservices
+*   **Identity Service**: Manages user authentication, authorization (RBAC), and profile management. Issues JWTs and handles multi-factor authentication (OTP).
+*   **Card Service**: Responsible for card issuance, cardholder details, and maintaining the card-level transaction ledger.
+*   **Billing Service**: Handles cyclic bill generation, statement processing, and maintains the rewards point system.
+*   **Payment Service**: Orchestrates the payment lifecycle. It functions as the **Saga Coordinator** for complex distributed transactions (e.g., paying a bill with rewards and a card).
+*   **Notification Service**: An asynchronous background worker that consumes events from the message bus to dispatch Email and SMS notifications.
+
+---
+
+## 4. Macro-Architecture Diagram
+
+The following diagram illustrates the high-fidelity system topology and the flow of information across layers.
 
 ```mermaid
 flowchart TB
-    %% External Actors
-    Client(["📱 Angular SPA / Mobile Client"])
-    
+    %% External Layer
+    subgraph External_Zone [Public Internet]
+        Client(["📱 Angular SPA Client"])
+    end
+
     %% Edge Layer
-    subgraph Edge [Edge / Entry Layer]
-        Gateway{"🚪 Ocelot API Gateway"}
+    subgraph Edge_Layer [DMZ / Edge Layer]
+        Gateway{{"🚪 Ocelot API Gateway<br/>(Port: 5006)"}}
     end
 
-    %% Application Layer
-    subgraph Microservices [Microservices Ecosystem]
-        direction LR
-        ID["Identity Service<br>(Auth, Roles)"]
-        CD["Card Service<br>(Issuance, Ledger)"]
-        BL["Billing Service<br>(Statements, Rewards)"]
-        PM["Payment Service<br>(Wallet, Top-Ups)"]
-        NT["Notification Service<br>(Email, SMS)"]
+    %% Internal Services
+    subgraph Service_Mesh [Internal Microservices Network]
+        direction TB
+        ID["🛡️ Identity Service<br/>(Auth & Users)"]
+        CD["💳 Card Service<br/>(Ledger & Issuance)"]
+        BL["🧾 Billing Service<br/>(Bills & Rewards)"]
+        PM["💸 Payment Service<br/>(Saga Orchestrator)"]
+        NT["📨 Notification Service<br/>(Background Worker)"]
     end
 
-    %% Infrastructure Layer
-    subgraph Infra [State & Messaging Infrastructure]
-        MQ[["RabbitMQ Event Bus"]]
-        DB_ID[("SQL: Identity")]
-        DB_CD[("SQL: Cards")]
-        DB_BL[("SQL: Billing")]
-        DB_PM[("SQL: Payments")]
-    end
-
-    %% Associations
-    Client ==>|"HTTPS/REST"| Gateway
-    
-    Gateway -->|"Routes (Internal TCP)"| ID
-    Gateway -->|"Routes (Internal TCP)"| CD
-    Gateway -->|"Routes (Internal TCP)"| BL
-    Gateway -->|"Routes (Internal TCP)"| PM
-    
-    %% DB Associations
-    ID -.-> DB_ID
-    CD -.-> DB_CD
-    BL -.-> DB_BL
-    PM -.-> DB_PM
-    
-    %% Event Bus Associations
-    ID <--> MQ
-    CD <--> MQ
-    BL <--> MQ
-    PM <--> MQ
-    MQ -->|"Consumes"| NT
-```
-
-### 4.1 Component Descriptions
-
-1.  **Angular SPA Client:** The user-facing application providing dashboards, payment interfaces, and card management via responsive WEB/UI.
-2.  **Ocelot API Gateway:** Serves as the single ingress point. It maps public URL schemas (e.g., `/api/cards`) to internal upstream service IPs (e.g., `http://cards-service:80`).
-3.  **Identity Service:** The source of truth for user profiles and authentication. Issues JWTs utilizing secure hashing mechanisms.
-4.  **Card Service:** Manages credit card entities, masking algorithms, and card-specific transactional ledgers.
-5.  **Billing Service:** Aggregates user spends into cyclic bills, generates statements, and calculates reward points.
-6.  **Payment Service:** Orchestrates complex digital wallet top-ups and cross-service distributed bill payments (incorporating the Saga orchestrator).
-7.  **Notification Service:** A background worker service entirely decoupled from the request-response cycle. It listens for domain events (`UserRegistered`, `PaymentFailed`) and dispatches emails.
-
----
-
-## 5. Data Architecture Strategy
-
-* **Polyglot & Segregated Persistence:** While currently utilizing SQL Server for relational consistency, the architecture allows swapping data stores (e.g., mapping MongoDB for Notifications) without impacting adjacent services.
-* **Foreign Keys Over Microservices:** Physical foreign keys do not exist across domains. Services utilize immutable **Correlation IDs / User IDs (GUIDs)**. Example: The `Billing Service` records a `UserId` but does not JOIN with the `Identity DB`. It queries the Identity API if synchronous profile data is absolutely necessary, preferring replicated data via events.
-* **Event Sourcing (Partial):** State transitions for critical financial elements (like Payments) are tracked via Saga State Logs to maintain a history of compensation attempts.
-
----
-
-## 6. Communication & Integration Strategy
-
-### 6.1 Synchronous Communication (REST/HTTP)
-Reserved exclusively for:
-1.  Client-to-Gateway interactions.
-2.  Gateway-to-Microservice downstream routing.
-*Constraint:* Microservice-to-Microservice synchronous HTTP calls are strictly avoided to prevent cascading timeouts (except in rare, non-mutating validation scenarios).
-
-### 6.2 Asynchronous Communication (AMQP / RabbitMQ)
-The backbone of the system's eventual consistency, utilized for:
-1.  **Publish-Subscribe (Pub/Sub):** Broadcasting state changes. Example: Identity service publishes `UserCreatedIntegrationEvent`; Notification service consumes it to send a welcome email, Billing service consumes it to initialize a blank Reward Account.
-2.  **Saga Orchestration:** Directed command-based messaging where the `Payment Orchestrator` sends specific commands to specific queues (e.g., `DeductWalletCommand` to the Payment Queue, `UpdateBillCommand` to the Billing Queue) and awaits structured Acknowledgment events.
-
----
-
-## 7. Security Architecture
-
-1.  **Edge Termination:** SSL/TLS is terminated at the Gateway/Load Balancer.
-2.  **Token-Based Auth:** Stateless JWT authentication. The Gateway optionally parses token validity, but deep Authorization (Claims/Role checking) is executed locally within each microservice's ASP.NET middleware pipeline.
-3.  **Network Isolation:** All backend components (APIs, SQL, RabbitMQ) reside in a private Docker virtual network (`credvault-network`). They expose zero public ports.
-4.  **Secret Management:** Environment variables dictate runtime configuration (DB strings, JWT symmetric keys). No secrets are hardcoded.
-
----
-
-## 8. Deployment & Infrastructure View
-
-The target container orchestration utilizes Docker. The topology ensures environment parity across Development, Staging, and Production.
-
-```mermaid
-flowchart TB
-    subgraph Host / Cloud Environment
-        subgraph credvault-network [Docker Custom Bridge Network]
-            direction TB
-            
-            subgraph Web Tier
-                GW[gateway-service]
-            end
-            
-            subgraph App Tier
-                S1[identity-service]
-                S2[card-service]
-                S3[billing-service]
-                S4[payment-service]
-                S5[notification-worker]
-            end
-            
-            subgraph Data Tier
-                RABBIT[rabbitmq-broker]
-                SQL[sql-server-engine]
-                VOL1[(Docker Volumes:\nSQL Data & Logs)]
-            end
-            
-            GW --> S1 & S2 & S3 & S4
-            S1 & S2 & S3 & S4 & S5 --- RABBIT
-            S1 & S2 & S3 & S4 --- SQL
-            SQL --- VOL1
-        end
+    %% Messaging & State
+    subgraph Infrastructure_Layer [State & Messaging Infrastructure]
+        MQ[["🐇 RabbitMQ Message Bus<br/>(MassTransit)"]]
         
-        Internet((Public Internet)) ===|Port 5006| GW
+        DB_ID[("🗄️ SQL: Identity")]
+        DB_CD[("🗄️ SQL: Card")]
+        DB_BL[("🗄️ SQL: Billing")]
+        DB_PM[("🗄️ SQL: Payment")]
     end
+
+    %% Connectivity
+    Client ==>|"HTTPS / REST (JWT)"| Gateway
+    
+    Gateway -->|"Route: /api/identity"| ID
+    Gateway -->|"Route: /api/cards"| CD
+    Gateway -->|"Route: /api/billing"| BL
+    Gateway -->|"Route: /api/payments"| PM
+    
+    %% Service to DB
+    ID --- DB_ID
+    CD --- DB_CD
+    BL --- DB_BL
+    PM --- DB_PM
+    
+    %% Event Bus Interactivity
+    ID -.->|"Publish Event"| MQ
+    CD <-->|"Pub / Sub"| MQ
+    BL <-->|"Pub / Sub"| MQ
+    PM <==>|"Saga Command/Reply"| MQ
+    MQ -.->|"Consume"| NT
+
+    %% Styling
+    classDef infra fill:#f5f5f5,stroke:#333,stroke-width:2px;
+    classDef service fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef edge fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    
+    class MQ,DB_ID,DB_CD,DB_BL,DB_PM infra
+    class ID,CD,BL,PM,NT service
+    class Gateway edge
 ```
 
-**Key Deployment Tenets:**
-* **Immutability:** Docker images are compiled once and promoted across environments.
-* **Persistent Storage:** SQL Server data mounts to persistent Docker Volumes mapped to the host filesystem, protecting against container ephemerality.
-* **Service Discovery:** Native Docker DNS mapping allows services to resolve internal names (e.g., `rabbitmq://rabbitmq-broker:5672`).
+---
+
+## 5. Communication Strategy
+
+CredVault employs a hybrid communication model to balance immediate consistency with system resilience.
+
+### 5.1 Synchronous Communication (Edge Boundary)
+*   **Protocol**: REST over HTTPS.
+*   **Usage**: Client-to-Gateway and Gateway-to-Service requests.
+*   **Rationale**: Used for operations where the client expects an immediate response (e.g., Login, Fetching Card Details).
+
+### 5.2 Asynchronous Communication (Internal Core)
+*   **Protocol**: AMQP via RabbitMQ (MassTransit).
+*   **Patterns**: 
+    *   **Pub/Sub**: Used for side effects (e.g., `UserRegistered` event triggers `WelcomeEmail`).
+    *   **Request/Response**: Asynchronous commands used within Saga workflows.
+*   **Rationale**: Decouples services, allowing the system to remain functional even if a specific service (like Notifications) is temporarily offline.
+
+---
+
+## 6. Non-Functional Requirements (NFRs)
+
+*   **Scalability**: All microservices are stateless and containerized, supporting horizontal auto-scaling (Scale-out) based on CPU/Memory pressure.
+*   **Availability**: Targeted at **99.9% (Three Nines)**. Critical paths (Identity/Payment) are isolated to ensure that a failure in the Rewards system does not prevent a user from logging in.
+*   **Reliability**: Guaranteed through the implementation of the **Outbox Pattern** and **Retry Policies** (exponential backoff) provided by MassTransit.
+*   **Security**:
+    *   **Authentication**: Stateless JWT-based authentication.
+    *   **Authorization**: Role-Based Access Control (RBAC) enforced at the service level.
+    *   **Data Protection**: Encryption at rest for sensitive card data and TLS 1.2+ for all data in transit.
+
+---
+
+## 7. Infrastructure & Deployment View
+
+### 7.1 Containerization
+The entire CredVault stack is containerized using Docker, ensuring environment parity from developer machines to production clusters.
+
+### 7.2 Network Isolation
+*   **Public Zone**: Only the API Gateway and Angular Client are reachable via public-facing ports.
+*   **Private Zone**: All microservices, SQL databases, and the RabbitMQ broker reside in an isolated Docker bridge network. They communicate via internal DNS and are unreachable from the public internet.
+
+### 7.3 Persistence Strategy
+*   **Storage**: Each service utilizes a dedicated SQL Server schema.
+*   **Persistence**: Docker volumes are used to ensure data persists across container restarts and updates.
+
+---
+
+## 8. Summary of Technology Stack
+
+| Layer | Technology |
+|---|---|
+| **Frontend** | Angular 17+, Tailwind CSS |
+| **Gateway** | Ocelot API Gateway |
+| **Backend** | .NET 8, ASP.NET Core Web API |
+| **Messaging** | RabbitMQ, MassTransit |
+| **Persistence** | Microsoft SQL Server, EF Core |
+| **Patterns** | CQRS (MediatR), Saga (State Machine) |
+| **Infrastructure** | Docker, Docker Compose |

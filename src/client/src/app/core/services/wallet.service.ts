@@ -29,6 +29,23 @@ export interface TopUpRequest {
   description?: string;
 }
 
+export interface RazorpayTopUpOrder {
+  topUpId: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+  displayName: string;
+  description: string;
+}
+
+export interface RazorpayTopUpVerifyRequest {
+  topUpId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -44,8 +61,12 @@ export class WalletService {
     return this.http.get<ApiResponse<{ balance: number; hasWallet: boolean }>>(`${this.baseUrl}/balance`);
   }
 
-  topUp(request: TopUpRequest): Observable<ApiResponse<{ amount: number; newBalance: number; description: string }>> {
-    return this.http.post<ApiResponse<{ amount: number; newBalance: number; description: string }>>(`${this.baseUrl}/topup`, request);
+  createTopUpOrder(request: TopUpRequest): Observable<ApiResponse<RazorpayTopUpOrder>> {
+    return this.http.post<ApiResponse<RazorpayTopUpOrder>>(`${this.baseUrl}/topup/create-order`, request);
+  }
+
+  verifyTopUp(request: RazorpayTopUpVerifyRequest): Observable<ApiResponse<{ newBalance: number; alreadyProcessed: boolean }>> {
+    return this.http.post<ApiResponse<{ newBalance: number; alreadyProcessed: boolean }>>(`${this.baseUrl}/topup/verify`, request);
   }
 
   getTransactions(skip = 0, take = 20): Observable<ApiResponse<WalletTransaction[]>> {

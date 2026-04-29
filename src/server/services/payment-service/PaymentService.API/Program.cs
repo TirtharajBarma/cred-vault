@@ -64,8 +64,10 @@ try
     builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();    
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
     builder.Services.AddScoped<IWalletRepository, WalletRepository>();
+    builder.Services.AddScoped<IRazorpayWalletTopUpRepository, RazorpayWalletTopUpRepository>();
     builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PaymentDbContext>());       // if someone ask iUnitOfWork give PaymentDbContext
     builder.Services.AddScoped<IWalletService, WalletService>();        // if someone ask WalletService give WalletService
+    builder.Services.AddScoped<IRazorpayWalletTopUpService, RazorpayWalletTopUpService>();
     
     builder.Services.AddHostedService<PaymentExpirationBackgroundJob>();        // background job
 

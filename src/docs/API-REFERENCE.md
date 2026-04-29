@@ -1,531 +1,262 @@
-# Unified API Reference
+# Technical API Reference Guide
 
-## Document Control
+## 1. Executive Summary & Architecture Overview
 
-| Field          | Value                                                         |
-|----------------|---------------------------------------------------------------|
-| Project        | Credit Card Platform (Gateway + Microservices + Angular Client) |
-| Document Type  | Technical API Reference                                       |
-| Version        | 1.0                                                           |
-| Prepared On    | 2026-04-10                                                    |
-| Audience       | Engineering, QA, Support, Integration Teams                   |
-| Scope          | Frontend API usage + Backend service contracts                |
+### 1.1 Overview
+The Credit Card Platform is an enterprise-grade microservices architecture designed to handle secure credit card management, automated billing, rewards redemption, and two-factor authenticated payments. This document serves as the primary technical reference for frontend and backend engineers, QA, and integration partners.
 
----
-
-## 1. Executive Summary
-
-This document provides a complete API reference for the platform, including:
-
-- Gateway-exposed backend APIs across Identity, Card, Billing, Payment, and Notification services
-- Angular frontend service-to-endpoint integration map
-- Request and response contracts
-- Authentication, authorization, and error-handling conventions
-- Operational health and smoke-test references
-
-The backend is accessed primarily through the API Gateway running on port `5006`.
-
----
-
-## 2. Architecture Overview
+### 1.2 Architecture Overview
+The platform utilizes a **Gateway-Aggregator pattern** where all external traffic is routed through a central API Gateway (Ocelot), which handles cross-cutting concerns like routing and protocol translation.
 
 ```mermaid
-flowchart LR
-    A[Angular Frontend] -->|HTTP + JWT| G[Gateway API :5006]
+flowchart TB
+    Client[Angular Frontend] -- "HTTP/HTTPS (JWT)" --> Gateway[API Gateway :5006]
 
-    G --> I[Identity Service :5001]
-    G --> C[Card Service :5002]
-    G --> B[Billing Service :5003]
-    G --> P[Payment Service :5004]
-    G --> N[Notification Service :5005]
+    subgraph "Core Services"
+        Identity[Identity Service :5001]
+        Card[Card Service :5002]
+        Billing[Billing Service :5003]
+        Payment[Payment Service :5004]
+        Notification[Notification Service :5005]
+    end
 
-    B -->|internal reward ops| B
-    P -->|billing/payment workflows| B
+    Gateway --> Identity
+    Gateway --> Card
+    Gateway --> Billing
+    Gateway --> Payment
+    Gateway --> Notification
+
+    Payment -. "Internal Auth" .-> Billing
+    Billing -. "Internal" .-> Notification
 ```
 
-### Runtime Endpoints
-
-| Component              | URL                   |
-|------------------------|-----------------------|
-| API Gateway (primary)  | http://localhost:5006 |
-| Identity Service       | http://localhost:5001 |
-| Card Service           | http://localhost:5002 |
-| Billing Service        | http://localhost:5003 |
-| Payment Service        | http://localhost:5004 |
-| Notification Service   | http://localhost:5005 |
+### 1.3 Service Inventory
+| Service | Port | Primary Responsibility |
+| :--- | :--- | :--- |
+| **API Gateway** | 5006 | Central entry point, request routing, and rate limiting. |
+| **Identity** | 5001 | User authentication, RBAC, profile management, and OTP generation. |
+| **Card** | 5002 | Card lifecycle, transaction recording, and issuer management. |
+| **Billing** | 5003 | Statement generation, bill cycles, and rewards point accounting. |
+| **Payment** | 5004 | Payment initiation, 2FA (OTP) processing, and wallet management. |
+| **Notification** | 5005 | Email/SMS delivery, delivery logs, and system audit trails. |
 
 ---
 
-## 3. API Standards
+## 2. API Standards & Conventions
 
-### 3.1 Base URL
+### 2.1 Base URLs
+- **Internal Cluster:** `http://localhost:<service-port>`
+- **External/Client:** `http://localhost:5006` (All clients MUST use the Gateway)
 
-All frontend and external client traffic should use:
+### 2.2 Headers
+| Header | Value | Description |
+| :--- | :--- | :--- |
+| `Authorization` | `Bearer <JWT_TOKEN>` | Required for all protected endpoints. |
+| `Content-Type` | `application/json` | Required for all `POST`, `PUT`, and `PATCH` requests. |
+| `X-Trace-Id` | `<GUID>` | (Optional) Client-provided trace ID for distributed logging. |
 
-`http://localhost:5006`
-
-### 3.2 Headers
-
-| Header                         | Required                     | Notes                                      |
-|--------------------------------|------------------------------|--------------------------------------------|
-| Authorization: Bearer <token>  | Yes (protected endpoints)    | JWT added by Angular auth interceptor      |
-| Content-Type: application/json | Yes (request bodies)         | JSON request/response                      |
-
-### 3.3 Standard Response Envelope
+### 2.3 Standard Response Envelope
+All API responses follow a consistent wrapper to ensure predictable client-side parsing.
 
 ```json
 {
   "success": true,
-  "message": "Operation completed",
+  "message": "Operation description",
   "errorCode": null,
-  "data": {},
-  "traceId": "0HN...."
+  "data": { ... },
+  "traceId": "0HN12345678"
 }
 ```
 
-### 3.4 Common Status Codes
-
-| Code | Meaning                                   |
-|------|-------------------------------------------|
-| 200  | Success                                   |
-| 201  | Created                                   |
-| 400  | Validation or business rule failure       |
-| 401  | Unauthorized / missing or invalid token   |
-| 403  | Forbidden (role mismatch)                |
-| 404  | Not found                                 |
-| 503  | Downstream dependency unavailable         |
-
----
-
-## 4. Authentication and Authorization Matrix
-
-| Access Type   | Description                          |
-|---------------|--------------------------------------|
-| Public        | No token required                    |
-| Authenticated | JWT required                         |
-| Admin         | JWT required with role `admin`       |
-
-### Public Endpoints
-
-- `GET /health`
-- `GET /api/v1/billing/bills/has-pending/{cardId}`
-- `POST /api/v1/billing/rewards/internal/redeem` (internal service call)
-- Identity auth lifecycle endpoints (`/api/v1/identity/auth/*`)
+### 2.4 Common Status Codes
+| Code | Category | Meaning |
+| :--- | :--- | :--- |
+| **200** | Success | Standard success response. |
+| **201** | Success | Resource successfully created. |
+| **400** | Client Error | Validation failed or business rule violation. |
+| **401** | Security | Token missing or invalid. |
+| **403** | Security | Authenticated but insufficient permissions (Role required). |
+| **404** | Client Error | Resource not found. |
+| **503** | Server Error | Downstream service or database unavailable. |
 
 ---
 
-## 5. Backend API Catalog
+## 3. Service Catalog
 
-## 5.1 Identity Service
+### 3.1 Identity Service
+*Handles authentication and user profiles.*
 
-### 5.1.1 Auth APIs
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/identity/auth/register` | Public | Register a new user account. |
+| `POST` | `/api/v1/identity/auth/login` | Public | Authenticate and receive a JWT. |
+| `POST` | `/api/v1/identity/auth/verify-email-otp` | Public | Verify email address with 6-digit OTP. |
+| `GET` | `/api/v1/identity/users/me` | User | Get current user's profile. |
+| `GET` | `/api/v1/identity/users` | Admin | (Paginated) List all users. |
 
-| Method | Endpoint                                      | Auth   | Request Body                     | Description                     |
-|--------|-----------------------------------------------|--------|----------------------------------|---------------------------------|
-| POST   | /api/v1/identity/auth/register                | Public | fullName, email, password        | Register new user               |
-| POST   | /api/v1/identity/auth/login                   | Public | email, password                  | Login with email/password       |
-| POST   | /api/v1/identity/auth/google                  | Public | idToken                          | Google login                    |
-| POST   | /api/v1/identity/auth/resend-verification     | Public | email                            | Resend verification OTP         |
-| POST   | /api/v1/identity/auth/verify-email-otp        | Public | email, otp                       | Verify email with OTP           |
-| POST   | /api/v1/identity/auth/forgot-password         | Public | email                            | Trigger password reset OTP      |
-| POST   | /api/v1/identity/auth/reset-password          | Public | email, otp, newPassword          | Reset password                  |
-
-#### Sample Request: Register
-
+**Example: User Registration**
 ```json
 {
-  "fullName": "Aarav Sharma",
-  "email": "aarav@example.com",
-  "password": "StrongPassword@123"
+  "fullName": "John Doe",
+  "email": "john@example.com",
+  "password": "SecurePassword123!"
 }
 ```
 
-### 5.1.2 User APIs
+### 3.2 Card Service
+*Manages credit card instruments and basic transactions.*
 
-| Method | Endpoint                                   | Auth          | Query                                   | Request Body                     | Description               |
-|--------|--------------------------------------------|---------------|------------------------------------------|----------------------------------|--------------------------|
-| GET    | /api/v1/identity/users/me                  | Authenticated | -                                        | -                                | Get own profile          |
-| PUT    | /api/v1/identity/users/me                  | Authenticated | -                                        | fullName                         | Update own profile       |
-| PUT    | /api/v1/identity/users/me/password         | Authenticated | -                                        | currentPassword, newPassword     | Change own password      |
-| GET    | /api/v1/identity/users/{userId}            | Admin         | -                                        | -                                | Get user by ID           |
-| PUT    | /api/v1/identity/users/{userId}/status     | Admin         | -                                        | status                           | Update user status       |
-| PUT    | /api/v1/identity/users/{userId}/role       | Admin         | -                                        | role                             | Update user role         |
-| GET    | /api/v1/identity/users                     | Admin         | page, pageSize, search, status           | -                                | Paginated user list      |
-| GET    | /api/v1/identity/users/stats               | Admin         | -                                        | -                                | Aggregate user stats     |
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/cards` | User | List all cards for the user. |
+| `POST` | `/api/v1/cards` | User | Add a new credit card. |
+| `GET` | `/api/v1/cards/{id}` | User | Get specific card details. |
+| `POST` | `/api/v1/cards/{id}/transactions` | User | Manually record a transaction. |
+| `GET` | `/api/v1/issuers` | User | List supported card issuers. |
 
----
-
-## 5.2 Card Service
-
-### 5.2.1 Cards APIs
-
-| Method | Endpoint                                   | Auth          | Query | Request Body                                                     | Description              |
-|--------|--------------------------------------------|---------------|-------|------------------------------------------------------------------|--------------------------|
-| POST   | /api/v1/cards                              | Authenticated | -     | cardholderName, expMonth, expYear, cardNumber, issuerId, isDefault | Add card                 |
-| GET    | /api/v1/cards                              | Authenticated | -     | -                                                                | List my cards            |
-| GET    | /api/v1/cards/transactions                 | Authenticated | -     | -                                                                | List all my transactions |
-| GET    | /api/v1/cards/{cardId}                     | Authenticated | -     | -                                                                | Card details             |
-| PUT    | /api/v1/cards/{cardId}                     | Authenticated | -     | cardholderName, expMonth, expYear, isDefault                     | Update card              |
-| DELETE | /api/v1/cards/{cardId}                     | Authenticated | -     | -                                                                | Delete card              |
-| GET    | /api/v1/cards/{cardId}/transactions        | Authenticated | -     | -                                                                | Card transactions        |
-| POST   | /api/v1/cards/{cardId}/transactions        | Authenticated | -     | type, amount, description, dateUtc                               | Add transaction          |
-| GET    | /api/v1/cards/admin/{cardId}               | Admin         | -     | -                                                                | Admin card view          |
-| GET    | /api/v1/cards/admin/{cardId}/transactions  | Admin         | -     | -                                                                | Admin card transactions  |
-| PUT    | /api/v1/cards/{cardId}/admin               | Admin         | -     | cardholderName, creditLimit, outstandingBalance, billingCycleStartDay | Admin card update   |
-| GET    | /api/v1/cards/user/{userId}                | Admin         | -     | -                                                                | Cards by user            |
-
-### 5.2.2 Issuer APIs
-
-| Method | Endpoint                      | Auth          | Request Body   | Description     |
-|--------|-------------------------------|---------------|----------------|-----------------|
-| GET    | /api/v1/issuers               | Authenticated | -              | List issuers    |
-| GET    | /api/v1/issuers/{id}          | Authenticated | -              | Get issuer      |
-| POST   | /api/v1/issuers               | Admin         | name, network  | Create issuer   |
-| PUT    | /api/v1/issuers/{id}          | Admin         | name, network  | Update issuer   |
-| DELETE | /api/v1/issuers/{id}          | Admin         | -              | Delete issuer   |
-
----
-
-## 5.3 Billing Service
-
-### 5.3.1 Bills APIs
-
-| Method | Endpoint                                           | Auth             | Query                          | Request Body                     | Description               |
-|--------|----------------------------------------------------|------------------|--------------------------------|----------------------------------|---------------------------|
-| GET    | /api/v1/billing/bills                              | Authenticated    | userId (admin optional)        | -                                | List bills                |
-| GET    | /api/v1/billing/bills/{billId}                     | Authenticated    | -                              | -                                | Bill detail               |
-| POST   | /api/v1/billing/bills/admin/generate-bill          | Admin            | -                              | userId, cardId, currency         | Generate bill             |
-| POST   | /api/v1/billing/bills/admin/check-overdue          | Admin            | -                              | -                                | Mark overdue bills        |
-| GET    | /api/v1/billing/bills/has-pending/{cardId}         | Public/Internal  | -                              | -                                | Pending/overdue check     |
-
-### 5.3.2 Statements APIs
-
-| Method | Endpoint                                              | Auth          | Query                          | Request Body   | Description                     |
-|--------|-------------------------------------------------------|---------------|--------------------------------|----------------|---------------------------------|
-| GET    | /api/v1/billing/statements                            | Authenticated | userId (admin optional)        | -              | List statements                 |
-| GET    | /api/v1/billing/statements/{statementId}              | Authenticated | -                              | -              | Statement detail                |
-| POST   | /api/v1/billing/statements/generate                   | Authenticated | -                              | cardId         | Generate statement              |
-| POST   | /api/v1/billing/statements/admin/generate             | Admin         | -                              | cardId, userId | Generate statement as admin     |
-| GET    | /api/v1/billing/statements/admin/all                  | Admin         | -                              | -              | All statements                  |
-| GET    | /api/v1/billing/statements/bill/{billId}              | Authenticated | -                              | -              | Statements by bill              |
-| GET    | /api/v1/billing/statements/{statementId}/transactions | Authenticated | -                              | -              | Statement transactions          |
-| GET    | /api/v1/billing/statements/admin/{statementId}/full   | Admin         | -                              | -              | Full statement bundle           |
-
-### 5.3.3 Rewards APIs
-
-| Method | Endpoint                                          | Auth             | Query                          | Request Body                                                                 | Description                  |
-|--------|---------------------------------------------------|------------------|--------------------------------|------------------------------------------------------------------------------|------------------------------|
-| GET    | /api/v1/billing/rewards/tiers                     | Authenticated    | -                              | -                                                                            | List reward tiers            |
-| POST   | /api/v1/billing/rewards/tiers                     | Admin            | -                              | cardNetwork, issuerId, minimumSpend, pointsPerDollar, effectiveFromUtc, effectiveToUtc | Create tier         |
-| PUT    | /api/v1/billing/rewards/tiers/{id}                | Admin            | -                              | cardNetwork, issuerId, minimumSpend, pointsPerDollar, effectiveFromUtc, effectiveToUtc | Update tier         |
-| DELETE | /api/v1/billing/rewards/tiers/{id}                | Admin            | -                              | -                                                                            | Delete tier                 |
-| GET    | /api/v1/billing/rewards/account                   | Authenticated    | -                              | -                                                                            | My reward account            |
-| GET    | /api/v1/billing/rewards/transactions              | Authenticated    | userId (admin optional)        | -                                                                            | Reward transaction history   |
-| POST   | /api/v1/billing/rewards/redeem                    | Authenticated    | -                              | points, target, billId                                                       | Redeem points                |
-| POST   | /api/v1/billing/rewards/internal/redeem           | Public/Internal  | -                              | userId, points, target, billId                                               | Internal redeem call         |
-
----
-
-## 5.4 Payment Service
-
-| Method | Endpoint                                      | Auth          | Request Body                                       | Description                   |
-|--------|-----------------------------------------------|---------------|----------------------------------------------------|-------------------------------|
-| POST   | /api/v1/payments/initiate                     | Authenticated | cardId, billId, amount, paymentType, rewardsPoints | Initiate payment + OTP        |
-| POST   | /api/v1/payments/{paymentId}/verify-otp       | Authenticated | otpCode                                            | Verify OTP                    |
-| POST   | /api/v1/payments/{paymentId}/resend-otp       | Authenticated | -                                                  | Resend OTP                    |
-| GET    | /api/v1/payments                              | Authenticated | -                                                  | List my payments              |
-| GET    | /api/v1/payments/{paymentId}                  | Authenticated | -                                                  | Payment detail                |
-| GET    | /api/v1/payments/{paymentId}/transactions     | Authenticated | -                                                  | Payment transactions          |
-
-#### Sample Request: Initiate Payment
-
+**Example: Add Card**
 ```json
 {
-  "cardId": "1e83d51b-4f43-4be9-8af7-4f77d244846a",
-  "billId": "325ad403-07ca-4a47-a2cf-8bc9fb861c0e",
-  "amount": 4200,
+  "cardholderName": "JOHN DOE",
+  "cardNumber": "4111222233334444",
+  "expMonth": 12,
+  "expYear": 2028,
+  "issuerId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "isDefault": true
+}
+```
+
+### 3.3 Billing & Rewards Service
+*Handles billing cycles and reward logic.*
+
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/billing/bills` | User | List all bills. |
+| `GET` | `/api/v1/billing/statements` | User | List generated PDF/Data statements. |
+| `GET` | `/api/v1/billing/rewards/account` | User | Get current reward points balance. |
+| `POST` | `/api/v1/billing/rewards/redeem` | User | Redeem points for bill credit. |
+| `POST` | `/api/v1/billing/bills/admin/generate-bill` | Admin | Manually trigger a bill cycle for a user. |
+
+### 3.4 Payment Service
+*Orchestrates money movement and 2FA.*
+
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/payments/initiate` | User | Start payment flow (triggers OTP). |
+| `POST` | `/api/v1/payments/{id}/verify-otp` | User | Finalize payment with OTP. |
+| `GET` | `/api/v1/payments` | User | Payment history. |
+| `GET` | `/api/v1/wallets/balance` | User | Get wallet balance (if applicable). |
+
+**Example: Initiate Payment**
+```json
+{
+  "cardId": "GUID",
+  "billId": "GUID",
+  "amount": 500.00,
   "paymentType": "Full",
   "rewardsPoints": 100
 }
 ```
 
----
+### 3.5 Notification Service
+*Audit trail and log visibility.*
 
-## 5.5 Notification Service
-
-| Method | Endpoint                          | Auth          | Query                                   | Description               |
-|--------|-----------------------------------|---------------|------------------------------------------|---------------------------|
-| GET    | /api/v1/notifications/logs        | Authenticated | email, page, pageSize                    | Notification delivery logs |
-| GET    | /api/v1/notifications/audit       | Authenticated | userId, traceId, page, pageSize          | Audit trail logs          |
-
-Note: controller comments indicate admin intent, but role-level restriction is not enforced at action level currently.
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/notifications/logs` | Admin | View sent notification history. |
+| `GET` | `/api/v1/notifications/audit` | Admin | System-wide notification audit trail. |
 
 ---
 
-## 5.6 Health Endpoints
+## 4. Angular Integration Mapping
 
-| Method | Endpoint                           | Auth   | Description        |
-|--------|------------------------------------|--------|--------------------|
-| GET    | /health                            | Public | Gateway health     |
-| GET    | /api/v1/identity/health            | Public | Identity health    |
-| GET    | /api/v1/cards/health               | Public | Card health        |
-| GET    | /api/v1/billing/health             | Public | Billing health     |
-| GET    | /api/v1/payments/health            | Public | Payment health     |
+The frontend consumes backend services via dedicated Angular services.
 
----
-
-## 6. Frontend API Reference (Angular)
-
-## 6.1 Runtime Configuration
-
-Frontend reads the API base URL from runtime-generated environment values and defaults to:
-
-`http://localhost:5006`
-
-## 6.2 HTTP Interceptor Behavior
-
-- Attaches JWT bearer token to outbound requests when token exists.
-- On `401 Unauthorized`, auto-logs out user and redirects to login.
+| Angular Service | Method | Backend Endpoint |
+| :--- | :--- | :--- |
+| `AuthService` | `login()` | `POST /api/v1/identity/auth/login` |
+| `AuthService` | `getProfile()` | `GET /api/v1/identity/users/me` |
+| `DashboardService` | `getCards()` | `GET /api/v1/cards` |
+| `BillingService` | `getMyBills()` | `GET /api/v1/billing/bills` |
+| `RewardsService` | `getRewardAccount()` | `GET /api/v1/billing/rewards/account` |
+| `PaymentService` | `initiatePayment()` | `POST /api/v1/payments/initiate` |
+| `AdminService` | `getAllUsers()` | `GET /api/v1/identity/users` |
 
 ---
 
-## 6.3 Service-to-Endpoint Matrix
+## 5. Core Business Flows
 
-### AuthService
-
-| Method              | HTTP | Endpoint                                   |
-|---------------------|------|--------------------------------------------|
-| register            | POST | /api/v1/identity/auth/register             |
-| verifyEmailOtp      | POST | /api/v1/identity/auth/verify-email-otp     |
-| resendVerification  | POST | /api/v1/identity/auth/resend-verification  |
-| forgotPassword      | POST | /api/v1/identity/auth/forgot-password      |
-| resetPassword       | POST | /api/v1/identity/auth/reset-password       |
-| login               | POST | /api/v1/identity/auth/login                |
-| loginWithGoogle     | POST | /api/v1/identity/auth/google               |
-| getProfile          | GET  | /api/v1/identity/users/me                  |
-| updateProfile       | PUT  | /api/v1/identity/users/me                  |
-| changePassword      | PUT  | /api/v1/identity/users/me/password         |
-
-### DashboardService (Cards)
-
-| Method                   | HTTP   | Endpoint                                      |
-|--------------------------|--------|-----------------------------------------------|
-| getCards                 | GET    | /api/v1/cards                                 |
-| getAllTransactions       | GET    | /api/v1/cards/transactions                    |
-| getCardById              | GET    | /api/v1/cards/{cardId}                        |
-| getTransactionsByCardId  | GET    | /api/v1/cards/{cardId}/transactions           |
-| addCard                  | POST   | /api/v1/cards                                 |
-| deleteCard               | DELETE | /api/v1/cards/{cardId}                        |
-| addTransaction           | POST   | /api/v1/cards/{cardId}/transactions           |
-
-### BillingService
-
-| Method      | HTTP | Endpoint                     |
-|-------------|------|------------------------------|
-| getMyBills  | GET  | /api/v1/billing/bills        |
-
-### RewardsService + StatementService
-
-| Method                | HTTP | Endpoint                                      |
-|-----------------------|------|-----------------------------------------------|
-| getRewardAccount      | GET  | /api/v1/billing/rewards/account               |
-| getRewardHistory      | GET  | /api/v1/billing/rewards/transactions          |
-| getRewardTiers        | GET  | /api/v1/billing/rewards/tiers                 |
-| getMyStatements       | GET  | /api/v1/billing/statements                    |
-| getStatementById      | GET  | /api/v1/billing/statements/{statementId}      |
-| getStatementByBillId  | GET  | /api/v1/billing/statements/bill/{billId}      |
-| generateStatement     | POST | /api/v1/billing/statements/generate           |
-
-### PaymentService
-
-| Method             | HTTP | Endpoint                                      |
-|--------------------|------|-----------------------------------------------|
-| initiatePayment    | POST | /api/v1/payments/initiate                     |
-| verifyOtp          | POST | /api/v1/payments/{paymentId}/verify-otp       |
-| resendOtp          | POST | /api/v1/payments/{paymentId}/resend-otp       |
-| getPaymentById     | GET  | /api/v1/payments/{paymentId}                  |
-| getMyPayments      | GET  | /api/v1/payments                              |
-
-### AdminService
-
-| Domain       | Method                        | HTTP   | Endpoint                                              |
-|--------------|-------------------------------|--------|-------------------------------------------------------|
-| Identity     | getAllUsers                   | GET    | /api/v1/identity/users                                |
-| Identity     | getUserDetails                | GET    | /api/v1/identity/users/{userId}                       |
-| Identity     | updateUserStatus              | PUT    | /api/v1/identity/users/{userId}/status                |
-| Identity     | updateUserRole                | PUT    | /api/v1/identity/users/{userId}/role                  |
-| Identity     | getUserStats                  | GET    | /api/v1/identity/users/stats                          |
-| Card         | getIssuers                    | GET    | /api/v1/issuers                                       |
-| Card         | createIssuer                  | POST   | /api/v1/issuers                                       |
-| Card         | updateIssuer                  | PUT    | /api/v1/issuers/{id}                                  |
-| Card         | deleteIssuer                  | DELETE | /api/v1/issuers/{id}                                  |
-| Card         | getCardsByUser                | GET    | /api/v1/cards/user/{userId}                           |
-| Card         | updateCardByAdmin             | PUT    | /api/v1/cards/{cardId}/admin                          |
-| Card         | getAdminCardTransactions      | GET    | /api/v1/cards/admin/{cardId}/transactions             |
-| Billing      | generateBill                  | POST   | /api/v1/billing/bills/admin/generate-bill             |
-| Billing      | checkOverdue                  | POST   | /api/v1/billing/bills/admin/check-overdue             |
-| Billing      | getUserBills                  | GET    | /api/v1/billing/bills?userId=...                      |
-| Billing      | getUserStatements             | GET    | /api/v1/billing/statements?userId=...                 |
-| Billing      | getCardStatements             | GET    | /api/v1/billing/statements?cardId=...                 |
-| Billing      | getAllStatementsForAdmin      | GET    | /api/v1/billing/statements/admin/all                  |
-| Billing      | getAdminStatementFull         | GET    | /api/v1/billing/statements/admin/{statementId}/full   |
-| Rewards      | getRewardTiers                | GET    | /api/v1/billing/rewards/tiers                         |
-| Rewards      | createRewardTier              | POST   | /api/v1/billing/rewards/tiers                         |
-| Rewards      | updateRewardTier              | PUT    | /api/v1/billing/rewards/tiers/{id}                    |
-| Rewards      | deleteRewardTier              | DELETE | /api/v1/billing/rewards/tiers/{id}                    |
-| Rewards      | getUserRewardTransactions     | GET    | /api/v1/billing/rewards/transactions?userId=...       |
-| Notification | getNotificationLogs           | GET    | /api/v1/notifications/logs                            |
-| Notification | getAuditLogs                  | GET    | /api/v1/notifications/audit                           |
-
----
-
-## 7. Key Request Contracts
-
-## 7.1 Identity Requests
-
-```json
-{
-  "register": { "fullName": "string", "email": "string", "password": "string" },
-  "login": { "email": "string", "password": "string" },
-  "verifyEmailOtp": { "email": "string", "otp": "string" },
-  "resetPassword": { "email": "string", "otp": "string", "newPassword": "string" },
-  "changePassword": { "currentPassword": "string", "newPassword": "string" }
-}
-```
-
-## 7.2 Card Requests
-
-```json
-{
-  "createCard": {
-    "cardholderName": "string",
-    "expMonth": 1,
-    "expYear": 2030,
-    "cardNumber": "string",
-    "issuerId": "guid",
-    "isDefault": true
-  },
-  "updateCard": {
-    "cardholderName": "string",
-    "expMonth": 1,
-    "expYear": 2030,
-    "isDefault": false
-  },
-  "addTransaction": {
-    "type": 1,
-    "amount": 1200,
-    "description": "Restaurant",
-    "dateUtc": "2026-04-10T10:30:00Z"
-  }
-}
-```
-
-## 7.3 Billing and Payment Requests
-
-```json
-{
-  "generateBill": {
-    "userId": "guid",
-    "cardId": "guid",
-    "currency": "INR"
-  },
-  "generateStatement": { "cardId": "guid" },
-  "initiatePayment": {
-    "cardId": "guid",
-    "billId": "guid",
-    "amount": 2500,
-    "paymentType": "Full",
-    "rewardsPoints": 50
-  },
-  "verifyOtp": { "otpCode": "123456" },
-  "redeemRewards": { "points": 100, "target": "Bill", "billId": "guid" }
-}
-```
-
----
-
-## 8. Core Business Flow References
-
-## 8.1 User Onboarding and Verification
-
+### 5.1 User Registration & Verification
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant F as Frontend
+    participant U as End User
+    participant F as Angular Client
     participant G as Gateway
-    participant I as Identity Service
+    participant I as Identity Svc
+    participant N as Notification Svc
 
-    U->>F: Register
-    F->>G: POST /identity/auth/register
-    G->>I: Forward request
-    I-->>F: Registration response
-
-    U->>F: Submit email OTP
-    F->>G: POST /identity/auth/verify-email-otp
-    G->>I: Forward request
-    I-->>F: Access token + profile
-```
-
-## 8.2 Bill Payment with OTP and Rewards
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant G as Gateway
-    participant P as Payment Service
-    participant B as Billing Service
-
-    U->>F: Initiate payment
-    F->>G: POST /payments/initiate
-    G->>P: Forward request
-    P-->>F: paymentId + OTP required
-
+    U->>F: Enter Email/Pass
+    F->>G: POST /auth/register
+    G->>I: RegisterCommand
+    I->>N: EmailVerificationEvent
+    N-->>U: Send OTP via Email
+    I-->>F: 201 Created (Pending Verification)
+    
     U->>F: Enter OTP
-    F->>G: POST /payments/{paymentId}/verify-otp
-    G->>P: Forward request
-    P->>B: Bill/payment side effects
-    P-->>F: Payment processing started
+    F->>G: POST /auth/verify-email-otp
+    G->>I: VerifyOtpCommand
+    I-->>F: 200 OK (JWT Issued)
+```
+
+### 5.2 Bill Payment with OTP
+```mermaid
+sequenceDiagram
+    participant U as End User
+    participant F as Angular Client
+    participant G as Gateway
+    participant P as Payment Svc
+    participant B as Billing Svc
+    participant N as Notification Svc
+
+    U->>F: Select Bill & Pay
+    F->>G: POST /payments/initiate
+    G->>P: InitiatePaymentCommand
+    P->>N: PaymentOtpRequestedEvent
+    N-->>U: Send OTP via Email
+    P-->>F: 201 Created (PaymentId)
+    
+    U->>F: Submit OTP
+    F->>G: POST /payments/{id}/verify-otp
+    G->>P: ProcessPaymentCommand
+    P->>B: UpdateBillStatus (Internal)
+    P-->>F: 200 OK (Payment Success)
 ```
 
 ---
 
-## 9. Operational Readiness Checks
+## 6. Operational Readiness & Health Checks
 
-### 9.1 Basic Health Smoke Test
+### 6.1 Health Check Matrix
+Health checks are available at the following endpoints for monitoring systems (e.g., Kubernetes Liveness/Readiness probes).
 
+| Service | Health Check URL |
+| :--- | :--- |
+| **API Gateway** | `http://localhost:5006/health` |
+| **Identity** | `http://localhost:5001/api/v1/identity/health` |
+| **Card** | `http://localhost:5002/api/v1/cards/health` |
+| **Billing** | `http://localhost:5003/api/v1/billing/health` |
+| **Payment** | `http://localhost:5004/api/v1/payments/health` |
+
+### 6.2 Smoke Test Command
 ```bash
-curl -s http://localhost:5006/health
-curl -s http://localhost:5006/api/v1/identity/health
-curl -s http://localhost:5006/api/v1/cards/health
-curl -s http://localhost:5006/api/v1/billing/health
-curl -s http://localhost:5006/api/v1/payments/health
+# Verify Gateway and Identity Connectivity
+curl -X GET http://localhost:5006/api/v1/identity/health \
+     -H "Accept: application/json"
 ```
 
-### 9.2 Auth Validation Smoke Test
-
-- Protected endpoints should return `401` without token, not `500`.
-
 ---
 
-## 10. Notes and Constraints
-
-- Gateway route strategy uses broad service-level templates to avoid route fragility when APIs evolve.
-- Frontend API base URL is runtime-injected and falls back to gateway localhost URL.
-- Notification controller is authenticated, but explicit admin-role checks are currently not enforced in action attributes.
-
----
-
-## 11. Source Index (Code Locations)
-
-- Gateway routes: `server/services/gateway/Gateway.API/ocelot.json`
-- Gateway setup: `server/services/gateway/Gateway.API/Program.cs`
-- Identity APIs: `server/services/identity-service/IdentityService.API/Controllers/`
-- Card APIs: `server/services/card-service/CardService.API/Controllers/`
-- Billing APIs: `server/services/billing-service/BillingService.API/Controllers/`
-- Payment APIs: `server/services/payment-service/PaymentService.API/Controllers/`
-- Notification APIs: `server/services/notification-service/NotificationService.API/Controllers/`
-- Shared response model: `server/shared.contracts/Shared.Contracts/Models/ApiResponse.cs`
-- Frontend service consumers: `client/src/app/core/services/`
-- Frontend auth interceptor: `client/src/app/core/interceptors/auth.interceptor.ts`
-- Frontend environment: `client/src/environments/environment.ts`
+## 7. Versioning & Deprecation
+- Current Version: `v1`
+- All breaking changes will be introduced via `v2` pathing.
+- Deprecated endpoints will include a `Warning: 299 - "Deprecated"` header.

@@ -43,7 +43,7 @@ public sealed class WalletService : IWalletService
         return await _walletRepository.GetByUserIdAsync(userId);
     }
 
-    public async Task<decimal> TopUpAsync(Guid userId, decimal amount, string description, CancellationToken ct = default)
+    public async Task<decimal> TopUpAsync(Guid userId, decimal amount, string description, Guid? relatedPaymentId = null, CancellationToken ct = default)
     {
         if (amount <= 0)
         {
@@ -64,6 +64,7 @@ public sealed class WalletService : IWalletService
             Amount = amount,
             BalanceAfter = wallet.Balance + amount,
             Description = description,
+            RelatedPaymentId = relatedPaymentId,
             CreatedAtUtc = DateTime.UtcNow
         };
 

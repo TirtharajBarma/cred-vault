@@ -85,6 +85,12 @@ public sealed class WalletRepository(PaymentDbContext dbContext) : IWalletReposi
             .ToListAsync();
     }
 
+    public async Task<WalletTransaction?> GetTransactionByRelatedPaymentIdAsync(Guid relatedPaymentId)
+    {
+        return await dbContext.WalletTransactions
+            .FirstOrDefaultAsync(x => x.RelatedPaymentId == relatedPaymentId);
+    }
+
     public async Task AddAsync(UserWallet wallet)
     {
         await dbContext.UserWallets.AddAsync(wallet);
@@ -100,6 +106,31 @@ public sealed class WalletRepository(PaymentDbContext dbContext) : IWalletReposi
     public async Task AddTransactionAsync(WalletTransaction transaction)
     {
         await dbContext.WalletTransactions.AddAsync(transaction);
+        await dbContext.SaveChangesAsync();
+    }
+}
+
+public sealed class RazorpayWalletTopUpRepository(PaymentDbContext dbContext) : IRazorpayWalletTopUpRepository
+{
+    public async Task<RazorpayWalletTopUp?> GetByIdAsync(Guid id)
+    {
+        return await dbContext.RazorpayWalletTopUps.FirstOrDefaultAsync(x => x.Id == id);
+    }
+
+    public async Task<RazorpayWalletTopUp?> GetByOrderIdAsync(string orderId)
+    {
+        return await dbContext.RazorpayWalletTopUps.FirstOrDefaultAsync(x => x.RazorpayOrderId == orderId);
+    }
+
+    public async Task AddAsync(RazorpayWalletTopUp topUp)
+    {
+        await dbContext.RazorpayWalletTopUps.AddAsync(topUp);
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task UpdateAsync(RazorpayWalletTopUp topUp)
+    {
+        dbContext.RazorpayWalletTopUps.Update(topUp);
         await dbContext.SaveChangesAsync();
     }
 }

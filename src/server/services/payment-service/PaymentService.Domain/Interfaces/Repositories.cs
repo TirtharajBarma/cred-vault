@@ -22,9 +22,18 @@ public interface IWalletRepository
     Task<UserWallet?> GetByUserIdAsync(Guid userId);
     Task<UserWallet?> GetByIdAsync(Guid id);
     Task<IEnumerable<WalletTransaction>> GetTransactionsAsync(Guid walletId, int skip = 0, int take = 20);
+    Task<WalletTransaction?> GetTransactionByRelatedPaymentIdAsync(Guid relatedPaymentId);
     Task AddAsync(UserWallet wallet);
     Task UpdateAsync(UserWallet wallet);
     Task AddTransactionAsync(WalletTransaction transaction);
+}
+
+public interface IRazorpayWalletTopUpRepository
+{
+    Task<RazorpayWalletTopUp?> GetByIdAsync(Guid id);
+    Task<RazorpayWalletTopUp?> GetByOrderIdAsync(string orderId);
+    Task AddAsync(RazorpayWalletTopUp topUp);
+    Task UpdateAsync(RazorpayWalletTopUp topUp);
 }
 
 public interface IUnitOfWork
