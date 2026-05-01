@@ -2,16 +2,10 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { WalletService, WalletTransaction, RazorpayTopUpOrder } from '../../../core/services/wallet.service';
+import { WalletService, WalletTransaction } from '../../../core/services/wallet.service';
 import { IstDatePipe } from '../../../shared/pipes/ist-date.pipe';
-import { environment } from '../../../../environments/environment';
 
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
+declare var Razorpay: any;
 
 @Component({
   selector: 'app-wallet-activity',
@@ -22,7 +16,6 @@ declare global {
 })
 export class WalletActivityComponent implements OnInit {
   private walletService = inject(WalletService);
-  private razorpayLoader?: Promise<void>;
 
   isLoading = signal(true);
   hasWallet = signal(false);
@@ -78,7 +71,7 @@ export class WalletActivityComponent implements OnInit {
     this.topUpSuccess.set(null);
   }
 
-  async submitTopUp(): Promise<void> {
+  submitTopUp(): void {
     const amount = this.topUpAmount();
 
     if (!amount || amount <= 0) {
@@ -90,103 +83,75 @@ export class WalletActivityComponent implements OnInit {
     this.topUpError.set(null);
     this.topUpSuccess.set(null);
 
-    try {
-      if (!environment.razorpayKeyId) {
-        throw new Error('Razorpay public key is missing in frontend configuration.');
-      }
-
-      await this.ensureRazorpayLoaded();
-      const createOrderRes = await firstValueFrom(
-        this.walletService.createTopUpOrder({ amount, description: this.topUpDescription() || 'Wallet top-up' })
-      );
-
-      if (!createOrderRes.success || !createOrderRes.data) {
-        throw new Error(createOrderRes.message || 'Unable to create payment order.');
-      }
-
-      const checkoutResponse = await this.openRazorpayCheckout(createOrderRes.data);
-      const verifyRes = await firstValueFrom(this.walletService.verifyTopUp({
-        topUpId: createOrderRes.data.topUpId,
-        razorpayOrderId: checkoutResponse.razorpay_order_id,
-        razorpayPaymentId: checkoutResponse.razorpay_payment_id,
-        razorpaySignature: checkoutResponse.razorpay_signature
-      }));
-
-      if (!verifyRes.success) {
-        throw new Error(verifyRes.message || 'Unable to verify payment.');
-      }
-
-      const newBalance = Number(verifyRes.data?.newBalance || 0);
-      this.walletBalance.set(newBalance);
-      this.topUpSuccess.set(
-        `Successfully topped up ₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. New balance: ₹${newBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      );
-      this.loadWalletData();
-      setTimeout(() => this.toggleTopUpModal(), 1600);
-    } catch (err: any) {
-      this.topUpError.set(err?.message || err?.error?.message || 'Unable to top up wallet right now.');
-    } finally {
-      this.isTopUpSubmitting.set(false);
-    }
-  }
-
-  private async ensureRazorpayLoaded(): Promise<void> {
-    if (typeof window === 'undefined') {
-      throw new Error('Razorpay checkout is only available in the browser.');
-    }
-
-    if (window.Razorpay) {
-      return;
-    }
-
-    if (this.razorpayLoader) {
-      return this.razorpayLoader;
-    }
-
-    this.razorpayLoader = new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Unable to load Razorpay checkout.'));
-      document.body.appendChild(script);
-    });
-
-    return this.razorpayLoader;
-  }
-
-  private openRazorpayCheckout(order: RazorpayTopUpOrder): Promise<{
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-  }> {
-    return new Promise((resolve, reject) => {
-      if (!window.Razorpay) {
-        reject(new Error('Razorpay checkout is unavailable.'));
-        return;
-      }
-
-      const razorpay = new window.Razorpay({
-        key: order.keyId || environment.razorpayKeyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: order.displayName || 'CredVault',
-        description: order.description || 'Wallet top-up',
-        order_id: order.orderId,
-        handler: (response: {
-          razorpay_order_id: string;
-          razorpay_payment_id: string;
-          razorpay_signature: string;
-        }) => resolve(response),
-        modal: {
-          ondismiss: () => reject(new Error('Payment was cancelled.'))
-        },
-        theme: {
-          color: '#8a5100'
+    this.walletService.createRazorpayOrder({ amount, description: this.topUpDescription() || 'Wallet top-up' }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.openRazorpay(res.data);
+        } else {
+          this.topUpError.set(res.message || 'Unable to create payment order.');
+          this.isTopUpSubmitting.set(false);
         }
-      });
+      },
+      error: (err) => {
+        this.topUpError.set(err?.error?.message || 'Unable to create payment order.');
+        this.isTopUpSubmitting.set(false);
+      }
+    });
+  }
 
-      razorpay.open();
+  private openRazorpay(orderData: { topUpId: string; orderId: string; amountInPaise: number; currency: string; keyId: string; displayName: string; description: string }): void {
+    const options = {
+      key: orderData.keyId,
+      amount: orderData.amountInPaise,
+      currency: orderData.currency,
+      name: orderData.displayName,
+      description: orderData.description,
+      order_id: orderData.orderId,
+      handler: (response: any) => {
+        this.verifyPayment(orderData.topUpId, orderData.orderId, response.razorpay_payment_id, response.razorpay_signature);
+      },
+      prefill: {
+        email: '',
+        contact: ''
+      },
+      theme: {
+        color: '#8a5100'
+      },
+      modal: {
+        ondismiss: () => {
+          this.isTopUpSubmitting.set(false);
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.on('payment.failed', (response: any) => {
+      this.topUpError.set(response.error?.description || 'Payment failed. Please try again.');
+      this.isTopUpSubmitting.set(false);
+    });
+    rzp.open();
+  }
+
+  private verifyPayment(topUpId: string, orderId: string, paymentId: string, signature: string): void {
+    this.walletService.verifyRazorpayPayment({ topUpId, orderId, paymentId, signature }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          const amount = this.topUpAmount();
+          const newBalance = Number(res.data?.newBalance || 0);
+          this.walletBalance.set(newBalance);
+          this.hasWallet.set(true);
+          this.topUpSuccess.set(`Successfully topped up ₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. New balance: ₹${newBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+          this.loadWalletData();
+          setTimeout(() => this.toggleTopUpModal(), 1600);
+        } else {
+          this.topUpError.set(res.message || 'Payment verification failed.');
+        }
+        this.isTopUpSubmitting.set(false);
+      },
+      error: (err) => {
+        this.topUpError.set(err?.error?.message || 'Payment verification failed.');
+        this.isTopUpSubmitting.set(false);
+      }
     });
   }
 

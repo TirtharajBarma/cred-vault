@@ -71,9 +71,6 @@ public sealed class RegisterCommandHandler(IUserRepository users, IPublishEndpoi
             await publisher.Publish<IUserOtpGenerated>(new { UserId = user.Id, user.Email, user.FullName, OtpCode = otp, Purpose = "EmailVerification", ExpiresAtUtc = user.EmailVerificationOtpExpiresAtUtc }, ct);
             logger.LogInformation("Published IUserOtpGenerated for {UserId}", user.Id);
 
-            await publisher.Publish<IUserRegistered>(new { UserId = user.Id, Email = user.Email, FullName = user.FullName, CreatedAtUtc = user.CreatedAtUtc }, ct);
-            logger.LogInformation("Published IUserRegistered for {UserId}", user.Id);
-
             return new()
             {
                 Success = true, Message = "Registered",

@@ -8,11 +8,13 @@ namespace PaymentService.Application.Services;
 public sealed class WalletService : IWalletService
 {
     private readonly IWalletRepository _walletRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<WalletService> _logger;
 
-    public WalletService(IWalletRepository walletRepository, ILogger<WalletService> logger)
+    public WalletService(IWalletRepository walletRepository, IUnitOfWork unitOfWork, ILogger<WalletService> logger)
     {
         _walletRepository = walletRepository;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -34,6 +36,7 @@ public sealed class WalletService : IWalletService
         };
 
         await _walletRepository.AddAsync(wallet);
+        await _unitOfWork.SaveChangesAsync(ct);
         _logger.LogInformation("Created wallet for user {UserId}", userId);
         return wallet;
     }
@@ -43,7 +46,7 @@ public sealed class WalletService : IWalletService
         return await _walletRepository.GetByUserIdAsync(userId);
     }
 
-    public async Task<decimal> TopUpAsync(Guid userId, decimal amount, string description, Guid? relatedPaymentId = null, CancellationToken ct = default)
+    public async Task<decimal> TopUpAsync(Guid userId, decimal amount, string description, CancellationToken ct = default)
     {
         if (amount <= 0)
         {
@@ -64,15 +67,16 @@ public sealed class WalletService : IWalletService
             Amount = amount,
             BalanceAfter = wallet.Balance + amount,
             Description = description,
-            RelatedPaymentId = relatedPaymentId,
             CreatedAtUtc = DateTime.UtcNow
         };
 
         wallet.Balance += amount;
+        wallet.TotalTopUps += amount;
         wallet.UpdatedAtUtc = DateTime.UtcNow;
 
         await _walletRepository.UpdateAsync(wallet);
         await _walletRepository.AddTransactionAsync(transaction);
+        await _unitOfWork.SaveChangesAsync(ct);
 
         _logger.LogInformation("Topped up wallet for user {UserId} with amount {Amount}. New balance: {Balance}", 
             userId, amount, wallet.Balance);
@@ -108,10 +112,12 @@ public sealed class WalletService : IWalletService
         };
 
         wallet.Balance -= amount;
+        wallet.TotalSpent += amount;
         wallet.UpdatedAtUtc = DateTime.UtcNow;
 
         await _walletRepository.UpdateAsync(wallet);
         await _walletRepository.AddTransactionAsync(transaction);
+        await _unitOfWork.SaveChangesAsync(ct);
 
         _logger.LogInformation("Deducted {Amount} from wallet for user {UserId}. New balance: {Balance}",
             amount, userId, wallet.Balance);
@@ -149,6 +155,7 @@ public sealed class WalletService : IWalletService
 
         await _walletRepository.UpdateAsync(wallet);
         await _walletRepository.AddTransactionAsync(transaction);
+        await _unitOfWork.SaveChangesAsync(ct);
 
         _logger.LogInformation("Refunded {Amount} to wallet for user {UserId}. New balance: {Balance}",
             amount, userId, wallet.Balance);
@@ -161,7 +168,7 @@ public sealed class WalletService : IWalletService
         var wallet = await _walletRepository.GetByUserIdAsync(userId);
         if (wallet == null)
         {
-            return Enumerable.Empty<WalletTransaction>();       // return a empty list of WalletTransaction
+            return Enumerable.Empty<WalletTransaction>();
         }
 
         return await _walletRepository.GetTransactionsAsync(wallet.Id, skip, take);

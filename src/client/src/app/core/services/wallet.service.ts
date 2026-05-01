@@ -29,21 +29,19 @@ export interface TopUpRequest {
   description?: string;
 }
 
-export interface RazorpayTopUpOrder {
+export interface RazorpayOrderResponse {
   topUpId: string;
   orderId: string;
-  amount: number;
+  amountInPaise: number;
   currency: string;
   keyId: string;
   displayName: string;
   description: string;
 }
 
-export interface RazorpayTopUpVerifyRequest {
-  topUpId: string;
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
-  razorpaySignature: string;
+export interface RazorpayVerifyResponse {
+  newBalance: number;
+  alreadyProcessed: boolean;
 }
 
 @Injectable({
@@ -61,15 +59,23 @@ export class WalletService {
     return this.http.get<ApiResponse<{ balance: number; hasWallet: boolean }>>(`${this.baseUrl}/balance`);
   }
 
-  createTopUpOrder(request: TopUpRequest): Observable<ApiResponse<RazorpayTopUpOrder>> {
-    return this.http.post<ApiResponse<RazorpayTopUpOrder>>(`${this.baseUrl}/topup/create-order`, request);
-  }
-
-  verifyTopUp(request: RazorpayTopUpVerifyRequest): Observable<ApiResponse<{ newBalance: number; alreadyProcessed: boolean }>> {
-    return this.http.post<ApiResponse<{ newBalance: number; alreadyProcessed: boolean }>>(`${this.baseUrl}/topup/verify`, request);
+  topUp(request: TopUpRequest): Observable<ApiResponse<{ amount: number; newBalance: number; description: string }>> {
+    return this.http.post<ApiResponse<{ amount: number; newBalance: number; description: string }>>(`${this.baseUrl}/topup`, request);
   }
 
   getTransactions(skip = 0, take = 20): Observable<ApiResponse<WalletTransaction[]>> {
     return this.http.get<ApiResponse<WalletTransaction[]>>(`${this.baseUrl}/transactions?skip=${skip}&take=${take}`);
+  }
+
+  createRazorpayOrder(request: TopUpRequest): Observable<ApiResponse<RazorpayOrderResponse>> {
+    return this.http.post<ApiResponse<RazorpayOrderResponse>>(`${this.baseUrl}/razorpay/create-order`, request);
+  }
+
+  verifyRazorpayPayment(request: { topUpId: string; orderId: string; paymentId: string; signature: string }): Observable<ApiResponse<RazorpayVerifyResponse>> {
+    return this.http.post<ApiResponse<RazorpayVerifyResponse>>(`${this.baseUrl}/razorpay/verify`, request);
+  }
+
+  getRazorpayPublicKey(): Observable<ApiResponse<{ keyId: string }>> {
+    return this.http.get<ApiResponse<{ keyId: string }>>(`${this.baseUrl}/razorpay/public-key`);
   }
 }

@@ -4,7 +4,6 @@ export interface EnvironmentConfig {
   production: boolean;
   apiGatewayUrl: string;
   googleClientId: string;
-  razorpayKeyId: string;
   pointsToRupeeRate: number;
 }
 
@@ -16,6 +15,5 @@ export const environment: EnvironmentConfig = {
   production: true,
   apiGatewayUrl: runtimeEnv.apiGatewayUrl || fallbackApiGatewayUrl,
   googleClientId: hasPlaceholderGoogleClientId ? '' : configuredGoogleClientId,
-  razorpayKeyId: (runtimeEnv.razorpayKeyId || '').trim(),
   pointsToRupeeRate: 0.25
 };

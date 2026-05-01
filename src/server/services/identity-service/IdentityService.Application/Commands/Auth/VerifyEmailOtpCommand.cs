@@ -5,6 +5,9 @@ using IdentityService.Application.Common;
 using Shared.Contracts.Configuration;
 using MediatR;
 using Microsoft.Extensions.Options;
+using MassTransit;
+using Shared.Contracts.Events.Identity;
+using Microsoft.Extensions.Logging;
 
 namespace IdentityService.Application.Commands.Auth;
 
@@ -25,9 +28,10 @@ public record VerifyEmailOtpCommand(string Email, string Otp) : IRequest<AuthRes
 /// 5. Checks if OTP exists and hasn't expired (10-minute window)
 /// 6. Verifies OTP matches exactly
 /// 7. On success: marks email as verified, sets status to Active, clears OTP
-/// 8. Returns JWT access token for immediate login
+/// 8. Publishes IUserRegistered event for other services (e.g., NotificationService for welcome email)
+/// 9. Returns JWT access token for immediate login
 /// </summary>
-public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository, IOptions<JwtOptions> jwtOptions)
+public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository, IOptions<JwtOptions> jwtOptions, IPublishEndpoint publisher, ILogger<VerifyEmailOtpCommandHandler> logger)
     : IRequestHandler<VerifyEmailOtpCommand, AuthResult>
 {
     public async Task<AuthResult> Handle(VerifyEmailOtpCommand request, CancellationToken cancellationToken)
@@ -101,6 +105,18 @@ public sealed class VerifyEmailOtpCommandHandler(IUserRepository userRepository,
         user.EmailVerificationOtpExpiresAtUtc = null;
         user.UpdatedAtUtc = DateTime.UtcNow;
         await userRepository.UpdateAsync(user, cancellationToken);
+
+        logger.LogInformation("Email verified for user: {UserId}. Publishing IUserRegistered.", user.Id);
+        
+        // Publish UserRegistered event only AFTER successful OTP verification
+        // This triggers the Welcome email and other post-registration setup
+        await publisher.Publish<IUserRegistered>(new 
+        { 
+            UserId = user.Id, 
+            Email = user.Email, 
+            FullName = user.FullName, 
+            CreatedAtUtc = user.CreatedAtUtc 
+        }, cancellationToken);
 
         // Generate Access Token for direct login
         var accessToken = IdentityHelpers.GenerateAccessToken(user, jwtOptions.Value);

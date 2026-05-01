@@ -40,6 +40,7 @@ public sealed class RazorpayWalletTopUpService(
     IWalletRepository walletRepository,
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
+    IUnitOfWork unitOfWork,
     ILogger<RazorpayWalletTopUpService> logger) : IRazorpayWalletTopUpService
 {
     private const string RazorpayOrdersUrl = "https://api.razorpay.com/v1/orders";
@@ -110,6 +111,7 @@ public sealed class RazorpayWalletTopUpService(
             };
 
             await topUpRepository.AddAsync(topUp);
+            await unitOfWork.SaveChangesAsync(ct);
 
             return new RazorpayOrderCreateResult(
                 true,
@@ -154,6 +156,7 @@ public sealed class RazorpayWalletTopUpService(
             topUp.VerifiedAtUtc ??= DateTime.UtcNow;
             topUp.FailureReason = null;
             await topUpRepository.UpdateAsync(topUp);
+            await unitOfWork.SaveChangesAsync(ct);
             return new RazorpayVerifyResult(true, null, existingCredit.BalanceAfter, AlreadyProcessed: true);
         }
 
@@ -167,6 +170,7 @@ public sealed class RazorpayWalletTopUpService(
             topUp.RazorpayPaymentId = paymentId;
             topUp.RazorpaySignature = signature;
             await topUpRepository.UpdateAsync(topUp);
+            await unitOfWork.SaveChangesAsync(ct);
             return new RazorpayVerifyResult(false, "Payment verification failed.");
         }
 
@@ -174,7 +178,6 @@ public sealed class RazorpayWalletTopUpService(
             userId,
             topUp.Amount,
             $"Wallet top-up via Razorpay ({paymentId})",
-            topUp.Id,
             ct);
 
         topUp.RazorpayPaymentId = paymentId;
@@ -183,6 +186,7 @@ public sealed class RazorpayWalletTopUpService(
         topUp.VerifiedAtUtc = DateTime.UtcNow;
         topUp.FailureReason = null;
         await topUpRepository.UpdateAsync(topUp);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new RazorpayVerifyResult(true, null, newBalance);
     }

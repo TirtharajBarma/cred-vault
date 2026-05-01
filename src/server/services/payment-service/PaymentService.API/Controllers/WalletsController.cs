@@ -9,9 +9,7 @@ namespace PaymentService.API.Controllers;
 [ApiController]
 [Route("api/v1/wallets")]
 [Authorize]
-public class WalletsController(
-    IWalletService walletService,
-    IRazorpayWalletTopUpService razorpayWalletTopUpService) : BaseApiController
+public class WalletsController(IWalletService walletService) : BaseApiController
 {
     [HttpGet("me")]
     public async Task<IActionResult> GetMyWallet(CancellationToken cancellationToken)
@@ -46,8 +44,8 @@ public class WalletsController(
         });
     }
 
-    [HttpPost("topup/create-order")]
-    public async Task<IActionResult> CreateTopUpOrder([FromBody] TopUpRequest request, CancellationToken cancellationToken)
+    [HttpPost("topup")]
+    public async Task<IActionResult> TopUp([FromBody] TopUpRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserIdFromToken();
         if (userId is null)
@@ -56,59 +54,22 @@ public class WalletsController(
         if (request.Amount <= 0)
             return BadRequestResponse("Amount must be greater than zero.");
 
-        var result = await razorpayWalletTopUpService.CreateOrderAsync(
+        var newBalance = await walletService.TopUpAsync(
             userId.Value,
             request.Amount,
             request.Description ?? "Wallet top-up",
-            cancellationToken);
+            cancellationToken
+        );
 
-        if (!result.Success)
-            return BadRequestResponse(result.Error ?? "Unable to create Razorpay order.");
-
-        return Ok(new ApiResponse<object>
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<object>
         {
             Success = true,
-            Message = "Razorpay order created.",
+            Message = "Wallet topped up successfully.",
             Data = new
             {
-                TopUpId = result.TopUpId,
-                OrderId = result.OrderId,
-                Amount = result.AmountInPaise,
-                Currency = result.Currency,
-                KeyId = result.KeyId,
-                DisplayName = result.DisplayName,
-                Description = result.Description
-            },
-            TraceId = HttpContext.TraceIdentifier
-        });
-    }
-
-    [HttpPost("topup/verify")]
-    public async Task<IActionResult> VerifyTopUp([FromBody] VerifyRazorpayTopUpRequest request, CancellationToken cancellationToken)
-    {
-        var userId = GetUserIdFromToken();
-        if (userId is null)
-            return UnauthorizedResponse();
-
-        var result = await razorpayWalletTopUpService.VerifyAsync(
-            userId.Value,
-            request.TopUpId,
-            request.RazorpayOrderId,
-            request.RazorpayPaymentId,
-            request.RazorpaySignature,
-            cancellationToken);
-
-        if (!result.Success)
-            return BadRequestResponse(result.Error ?? "Unable to verify payment.");
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Message = result.AlreadyProcessed ? "Wallet top-up already verified." : "Wallet topped up successfully.",
-            Data = new
-            {
-                NewBalance = result.NewBalance ?? 0m,
-                AlreadyProcessed = result.AlreadyProcessed
+                Amount = request.Amount,
+                NewBalance = newBalance,
+                Description = request.Description ?? "Wallet top-up"
             },
             TraceId = HttpContext.TraceIdentifier
         });
@@ -171,4 +132,3 @@ public class WalletsController(
 }
 
 public record TopUpRequest(decimal Amount, string? Description = null);
-public record VerifyRazorpayTopUpRequest(Guid TopUpId, string RazorpayOrderId, string RazorpayPaymentId, string RazorpaySignature);

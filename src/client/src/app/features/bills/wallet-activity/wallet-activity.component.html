@@ -34,14 +34,13 @@
 
       <article class="mist-blur rounded-[2rem] bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] md:p-8">
         <label class="mb-4 block text-[0.7rem] font-bold uppercase tracking-widest text-[#615e5c]">Wallet Status</label>
-        <div class="text-4xl font-extrabold tracking-tight">
-          @if (hasWallet()) {
-            Active
-          } @else {
-            Missing
-          }
-        </div>
-        <p class="mt-2 text-sm font-semibold text-[#8a5100]">Authenticated user wallet scope</p>
+        @if (hasWallet()) {
+          <div class="text-4xl font-extrabold tracking-tight text-green-700">Active</div>
+          <p class="mt-2 text-sm font-semibold text-[#615e5c]">Your wallet is ready to use</p>
+        } @else {
+          <div class="text-4xl font-extrabold tracking-tight text-[#8a5100]">Not Created</div>
+          <p class="mt-2 text-sm font-semibold text-[#8a5100]">Top up to create your wallet automatically</p>
+        }
       </article>
 
       <article class="mist-blur rounded-[2rem] bg-white/70 p-7 shadow-[0_20px_80px_-10px_rgba(83,68,55,0.08)] md:p-8">

@@ -316,6 +316,13 @@
       "UpstreamHttpMethod": ["GET"]
     },
     {
+      "DownstreamPathTemplate": "/api/v1/wallets/topup",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],
+      "UpstreamPathTemplate": "/api/v1/wallets/topup",
+      "UpstreamHttpMethod": ["POST"]
+    },
+    {
       "DownstreamPathTemplate": "/api/v1/wallets/transactions",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [{ "Host": "payment-service", "Port": 5004 }],

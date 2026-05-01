@@ -38,23 +38,19 @@ const isPlaceholder = fromProcess.includes('your-gateway-domain.com');
 const fromFilesGoogleClientId = modeEnv.GOOGLE_CLIENT_ID || commonEnv.GOOGLE_CLIENT_ID || '';
 const fromProcessGoogleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
 const isPlaceholderGoogleClientId = fromProcessGoogleClientId.includes('your-google-client-id');
-const fromFilesRazorpayKeyId = modeEnv.RAZORPAY_KEY_ID || commonEnv.RAZORPAY_KEY_ID || '';
-const fromProcessRazorpayKeyId = (process.env.RAZORPAY_KEY_ID || '').trim();
 
 // For local development, favor checked-in env files unless an explicit non-placeholder override is provided.
 const apiGatewayUrl = fromProcess && !isPlaceholder ? fromProcess : fromFiles || fromProcess || '';
 const googleClientId = fromProcessGoogleClientId && !isPlaceholderGoogleClientId
   ? fromProcessGoogleClientId
   : fromFilesGoogleClientId || fromProcessGoogleClientId || '';
-const razorpayKeyId = fromProcessRazorpayKeyId || fromFilesRazorpayKeyId || '';
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
 const output = [
   'export const runtimeEnv = {',
   `  apiGatewayUrl: ${JSON.stringify(apiGatewayUrl)},`,
-  `  googleClientId: ${JSON.stringify(googleClientId)},`,
-  `  razorpayKeyId: ${JSON.stringify(razorpayKeyId)}`,
+  `  googleClientId: ${JSON.stringify(googleClientId)}`,
   '} as const;',
   ''
 ].join('\n');
