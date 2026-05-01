@@ -1,6 +1,8 @@
 using MediatR;
+using MassTransit;
 using CardService.Application.Abstractions.Persistence;
 using CardService.Application.Common;
+using Shared.Contracts.Events.Card;
 using Shared.Contracts.Models;
 
 namespace CardService.Application.Commands.Cards;
@@ -8,7 +10,8 @@ namespace CardService.Application.Commands.Cards;
 public record UpdateCardByAdminCommand(Guid CardId, string? CardholderName, decimal CreditLimit, decimal? OutstandingBalance, int? BillingCycleStartDay) : IRequest<ApiResponse<object>>;
 
 public class UpdateCardByAdminCommandHandler(
-    ICardRepository cardRepository) : IRequestHandler<UpdateCardByAdminCommand, ApiResponse<object>>
+    ICardRepository cardRepository,
+    IPublishEndpoint publisher) : IRequestHandler<UpdateCardByAdminCommand, ApiResponse<object>>
 {
     public async Task<ApiResponse<object>> Handle(UpdateCardByAdminCommand request, CancellationToken cancellationToken)
     {
@@ -17,6 +20,8 @@ public class UpdateCardByAdminCommandHandler(
         {
             return new ApiResponse<object> { Success = false, Message = "Card not found." };
         }
+
+        var wasUnconfigured = card.CreditLimit <= 0;
 
         if (!string.IsNullOrWhiteSpace(request.CardholderName))
             card.CardholderName = request.CardholderName;
@@ -39,6 +44,22 @@ public class UpdateCardByAdminCommandHandler(
 
         card.UpdatedAtUtc = DateTime.UtcNow;
         await cardRepository.UpdateAsync(card, cancellationToken);
+
+        // Fire ICardAdded notification when admin first configures the card (credit limit > 0)
+        // This is the "admin approval" event - user gets notified their card is active
+        if (wasUnconfigured && card.CreditLimit > 0)
+        {
+            await publisher.Publish<ICardAdded>(new
+            {
+                CardId = card.Id,
+                UserId = card.UserId,
+                Email = string.Empty,   // Notification service will look up email by UserId
+                FullName = card.CardholderName,
+                CardNumberLast4 = card.Last4,
+                CardHolderName = card.CardholderName,
+                AddedAt = card.UpdatedAtUtc
+            }, cancellationToken);
+        }
 
         return new ApiResponse<object> { Success = true, Message = "Card updated successfully.", Data = CardMapping.ToDto(card) };
     }

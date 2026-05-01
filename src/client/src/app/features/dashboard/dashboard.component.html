@@ -151,9 +151,9 @@
 
         <!-- Add Generic Card Button -->
         <button (click)="toggleAddCardModal()" 
-                class="w-full aspect-[1.6/1] rounded-[2rem] border-2 border-dashed border-[#d8c3b2]/20 flex flex-col items-center justify-center gap-4 group hover:bg-white hover:border-[#8a5100]/40 hover:shadow-xl transition-all duration-500">
-          <div class="w-14 h-14 bg-[#f6f3f2] rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-[#8a5100]/10 transition-all">
-            <span class="material-symbols-outlined text-[#615e5c]/30 group-hover:text-[#8a5100] font-bold">add</span>
+                class="w-full aspect-[1.6/1] rounded-[2rem] border-2 border-dashed border-[#8a5100]/30 bg-white/80 flex flex-col items-center justify-center gap-4 group hover:border-[#8a5100]/60 hover:bg-white hover:shadow-xl transition-all duration-500 shadow-sm">
+          <div class="w-14 h-14 bg-[#8a5100]/10 rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-[#8a5100]/20 transition-all">
+            <span class="material-symbols-outlined text-[#8a5100] font-bold">add</span>
           </div>
           <span class="text-sm font-bold text-[#615e5c] group-hover:text-[#1b1c1c]">Connect Another Card</span>
         </button>
@@ -290,11 +290,11 @@
           <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div class="space-y-2">
               <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">Cardholder Name</label>
-              <input type="text" formControlName="cardholderName" class="premium-input h-14 px-6" placeholder="ALEXANDER VANCE">
+              <input type="text" formControlName="cardholderName" class="premium-input h-14 px-6" placeholder="ALEXANDER VANCE" autocomplete="cc-name">
             </div>
             <div class="space-y-2">
               <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">Card Number</label>
-              <input type="text" formControlName="cardNumber" class="premium-input h-14 px-6" placeholder="1234 5678 9012 3456" inputmode="numeric" maxlength="19" autocomplete="off">
+              <input type="text" formControlName="cardNumber" class="premium-input h-14 px-6" placeholder="1234 5678 9012 3456" inputmode="numeric" maxlength="19" autocomplete="cc-number">
             </div>
             <div class="space-y-2">
               <label class="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#8c8783]">Card Issuer</label>

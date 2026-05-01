@@ -4,16 +4,17 @@ namespace NotificationService.Application.Services;
 
 public static class EmailTemplates
 {
-    private const string PrimaryColor = "#2563EB"; // Modern Blue
-    private const string PrimaryDark = "#1E40AF";
-    private const string PrimaryLight = "#EFF6FF";
-    private const string TextColor = "#1E293B"; // Slate 800
-    private const string MutedColor = "#64748B"; // Slate 500
-    private const string BorderColor = "#E2E8F0"; // Slate 200
-    private const string SuccessColor = "#10B981"; // Emerald 500
-    private const string WarningColor = "#F59E0B"; // Amber 500
-    private const string ErrorColor = "#EF4444"; // Red 500
-    private const string BgColor = "#F8FAFC"; // Slate 50
+    private const string BrandColor   = "#8a5100"; // CredVault amber
+    private const string BrandDark    = "#6b3f00";
+    private const string BrandLight   = "#fef3e2";
+    private const string TextPrimary  = "#1b1c1c";
+    private const string TextMuted    = "#615e5c";
+    private const string BorderColor  = "#e8ddd4";
+    private const string SuccessColor = "#16a34a";
+    private const string ErrorColor   = "#dc2626";
+    private const string WarningColor = "#d97706";
+    private const string BgPage       = "#f0edeb";
+    private const string BgCard       = "#ffffff";
 
     private static DateTime ConvertToIst(DateTime dateTime)
     {
@@ -31,8 +32,8 @@ public static class EmailTemplates
 
     public static string BaseTemplate(string title, string subtitle, string content, string? footerNote = null)
     {
-        var subtitleHtml = string.IsNullOrEmpty(subtitle) ? "" : $@"<p style=""margin: 0 0 32px 0; color: {MutedColor}; font-size: 16px;"">{EscapeHtml(subtitle)}</p>";
-        var footerNoteHtml = string.IsNullOrEmpty(footerNote) ? "" : $@"<div style=""margin-top: 32px; padding: 20px; background-color: {BgColor}; border-radius: 12px; border-left: 4px solid {PrimaryColor};""><p style=""margin: 0; color: {MutedColor}; font-size: 14px; line-height: 1.5;"">{footerNote}</p></div>";
+        var subtitleHtml = string.IsNullOrEmpty(subtitle) ? "" : $@"<p style=""margin: 4px 0 20px 0; color: {TextMuted}; font-size: 14px; line-height: 1.5;"">{EscapeHtml(subtitle)}</p>";
+        var footerNoteHtml = string.IsNullOrEmpty(footerNote) ? "" : $@"<div style=""margin-top: 20px; padding: 14px 16px; background-color: {BrandLight}; border-radius: 10px; border-left: 3px solid {BrandColor};""><p style=""margin: 0; color: {BrandDark}; font-size: 13px; line-height: 1.5;"">{footerNote}</p></div>";
 
         return $@"<!DOCTYPE html>
 <html lang=""en"">
@@ -43,42 +44,36 @@ public static class EmailTemplates
     <style>
         @media only screen and (max-width: 600px) {{
             .main-table {{ width: 100% !important; border-radius: 0 !important; }}
-            .content-padding {{ padding: 24px !important; }}
+            .content-padding {{ padding: 20px !important; }}
         }}
     </style>
 </head>
-<body style=""margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: {BgColor}; line-height: 1.6; color: {TextColor};"">
-    <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""background-color: {BgColor}; padding: 40px 10px;"">
+<body style=""margin: 0; padding: 0; font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: {BgPage}; color: {TextPrimary}; -webkit-font-smoothing: antialiased;"">
+    <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""background-color: {BgPage}; padding: 28px 12px;"">
         <tr>
             <td align=""center"">
-                <table class=""main-table"" width=""600"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02); border: 1px solid {BorderColor};"">
+                <table class=""main-table"" width=""560"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""background-color: {BgCard}; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.07); border: 1px solid {BorderColor};"">
+                    <!-- Header -->
                     <tr>
-                        <td style=""background: linear-gradient(135deg, {PrimaryColor} 0%, {PrimaryDark} 100%); padding: 32px; text-align: center;"">
-                            <div style=""display: inline-block; padding: 10px 20px; background: rgba(255, 255, 255, 0.1); border-radius: 12px;"">
-                                <span style=""margin: 0; color: #FFFFFF; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;"">💳 CredVault</span>
-                            </div>
-                            <p style=""margin: 12px 0 0 0; color: rgba(255, 255, 255, 0.85); font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 1.5px;"">Premium Credit Management</p>
+                        <td style=""background: linear-gradient(135deg, {BrandColor} 0%, {BrandDark} 100%); padding: 20px 28px; text-align: center;"">
+                            <span style=""color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: -0.3px;"">💳 CredVault</span>
+                            <p style=""margin: 4px 0 0 0; color: rgba(255,255,255,0.75); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 2px;"">Premium Credit Management</p>
                         </td>
                     </tr>
+                    <!-- Body -->
                     <tr>
-                        <td class=""content-padding"" style=""padding: 48px;"">
-                            <h2 style=""margin: 0 0 8px 0; color: {TextColor}; font-size: 22px; font-weight: 700; letter-spacing: -0.025em;"">{EscapeHtml(title)}</h2>
+                        <td class=""content-padding"" style=""padding: 28px 32px;"">
+                            <h2 style=""margin: 0 0 4px 0; color: {TextPrimary}; font-size: 20px; font-weight: 700; letter-spacing: -0.3px;"">{EscapeHtml(title)}</h2>
                             {subtitleHtml}
                             {content}
                             {footerNoteHtml}
                         </td>
                     </tr>
+                    <!-- Footer -->
                     <tr>
-                        <td style=""background-color: #FFFFFF; padding: 32px; border-top: 1px solid {BorderColor};"">
-                            <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"">
-                                <tr><td align=""center"" style=""padding-bottom: 16px;""><div style=""height: 1px; width: 60px; background-color: {BorderColor};""></div></td></tr>
-                                <tr>
-                                    <td align=""center"">
-                                        <p style=""margin: 0 0 8px 0; color: {MutedColor}; font-size: 12px; text-align: center; font-weight: 500;"">This is an automated security notification.</p>
-                                        <p style=""margin: 0; color: {MutedColor}; font-size: 12px; text-align: center; opacity: 0.8;"">© {DateTime.UtcNow:yyyy} CredVault Systems Inc.<br>Intelligent Credit Tracking & Protection</p>
-                                    </td>
-                                </tr>
-                            </table>
+                        <td style=""background-color: {BgPage}; padding: 16px 32px; border-top: 1px solid {BorderColor}; text-align: center;"">
+                            <p style=""margin: 0 0 4px 0; color: {TextMuted}; font-size: 11px;"">This is an automated security notification from CredVault.</p>
+                            <p style=""margin: 0; color: {TextMuted}; font-size: 11px; opacity: 0.7;"">© {DateTime.UtcNow:yyyy} CredVault Systems · Intelligent Credit Tracking &amp; Protection</p>
                         </td>
                     </tr>
                 </table>
@@ -93,19 +88,19 @@ public static class EmailTemplates
     {
         var content = $@"
             <p style=""margin: 0 0 24px 0; font-size: 16px;"">Hello <strong>{EscapeHtml(fullName)}</strong>,</p>
-            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextColor};"">We're thrilled to have you join CredVault! Your account is now active, and you're ready to take control of your financial journey.</p>
+            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextPrimary};"">We're thrilled to have you join CredVault! Your account is now active, and you're ready to take control of your financial journey.</p>
             <div style=""background-color: #FFFFFF; border: 1px solid {BorderColor}; border-radius: 12px; padding: 24px; margin-bottom: 32px;"">
-                <h3 style=""margin: 0 0 16px 0; color: {TextColor}; font-size: 16px; font-weight: 600;"">Account Overview</h3>
+                <h3 style=""margin: 0 0 16px 0; color: {TextPrimary}; font-size: 16px; font-weight: 600;"">Account Overview</h3>
                 <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"">
-                    <tr><td style=""padding: 8px 0; color: {MutedColor}; font-size: 14px;"">Registered Email</td><td style=""padding: 8px 0; color: {TextColor}; font-size: 14px; font-weight: 600; text-align: right;"">{EscapeHtml(email)}</td></tr>
-                    <tr><td style=""padding: 8px 0; color: {MutedColor}; font-size: 14px;"">Member Since</td><td style=""padding: 8px 0; color: {TextColor}; font-size: 14px; font-weight: 600; text-align: right;"">{DateTime.UtcNow:MMMM yyyy}</td></tr>
+                    <tr><td style=""padding: 8px 0; color: {TextMuted}; font-size: 14px;"">Registered Email</td><td style=""padding: 8px 0; color: {TextPrimary}; font-size: 14px; font-weight: 600; text-align: right;"">{EscapeHtml(email)}</td></tr>
+                    <tr><td style=""padding: 8px 0; color: {TextMuted}; font-size: 14px;"">Member Since</td><td style=""padding: 8px 0; color: {TextPrimary}; font-size: 14px; font-weight: 600; text-align: right;"">{DateTime.UtcNow:MMMM yyyy}</td></tr>
                 </table>
             </div>
-            <h3 style=""margin: 0 0 16px 0; color: {TextColor}; font-size: 16px; font-weight: 600;"">Get Started in 3 Steps:</h3>
+            <h3 style=""margin: 0 0 16px 0; color: {TextPrimary}; font-size: 16px; font-weight: 600;"">Get Started in 3 Steps:</h3>
             <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""margin-bottom: 16px;"">
-                <tr><td width=""40"" valign=""top"" style=""padding-bottom: 16px;""><div style=""width: 24px; height: 24px; background-color: {PrimaryLight}; color: {PrimaryColor}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 700;"">1</div></td><td style=""padding-bottom: 16px;""><p style=""margin: 0; font-size: 15px; font-weight: 600;"">Link your cards</p><p style=""margin: 4px 0 0 0; font-size: 14px; color: {MutedColor};"">Add your credit cards to see all transactions in one place.</p></td></tr>
-                <tr><td width=""40"" valign=""top"" style=""padding-bottom: 16px;""><div style=""width: 24px; height: 24px; background-color: {PrimaryLight}; color: {PrimaryColor}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 700;"">2</div></td><td style=""padding-bottom: 16px;""><p style=""margin: 0; font-size: 15px; font-weight: 600;"">Set up reminders</p><p style=""margin: 4px 0 0 0; font-size: 14px; color: {MutedColor};"">Never miss a due date with smart automated alerts.</p></td></tr>
-                <tr><td width=""40"" valign=""top""><div style=""width: 24px; height: 24px; background-color: {PrimaryLight}; color: {PrimaryColor}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 700;"">3</div></td><td><p style=""margin: 0; font-size: 15px; font-weight: 600;"">Maximize rewards</p><p style=""margin: 4px 0 0 0; font-size: 14px; color: {MutedColor};"">Discover which card to use for every purchase to get top points.</p></td></tr>
+                <tr><td width=""40"" valign=""top"" style=""padding-bottom: 16px;""><div style=""width: 24px; height: 24px; background-color: {BrandLight}; color: {BrandColor}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 700;"">1</div></td><td style=""padding-bottom: 16px;""><p style=""margin: 0; font-size: 15px; font-weight: 600;"">Link your cards</p><p style=""margin: 4px 0 0 0; font-size: 14px; color: {TextMuted};"">Add your credit cards to see all transactions in one place.</p></td></tr>
+                <tr><td width=""40"" valign=""top"" style=""padding-bottom: 16px;""><div style=""width: 24px; height: 24px; background-color: {BrandLight}; color: {BrandColor}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 700;"">2</div></td><td style=""padding-bottom: 16px;""><p style=""margin: 0; font-size: 15px; font-weight: 600;"">Set up reminders</p><p style=""margin: 4px 0 0 0; font-size: 14px; color: {TextMuted};"">Never miss a due date with smart automated alerts.</p></td></tr>
+                <tr><td width=""40"" valign=""top""><div style=""width: 24px; height: 24px; background-color: {BrandLight}; color: {BrandColor}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 700;"">3</div></td><td><p style=""margin: 0; font-size: 15px; font-weight: 600;"">Maximize rewards</p><p style=""margin: 4px 0 0 0; font-size: 14px; color: {TextMuted};"">Discover which card to use for every purchase to get top points.</p></td></tr>
             </table>";
 
         return BaseTemplate("Welcome to CredVault!", "Your financial management, elevated.", content, "Security Tip: We will never ask for your password via email. Always log in directly at credvault.app.");
@@ -116,10 +111,10 @@ public static class EmailTemplates
         var expiresAtIst = ConvertToIst(expiresAt);
         var content = $@"
             <p style=""margin: 0 0 24px 0; font-size: 16px;"">Hello <strong>{EscapeHtml(fullName)}</strong>,</p>
-            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextColor};"">To complete your <strong>{EscapeHtml(purpose)}</strong>, please use the following secure verification code:</p>
+            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextPrimary};"">To complete your <strong>{EscapeHtml(purpose)}</strong>, please use the following secure verification code:</p>
             <div style=""text-align: center; margin: 40px 0;"">
-                <div style=""display: inline-block; background-color: {BgColor}; border: 2px dashed {PrimaryColor}; padding: 24px 48px; border-radius: 16px;"">
-                    <span style=""font-size: 36px; font-weight: 800; color: {PrimaryColor}; letter-spacing: 8px; font-family: 'Courier New', monospace;"">{EscapeHtml(otpCode)}</span>
+                <div style=""display: inline-block; background-color: {BgPage}; border: 2px dashed {BrandColor}; padding: 24px 48px; border-radius: 16px;"">
+                    <span style=""font-size: 36px; font-weight: 800; color: {BrandColor}; letter-spacing: 8px; font-family: 'Courier New', monospace;"">{EscapeHtml(otpCode)}</span>
                 </div>
             </div>
             <div style=""background-color: #FFFBEB; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; border: 1px solid #FEF3C7;"">
@@ -127,7 +122,7 @@ public static class EmailTemplates
                     <tr><td width=""24"" valign=""top"" style=""padding-top: 2px;"">⚠️</td><td style=""padding-left: 12px;""><p style=""margin: 0; color: #92400E; font-size: 14px; line-height: 1.4;""><strong>Security Code Expiry:</strong><br>This code will expire on <strong>{expiresAtIst:MMM dd, yyyy}</strong> at <strong>{expiresAtIst:hh:mm tt} IST</strong>.</p></td></tr>
                 </table>
             </div>
-            <p style=""margin: 0; color: {MutedColor}; font-size: 14px; text-align: center;"">If you didn't request this code, you can safely ignore this email.</p>";
+            <p style=""margin: 0; color: {TextMuted}; font-size: 14px; text-align: center;"">If you didn't request this code, you can safely ignore this email.</p>";
 
         return BaseTemplate("Verification Code", "Secure your account with this one-time password.", content);
     }
@@ -137,7 +132,7 @@ public static class EmailTemplates
         var expiresAtIst = ConvertToIst(expiresAt);
         var content = $@"
             <p style=""margin: 0 0 24px 0; font-size: 16px;"">Hello <strong>{EscapeHtml(fullName)}</strong>,</p>
-            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextColor};"">We received a request to reset your password. If this was you, use the code below to proceed:</p>
+            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextPrimary};"">We received a request to reset your password. If this was you, use the code below to proceed:</p>
             <div style=""text-align: center; margin: 40px 0;"">
                 <div style=""display: inline-block; background-color: #FEF2F2; border: 2px solid {ErrorColor}; padding: 24px 48px; border-radius: 16px;"">
                     <span style=""font-size: 36px; font-weight: 800; color: {ErrorColor}; letter-spacing: 8px; font-family: 'Courier New', monospace;"">{EscapeHtml(otpCode)}</span>
@@ -157,16 +152,16 @@ public static class EmailTemplates
         var content = $@"
             <p style=""margin: 0 0 24px 0; font-size: 16px;"">Hello <strong>{EscapeHtml(fullName)}</strong>,</p>
             <p style=""margin: 0 0 24px 0; font-size: 16px;"">A payment request for <strong>₹{amount:N2}</strong> requires your authorization.</p>
-            <div style=""background-color: {BgColor}; border-radius: 16px; padding: 32px; margin-bottom: 32px; text-align: center; border: 1px solid {BorderColor};"">
-                <p style=""margin: 0 0 8px 0; color: {MutedColor}; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;"">Transaction Amount</p>
-                <p style=""margin: 0; color: {TextColor}; font-size: 36px; font-weight: 800;"">₹{amount:N2}</p>
+            <div style=""background-color: {BgPage}; border-radius: 16px; padding: 32px; margin-bottom: 32px; text-align: center; border: 1px solid {BorderColor};"">
+                <p style=""margin: 0 0 8px 0; color: {TextMuted}; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;"">Transaction Amount</p>
+                <p style=""margin: 0; color: {TextPrimary}; font-size: 36px; font-weight: 800;"">₹{amount:N2}</p>
             </div>
             <div style=""text-align: center; margin: 32px 0;"">
-                <p style=""margin: 0 0 16px 0; color: {MutedColor}; font-size: 14px;"">Verification Code</p>
-                <div style=""display: inline-block; background-color: {PrimaryColor}; padding: 20px 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);"">
+                <p style=""margin: 0 0 16px 0; color: {TextMuted}; font-size: 14px;"">Verification Code</p>
+                <div style=""display: inline-block; background-color: {BrandColor}; padding: 20px 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);"">
                     <span style=""font-size: 32px; font-weight: 800; color: #FFFFFF; letter-spacing: 6px; font-family: 'Courier New', monospace;"">{EscapeHtml(otpCode)}</span>
                 </div>
-                <p style=""margin: 16px 0 0 0; color: {MutedColor}; font-size: 13px;"">Expires at {expiresAtIst:hh:mm tt} IST</p>
+                <p style=""margin: 16px 0 0 0; color: {TextMuted}; font-size: 13px;"">Expires at {expiresAtIst:hh:mm tt} IST</p>
             </div>";
 
         return BaseTemplate("Payment Authorization", "Final step to complete your transaction.", content, "Always verify the amount and merchant before entering your OTP.");
@@ -174,21 +169,21 @@ public static class EmailTemplates
 
     public static string PaymentCompleted(string fullName, decimal amount, decimal amountPaid, decimal rewardsRedeemed, string paymentId)
     {
-        var rewardsHtml = rewardsRedeemed > 0 ? $@"<tr><td style=""padding: 8px 0; color: {MutedColor}; font-size: 14px;"">Rewards Applied</td><td style=""padding: 8px 0; color: {SuccessColor}; font-size: 14px; font-weight: 600; text-align: right;"">-₹{rewardsRedeemed:N2}</td></tr>" : "";
+        var rewardsHtml = rewardsRedeemed > 0 ? $@"<tr><td style=""padding: 8px 0; color: {TextMuted}; font-size: 14px;"">Rewards Applied</td><td style=""padding: 8px 0; color: {SuccessColor}; font-size: 14px; font-weight: 600; text-align: right;"">-₹{rewardsRedeemed:N2}</td></tr>" : "";
         var content = $@"
             <div style=""text-align: center; margin-bottom: 32px;"">
                 <div style=""display: inline-block; width: 80px; height: 80px; background-color: #ECFDF5; border-radius: 50%; text-align: center; line-height: 80px; margin-bottom: 24px;""><span style=""font-size: 40px;"">✅</span></div>
                 <h2 style=""margin: 0; color: {SuccessColor}; font-size: 26px; font-weight: 800;"">Payment Successful</h2>
-                <p style=""margin: 8px 0 0 0; color: {MutedColor}; font-size: 15px;"">Transaction ID: {EscapeHtml(paymentId)}</p>
+                <p style=""margin: 8px 0 0 0; color: {TextMuted}; font-size: 15px;"">Transaction ID: {EscapeHtml(paymentId)}</p>
             </div>
             <div style=""background-color: #FFFFFF; border: 1px solid {BorderColor}; border-radius: 16px; padding: 24px; margin-bottom: 32px;"">
                 <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"">
-                    <tr><td style=""padding: 12px 0; color: {MutedColor}; font-size: 14px;"">Amount Paid</td><td style=""padding: 12px 0; color: {TextColor}; font-size: 20px; font-weight: 700; text-align: right;"">₹{amountPaid:N2}</td></tr>
+                    <tr><td style=""padding: 12px 0; color: {TextMuted}; font-size: 14px;"">Amount Paid</td><td style=""padding: 12px 0; color: {TextPrimary}; font-size: 20px; font-weight: 700; text-align: right;"">₹{amountPaid:N2}</td></tr>
                     {rewardsHtml}
-                    <tr style=""border-top: 1px solid {BorderColor};""><td style=""padding: 16px 0 0 0; color: {TextColor}; font-size: 16px; font-weight: 600;"">Total Bill Settled</td><td style=""padding: 16px 0 0 0; color: {TextColor}; font-size: 16px; font-weight: 600; text-align: right;"">₹{amount:N2}</td></tr>
+                    <tr style=""border-top: 1px solid {BorderColor};""><td style=""padding: 16px 0 0 0; color: {TextPrimary}; font-size: 16px; font-weight: 600;"">Total Bill Settled</td><td style=""padding: 16px 0 0 0; color: {TextPrimary}; font-size: 16px; font-weight: 600; text-align: right;"">₹{amount:N2}</td></tr>
                 </table>
             </div>
-            <p style=""margin: 0; color: {TextColor}; font-size: 15px; text-align: center;"">Thank you for choosing CredVault. Your payment has been updated across your dashboard.</p>";
+            <p style=""margin: 0; color: {TextPrimary}; font-size: 15px; text-align: center;"">Thank you for choosing CredVault. Your payment has been updated across your dashboard.</p>";
 
         return BaseTemplate("Payment Confirmed", "Your transaction was processed successfully.", content, "A detailed receipt is available in your account dashboard under 'Transactions'.");
     }
@@ -199,19 +194,19 @@ public static class EmailTemplates
             <div style=""text-align: center; margin-bottom: 32px;"">
                 <div style=""display: inline-block; width: 80px; height: 80px; background-color: #FEF2F2; border-radius: 50%; text-align: center; line-height: 80px; margin-bottom: 24px;""><span style=""font-size: 40px;"">❌</span></div>
                 <h2 style=""margin: 0; color: {ErrorColor}; font-size: 26px; font-weight: 800;"">Payment Failed</h2>
-                <p style=""margin: 8px 0 0 0; color: {MutedColor}; font-size: 15px;"">Reference: {EscapeHtml(paymentId)}</p>
+                <p style=""margin: 8px 0 0 0; color: {TextMuted}; font-size: 15px;"">Reference: {EscapeHtml(paymentId)}</p>
             </div>
             <div style=""background-color: #FEF2F2; border-radius: 16px; padding: 24px; margin-bottom: 32px; border: 1px solid #FEE2E2;"">
                 <p style=""margin: 0 0 8px 0; color: {ErrorColor}; font-size: 14px; font-weight: 700; text-transform: uppercase;"">Failure Reason</p>
-                <p style=""margin: 0; color: {TextColor}; font-size: 16px; font-weight: 500;"">{EscapeHtml(reason)}</p>
+                <p style=""margin: 0; color: {TextPrimary}; font-size: 16px; font-weight: 500;"">{EscapeHtml(reason)}</p>
             </div>
             <div style=""background-color: #FFFFFF; border: 1px solid {BorderColor}; border-radius: 16px; padding: 24px; margin-bottom: 32px;"">
                 <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"">
-                    <tr><td style=""color: {MutedColor}; font-size: 14px;"">Attempted Amount</td><td style=""color: {TextColor}; font-size: 18px; font-weight: 700; text-align: right;"">₹{amount:N2}</td></tr>
+                    <tr><td style=""color: {TextMuted}; font-size: 14px;"">Attempted Amount</td><td style=""color: {TextPrimary}; font-size: 18px; font-weight: 700; text-align: right;"">₹{amount:N2}</td></tr>
                 </table>
             </div>
-            <h3 style=""margin: 0 0 16px 0; color: {TextColor}; font-size: 16px; font-weight: 600;"">What to do next?</h3>
-            <ul style=""margin: 0; padding-left: 20px; color: {MutedColor}; font-size: 14px;"">
+            <h3 style=""margin: 0 0 16px 0; color: {TextPrimary}; font-size: 16px; font-weight: 600;"">What to do next?</h3>
+            <ul style=""margin: 0; padding-left: 20px; color: {TextMuted}; font-size: 14px;"">
                 <li style=""margin-bottom: 8px;"">Verify your card limit and available balance.</li>
                 <li style=""margin-bottom: 8px;"">Check if your bank has blocked online transactions.</li>
                 <li>Ensure your OTP was entered correctly.</li>
@@ -226,8 +221,8 @@ public static class EmailTemplates
         var dueDateIst = ConvertToIst(dueDate);
         var content = $@"
             <p style=""margin: 0 0 24px 0; font-size: 16px;"">Hello <strong>{EscapeHtml(fullName)}</strong>,</p>
-            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextColor};"">Your latest credit card statement has been generated. Here's a summary of what's due:</p>
-            <div style=""background: linear-gradient(135deg, {PrimaryColor} 0%, {PrimaryDark} 100%); border-radius: 20px; padding: 40px; margin-bottom: 32px; color: #FFFFFF; box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.1);"">
+            <p style=""margin: 0 0 32px 0; font-size: 16px; color: {TextPrimary};"">Your latest credit card statement has been generated. Here's a summary of what's due:</p>
+            <div style=""background: linear-gradient(135deg, {BrandColor} 0%, {BrandDark} 100%); border-radius: 20px; padding: 40px; margin-bottom: 32px; color: #FFFFFF; box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.1);"">
                 <p style=""margin: 0 0 8px 0; font-size: 13px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1.5px;"">Total Amount Due</p>
                 <p style=""margin: 0 0 24px 0; font-size: 42px; font-weight: 800;"">₹{amount:N2}</p>
                 <table width=""100%"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px;"">
@@ -235,7 +230,7 @@ public static class EmailTemplates
                 </table>
             </div>
             <div style=""text-align: center; margin-bottom: 32px;"">
-                <a href=""#"" style=""display: inline-block; background-color: {PrimaryColor}; color: #FFFFFF; padding: 16px 40px; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none;"">Pay Bill Now</a>
+                <a href=""#"" style=""display: inline-block; background-color: {BrandColor}; color: #FFFFFF; padding: 16px 40px; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none;"">Pay Bill Now</a>
             </div>";
 
         return BaseTemplate("New Bill Statement", $"Your statement for {dueDateIst:MMMM} is ready.", content, "Early payments can help boost your credit score and increase your limit.");
@@ -246,8 +241,8 @@ public static class EmailTemplates
         var addedAtIst = ConvertToIst(addedAt);
         var content = $@"
             <div style=""text-align: center; margin-bottom: 32px;"">
-                <div style=""display: inline-block; width: 80px; height: 80px; background-color: {PrimaryLight}; border-radius: 50%; text-align: center; line-height: 80px; margin-bottom: 24px;""><span style=""font-size: 40px;"">🛡️</span></div>
-                <h2 style=""margin: 0; color: {TextColor}; font-size: 24px; font-weight: 800;"">Security Alert: Card Linked</h2>
+                <div style=""display: inline-block; width: 80px; height: 80px; background-color: {BrandLight}; border-radius: 50%; text-align: center; line-height: 80px; margin-bottom: 24px;""><span style=""font-size: 40px;"">🛡️</span></div>
+                <h2 style=""margin: 0; color: {TextPrimary}; font-size: 24px; font-weight: 800;"">Security Alert: Card Linked</h2>
             </div>
             <p style=""margin: 0 0 32px 0; font-size: 16px; text-align: center;"">Hello <strong>{EscapeHtml(fullName)}</strong>, a new card was successfully added to your secure wallet.</p>
             <div style=""background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-radius: 20px; padding: 32px; margin-bottom: 32px; color: #FFFFFF;"">
@@ -271,13 +266,13 @@ public static class EmailTemplates
                 <div style=""display: inline-block; width: 80px; height: 80px; background-color: #FFF7ED; border-radius: 50%; text-align: center; line-height: 80px; margin-bottom: 24px;""><span style=""font-size: 40px;"">🔒</span></div>
                 <h2 style=""margin: 0; color: {WarningColor}; font-size: 24px; font-weight: 800;"">Verification Failed</h2>
             </div>
-            <div style=""background-color: {BgColor}; border-radius: 16px; padding: 24px; margin-bottom: 32px; border: 1px solid {BorderColor};"">
-                <p style=""margin: 0 0 8px 0; color: {MutedColor}; font-size: 14px; font-weight: 700; text-transform: uppercase;"">Error Detail</p>
-                <p style=""margin: 0; color: {TextColor}; font-size: 16px; font-weight: 500;"">{EscapeHtml(reason)}</p>
+            <div style=""background-color: {BgPage}; border-radius: 16px; padding: 24px; margin-bottom: 32px; border: 1px solid {BorderColor};"">
+                <p style=""margin: 0 0 8px 0; color: {TextMuted}; font-size: 14px; font-weight: 700; text-transform: uppercase;"">Error Detail</p>
+                <p style=""margin: 0; color: {TextPrimary}; font-size: 16px; font-weight: 500;"">{EscapeHtml(reason)}</p>
             </div>
-            <p style=""margin: 0 0 24px 0; font-size: 15px; color: {TextColor};"">For your security, we've blocked this verification attempt. This usually happens when the code has expired or was entered incorrectly too many times.</p>
-            <div style=""background-color: {PrimaryLight}; border-radius: 12px; padding: 16px 20px;"">
-                <p style=""margin: 0; color: {PrimaryDark}; font-size: 14px;""><strong>How to resolve:</strong> Please return to the app and request a fresh OTP code.</p>
+            <p style=""margin: 0 0 24px 0; font-size: 15px; color: {TextPrimary};"">For your security, we've blocked this verification attempt. This usually happens when the code has expired or was entered incorrectly too many times.</p>
+            <div style=""background-color: {BrandLight}; border-radius: 12px; padding: 16px 20px;"">
+                <p style=""margin: 0; color: {BrandDark}; font-size: 14px;""><strong>How to resolve:</strong> Please return to the app and request a fresh OTP code.</p>
             </div>";
 
         return BaseTemplate("Security Alert", "An unsuccessful verification attempt was detected.", content);

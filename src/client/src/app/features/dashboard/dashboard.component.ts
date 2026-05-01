@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { AdminService } from '../../core/services/admin.service';
@@ -19,7 +19,7 @@ import { formatIstDate, getUtcTimestamp } from '../../core/utils/date-time.util'
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private dashboardService = inject(DashboardService);
   private adminService = inject(AdminService);
   private authService = inject(AuthService);
@@ -29,6 +29,9 @@ export class DashboardComponent implements OnInit {
   transactions = signal<CardTransaction[]>([]);
   issuers = signal<any[]>([]);
   isLoading = signal(true);
+  
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly refreshIntervalMs = 30000; // 30 seconds
   
   user = this.authService.currentUser;
   
@@ -55,6 +58,15 @@ export class DashboardComponent implements OnInit {
   ngOnInit(): void {
     this.loadDashboardData();
     this.loadIssuers();
+    // Auto-refresh every 30 seconds
+    this.refreshTimer = setInterval(() => this.loadDashboardData(), this.refreshIntervalMs);
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
   loadDashboardData(): void {

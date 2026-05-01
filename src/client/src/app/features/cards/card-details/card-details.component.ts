@@ -307,7 +307,10 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
           this.submitError.set(res.message || 'Transaction failed');
         }
       },
-      error: (err: any) => this.submitError.set('Network error. Is the backend running?')
+      error: (err: any) => {
+        const backendMessage = err?.error?.message || err?.error?.data?.message || err?.message;
+        this.submitError.set(backendMessage || 'Transaction could not be processed. Please try again.');
+      }
     });
   }
 
@@ -574,6 +577,7 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
         } else {
           this.paymentError.set(res.message || 'Failed to initiate payment');
           this.paymentStage.set('initiated');
+          this.scrollToError();
         }
       },
       error: (err: any) => {
@@ -582,8 +586,18 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
           || err?.message;
         this.paymentError.set(backendMessage || 'Network error. Please try again.');
         this.paymentStage.set('initiated');
+        this.scrollToError();
       }
     });
+  }
+
+  private scrollToError(): void {
+    setTimeout(() => {
+      const errorBox = document.getElementById('payment-error-box');
+      if (errorBox) {
+        errorBox.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }, 100);
   }
 
   verifyOtp(): void {
@@ -742,4 +756,24 @@ export class CardDetailsComponent implements OnInit, OnDestroy {
     const bill = this.currentBill();
     return bill !== null && bill !== undefined;
   });
+
+  /** Detect if the error is a wallet balance issue */
+  isWalletInsufficientError(message: string): boolean {
+    return message.toLowerCase().includes('insufficient wallet balance') || 
+           message.toLowerCase().includes('wallet balance');
+  }
+
+  /** Extract a user-friendly message from the wallet error */
+  getWalletErrorMessage(message: string): string {
+    // Parse "Available: 0.00, required: 11000.00" style messages
+    const availableMatch = message.match(/available:\s*([0-9,.]+)/i);
+    const requiredMatch = message.match(/required:\s*([0-9,.]+)/i);
+    if (availableMatch && requiredMatch) {
+      const available = parseFloat(availableMatch[1].replace(',', ''));
+      const required = parseFloat(requiredMatch[1].replace(',', ''));
+      const deficit = (required - available).toFixed(2);
+      return `Your wallet balance is ₹${available.toLocaleString('en-IN', {minimumFractionDigits: 2})}. You need ₹${deficit} more to complete this payment. Please top up your wallet first.`;
+    }
+    return 'Your wallet balance is insufficient for this payment. Please top up your wallet and try again.';
+  }
 }

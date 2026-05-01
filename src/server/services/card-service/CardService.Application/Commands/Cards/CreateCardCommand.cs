@@ -3,10 +3,8 @@ using CardService.Application.Common;
 using Shared.Contracts.DTOs.Card.Responses;
 using CardService.Domain.Entities;
 using Shared.Contracts.Enums;
-using Shared.Contracts.Events.Card;
 using Shared.Contracts.Models;
 using MediatR;
-using MassTransit;
 using Microsoft.Extensions.Logging;
 
 namespace CardService.Application.Commands.Cards;
@@ -22,7 +20,7 @@ public sealed record CreateCardCommand(
     string EncryptedCardNumber,
     string? UserEmail = null) : IRequest<CardResult>;
 
-public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndpoint publisher, ILogger<CreateCardCommandHandler> logger) : IRequestHandler<CreateCardCommand, CardResult>
+public sealed class CreateCardCommandHandler(ICardRepository cards, ILogger<CreateCardCommandHandler> logger) : IRequestHandler<CreateCardCommand, CardResult>
 {
     public async Task<CardResult> Handle(CreateCardCommand request, CancellationToken ct)
     {
@@ -107,13 +105,7 @@ public sealed class CreateCardCommandHandler(ICardRepository cards, IPublishEndp
 
         if (card.IsDefault) await cards.UnsetDefaultForUserAsync(request.UserId, null, ct);
         await cards.AddAsync(card, ct);
-        logger.LogInformation("Card created: {CardId}, UserId={UserId}, Last4={Last4}", card.Id, request.UserId, last4);
-
-        var userEmail = request.UserEmail?.Trim() ?? string.Empty;
-        var userName = request.CardholderName.Trim();
-
-        await publisher.Publish<ICardAdded>(new { CardId = card.Id, UserId = card.UserId, Email = userEmail, FullName = userName, CardNumberLast4 = card.Last4, CardHolderName = card.CardholderName, AddedAt = card.CreatedAtUtc }, ct);
-        logger.LogInformation("Published ICardAdded for {CardId}", card.Id);
+        logger.LogInformation("Card created: {CardId}, UserId={UserId}, Last4={Last4} — pending admin approval", card.Id, request.UserId, last4);
 
         return new() { Success = true, Message = "Card created", Card = CardMapping.ToDto(card) };
     }

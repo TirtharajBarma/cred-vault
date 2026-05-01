@@ -24,7 +24,7 @@
           <div class="flex justify-between items-start mb-6">
             <div>
               <span class="text-[0.65rem] font-bold uppercase tracking-widest text-[#615e5c] block mb-1">Points Balance</span>
-              <div class="text-4xl font-headline font-extrabold text-[#1b1c1c]">{{ rewardAccount()?.pointsBalance | number:'1.0-2' }} <span class="text-lg font-medium text-[#615e5c]">pts</span></div>
+              <div class="text-4xl font-headline font-extrabold text-[#1b1c1c]">{{ (rewardAccount()?.pointsBalance ?? 0) | number:'1.0-2' }} <span class="text-lg font-medium text-[#615e5c]">pts</span></div>
             </div>
           </div>
           @let active = getActiveRateInfo();
@@ -168,9 +168,6 @@
               Retry <span class="material-symbols-outlined text-lg">refresh</span>
             </button>
           }
-          <button class="text-xs font-bold text-secondary uppercase tracking-widest flex items-center gap-2 hover:text-[#8a5100] transition-colors">
-            Download Report <span class="material-symbols-outlined text-lg">download</span>
-          </button>
         </div>
       </div>
 

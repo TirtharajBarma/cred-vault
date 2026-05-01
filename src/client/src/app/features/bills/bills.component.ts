@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -26,7 +26,7 @@ import { environment } from '../../../environments/environment';
   templateUrl: './bills.component.html',
   styleUrls: ['./bills.component.css']
 })
-export class BillsComponent implements OnInit {
+export class BillsComponent implements OnInit, OnDestroy {
   private billingService = inject(BillingService);
   private dashboardService = inject(DashboardService);
   private paymentService = inject(PaymentService);
@@ -43,6 +43,7 @@ export class BillsComponent implements OnInit {
   filterStatus = signal<number | 'due' | null>(null);
   currentPage = signal(1);
   itemsPerPage = 7;
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   showPaymentModal = signal(false);
   selectedBill = signal<Bill | null>(null);
@@ -537,14 +538,26 @@ export class BillsComponent implements OnInit {
         } else {
           this.errorMessage.set(res.message || 'Payment initiation failed');
           this.paymentStage.set('initiated');
+          this.scrollToError();
         }
       },
       error: (err) => {
         this.isProcessing.set(false);
-        this.errorMessage.set(err?.error?.message || 'Server error');
+        const backendMessage = err?.error?.message || err?.error?.data?.message || err?.message;
+        this.errorMessage.set(backendMessage || 'Failed to initiate payment. Please try again.');
         this.paymentStage.set('initiated');
+        this.scrollToError();
       }
     });
+  }
+
+  private scrollToError(): void {
+    setTimeout(() => {
+      const errorBox = document.getElementById('payment-error-box');
+      if (errorBox) {
+        errorBox.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }, 100); // 100ms gives Angular enough time to render the *ngIf / @if block
   }
 
   verifyOtp(): void {
@@ -588,6 +601,11 @@ export class BillsComponent implements OnInit {
   ngOnInit(): void {
     this.loadData();
     this.loadWalletBalance();
+    this.refreshTimer = setInterval(() => this.loadData(), 30000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; }
   }
 
   loadData(): void {
@@ -630,5 +648,24 @@ export class BillsComponent implements OnInit {
   setFilter(status: number | 'due' | null): void {
     this.filterStatus.set(status);
     this.currentPage.set(1);
+  }
+
+  /** Detect if the error is a wallet balance issue */
+  isWalletInsufficientError(message: string): boolean {
+    return message.toLowerCase().includes('insufficient wallet balance') ||
+           message.toLowerCase().includes('wallet balance');
+  }
+
+  /** Extract a user-friendly message from the wallet error */
+  getWalletErrorMessage(message: string): string {
+    const availableMatch = message.match(/available:\s*([0-9,.]+)/i);
+    const requiredMatch = message.match(/required:\s*([0-9,.]+)/i);
+    if (availableMatch && requiredMatch) {
+      const available = parseFloat(availableMatch[1].replace(',', ''));
+      const required = parseFloat(requiredMatch[1].replace(',', ''));
+      const deficit = (required - available).toFixed(2);
+      return `Your wallet balance is ₹${available.toLocaleString('en-IN', {minimumFractionDigits: 2})}. You need ₹${deficit} more to complete this payment. Please top up your wallet first.`;
+    }
+    return 'Your wallet balance is insufficient for this payment. Please top up your wallet and try again.';
   }
 }
