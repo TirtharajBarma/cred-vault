@@ -181,45 +181,57 @@
         </div>
       } @else {
         <div class="glass-card rounded-[2rem] overflow-hidden border border-outline-variant/10 shadow-sm">
-          <table class="w-full text-left">
-            <thead class="sticky top-0 bg-surface-container-low/90 backdrop-blur-sm z-10">
-              <tr>
-                <th class="px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary">Date</th>
-                <th class="px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary">Activity</th>
-                <th class="px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary">Type</th>
-                <th class="px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary text-right">Points</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-outline-variant/10">
-              @if (isLoading()) {
-                @for (i of [1,2,3,4,5]; track i) {
-                  <tr>
-                    <td colspan="4" class="px-8 py-6">
-                      <div class="h-6 bg-mist-sand/30 skeleton rounded w-full"></div>
-                    </td>
-                  </tr>
-                }
-              } @else if (transactions().length > 0) {
-                @for (tx of paginatedTransactions(); track tx.id) {
-                  <tr class="hover:bg-surface-container-low/30 transition-colors">
-                    <td class="px-8 py-6 text-sm font-medium text-secondary">{{ tx.createdAtUtc | istDate:'MMM dd, yyyy' }}</td>
-                    <td class="px-8 py-6 text-sm font-bold text-on-surface">{{ getRewardActivityLabel(tx) }}</td>
-                    <td class="px-8 py-6">
-                      @let typeInfo = getTransactionTypeLabel(tx);
-                      <span class="px-3 py-1 rounded-full text-[0.6rem] font-bold uppercase tracking-wider" [class]="typeInfo.cssClass">{{ typeInfo.label }}</span>
-                    </td>
-                    <td class="px-8 py-6 text-sm font-extrabold text-right" [class]="(tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) ? 'text-red-500' : 'text-emerald-600'">
-                      {{ getTransactionPointsDisplay(tx) | number }}
-                    </td>
-                  </tr>
-                }
-              } @else {
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead class="sticky top-0 bg-surface-container-low/90 backdrop-blur-sm z-10">
                 <tr>
-                  <td colspan="4" class="px-8 py-12 text-center text-[#615e5c]">No reward transactions found.</td>
+                  <th class="px-4 md:px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary">Date</th>
+                  <th class="px-4 md:px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary">Activity</th>
+                  <th class="px-4 md:px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary">Type</th>
+                  <th class="px-4 md:px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary text-right">Points</th>
+                  <th class="px-4 md:px-8 py-5 text-[0.65rem] font-black uppercase tracking-widest text-secondary text-right">Balance Change</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="divide-y divide-outline-variant/10">
+                @if (isLoading()) {
+                  @for (i of [1,2,3,4,5]; track i) {
+                    <tr>
+                      <td colspan="5" class="px-4 md:px-8 py-6">
+                        <div class="h-6 bg-mist-sand/30 skeleton rounded w-full"></div>
+                      </td>
+                    </tr>
+                  }
+                } @else if (transactions().length > 0) {
+                  @for (tx of paginatedTransactions(); track tx.id) {
+                    <tr class="hover:bg-surface-container-low/30 transition-colors">
+                      <td class="px-4 md:px-8 py-6 text-sm font-medium text-secondary whitespace-nowrap">{{ tx.createdAtUtc | istDate:'MMM dd, yyyy' }}</td>
+                      <td class="px-4 md:px-8 py-6 text-sm font-bold text-on-surface">{{ getRewardActivityLabel(tx) }}</td>
+                      <td class="px-4 md:px-8 py-6">
+                        @let typeInfo = getTransactionTypeLabel(tx);
+                        <span class="px-3 py-1 rounded-full text-[0.6rem] font-bold uppercase tracking-wider" [class]="typeInfo.cssClass">{{ typeInfo.label }}</span>
+                      </td>
+                      <td class="px-4 md:px-8 py-6 text-sm font-extrabold text-right" [class]="(tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) ? 'text-red-500' : 'text-emerald-600'">
+                        {{ getTransactionPointsDisplay(tx) | number }}
+                      </td>
+                      <td class="px-4 md:px-8 py-6 text-sm font-medium text-right">
+                        @let balanceInfo = getTransactionBalanceInfo(tx);
+                        @let isDebit = (tx.type === 2 || tx.type === 3 || tx.reversedAtUtc);
+                        <span [class]="isDebit ? 'text-red-500' : 'text-emerald-600'">
+                          <span class="opacity-50">{{ balanceInfo.oldBalance }}</span>
+                          <span class="mx-1 opacity-40">→</span>
+                          <span class="font-bold">{{ balanceInfo.newBalance }}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                } @else {
+                  <tr>
+                    <td colspan="5" class="px-4 md:px-8 py-12 text-center text-[#615e5c]">No reward transactions found.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
           
           <!-- Pagination -->
           @if (transactions().length > transactionsPerPage) {

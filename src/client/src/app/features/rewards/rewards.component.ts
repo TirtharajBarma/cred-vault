@@ -1,6 +1,7 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, signal, inject, computed, OnDestroy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { catchError, forkJoin, of } from 'rxjs';
+import { catchError, forkJoin, of, Subscription, timer } from 'rxjs';
+import { switchMap, tap } from 'rxjs/operators';
 import { RewardsService, RewardAccount, RewardTransaction, RewardTier } from '../../core/services/rewards.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { AdminService } from '../../core/services/admin.service';
@@ -15,11 +16,12 @@ import { getUtcTimestamp } from '../../core/utils/date-time.util';
   templateUrl: './rewards.component.html',
   styleUrls: ['./rewards.component.css']
 })
-export class RewardsComponent implements OnInit {
+export class RewardsComponent implements OnInit, OnDestroy {
   private rewardsService = inject(RewardsService);
   private dashboardService = inject(DashboardService);
   private adminService = inject(AdminService);
   private billingService = inject(BillingService);
+  private ngZone = inject(NgZone);
 
   Math = Math;
 
@@ -31,6 +33,7 @@ export class RewardsComponent implements OnInit {
   brokenNetworkLogos = signal<Record<string, true>>({});
   isLoading = signal(true);
   error = signal<string | null>(null);
+  private refreshSubscription?: Subscription;
 
   tiersPage = signal(1);
   tiersPerPage = 3;
@@ -61,6 +64,79 @@ export class RewardsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadData();
+    this.startAutoRefresh();
+  }
+
+  private startAutoRefresh(): void {
+    this.refreshSubscription = timer(15000, 15000).pipe(
+      switchMap(() => this.loadDataSilently())
+    ).subscribe();
+  }
+
+  private loadDataSilently() {
+    return forkJoin({
+      account: this.rewardsService.getRewardAccount().pipe(
+        catchError(() => of({ success: false, message: 'Failed to load account', data: null, traceId: '' }))
+      ),
+      history: this.rewardsService.getRewardHistory().pipe(
+        catchError(() => of({ success: false, message: 'Failed to load history', data: [], traceId: '' }))
+      ),
+      tiers: this.rewardsService.getRewardTiers().pipe(
+        catchError(() => of({ success: false, message: 'Failed to load tiers', data: [], traceId: '' }))
+      ),
+      cards: this.dashboardService.getCards().pipe(
+        catchError(() => of({ success: false, message: 'Failed to load cards', data: [], traceId: '' }))
+      ),
+      bills: this.billingService.getMyBills().pipe(
+        catchError(() => of({ success: false, message: 'Failed to load bills', data: [], traceId: '' }))
+      ),
+      issuers: this.adminService.getIssuers().pipe(
+        catchError(() => of({ success: false, message: 'Failed to load issuers', data: [], traceId: '' }))
+      )
+    }).pipe(
+      tap((res) => {
+        if (res.account.success && res.account.data) {
+          this.rewardAccount.set(res.account.data);
+        }
+        this.transactions.set(res.history.data || []);
+        this.rewardTiers.set(res.tiers.data || []);
+
+        const cards = res.cards.data || [];
+        const bills = res.bills.data || [];
+        const issuers = res.issuers.data || [];
+
+        const cardLabelById: Record<string, string> = {};
+        const issuerNameById: Record<string, string> = {};
+
+        issuers.forEach(issuer => {
+          if (issuer.id && issuer.name) {
+            issuerNameById[issuer.id] = issuer.name;
+          }
+        });
+
+        cards.forEach(card => {
+          cardLabelById[card.id] = `${card.issuerName || 'Card'} \u2022\u2022\u2022\u2022 ${card.last4}`;
+          if (card.issuerId && card.issuerName && !issuerNameById[card.issuerId]) {
+            issuerNameById[card.issuerId] = card.issuerName;
+          }
+        });
+
+        const map: Record<string, string> = {};
+        bills.forEach(bill => {
+          map[bill.id] = cardLabelById[bill.cardId] || 'Card';
+        });
+
+        this.issuerMap.set(issuerNameById);
+        this.rewardCardLabelMap.set(map);
+        this.computeBalanceInfo();
+      })
+    );
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshSubscription) {
+      this.refreshSubscription.unsubscribe();
+    }
   }
 
   loadData(): void {
@@ -122,6 +198,7 @@ export class RewardsComponent implements OnInit {
 
         this.issuerMap.set(issuerNameById);
         this.rewardCardLabelMap.set(map);
+        this.computeBalanceInfo();
         this.isLoading.set(false);
       },
       error: () => {
@@ -145,6 +222,45 @@ export class RewardsComponent implements OnInit {
     const sorted = this.sortedTransactions();
     const start = (this.transactionsPage() - 1) * this.transactionsPerPage;
     return sorted.slice(start, start + this.transactionsPerPage);
+  }
+
+  // Pre-compute balance info for all transactions
+  private balanceInfoCache = new Map<string, { oldBalance: number; newBalance: number }>();
+
+  private computeBalanceInfo(): void {
+    const currentBalance = this.rewardAccount()?.pointsBalance ?? 0;
+
+    // Sort transactions newest to oldest
+    const allTxs = [...this.transactions()].sort(
+      (a, b) => getUtcTimestamp(b.createdAtUtc) - getUtcTimestamp(a.createdAtUtc)
+    );
+
+    this.balanceInfoCache.clear();
+    let runningBalance = currentBalance;
+
+    for (const tx of allTxs) {
+      const points = this.getTransactionPointsValue(tx);
+      const newBalance = runningBalance;
+      const oldBalance = runningBalance - points;
+      this.balanceInfoCache.set(tx.id, { oldBalance, newBalance });
+      runningBalance = oldBalance;
+    }
+  }
+
+  getTransactionBalanceInfo(tx: RewardTransaction): { oldBalance: number; newBalance: number } {
+    // Recompute if needed
+    if (this.balanceInfoCache.size === 0 && this.transactions().length > 0) {
+      this.computeBalanceInfo();
+    }
+    return this.balanceInfoCache.get(tx.id) || { oldBalance: 0, newBalance: 0 };
+  }
+
+  private getTransactionPointsValue(tx: RewardTransaction): number {
+    const points = tx.points;
+    if (tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) {
+      return -points; // debit
+    }
+    return points; // credit
   }
 
   totalTransactionPages(): number {

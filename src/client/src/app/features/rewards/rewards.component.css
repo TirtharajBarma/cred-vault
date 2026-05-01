@@ -1,1 +1,18 @@
-/* Rewards Component specific styles - globals used from styles.css */
+/* Rewards Component specific styles */
+
+/* Mobile responsive table */
+@media (max-width: 768px) {
+  :host ::ng-deep table {
+    min-width: 100% !important;
+  }
+
+  :host ::ng-deep td, :host ::ng-deep th {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    font-size: 0.875rem;
+  }
+
+  :host ::ng-deep th {
+    font-size: 0.625rem;
+  }
+}
