@@ -24,7 +24,7 @@
           <div class="flex justify-between items-start mb-6">
             <div>
               <span class="text-[0.65rem] font-bold uppercase tracking-widest text-[#615e5c] block mb-1">Points Balance</span>
-              <div class="text-4xl font-headline font-extrabold text-[#1b1c1c]">{{ (rewardAccount()?.pointsBalance ?? 0) | number:'1.0-2' }} <span class="text-lg font-medium text-[#615e5c]">pts</span></div>
+              <div class="text-4xl font-headline font-extrabold text-[#1b1c1c]">{{ (rewardAccount()?.pointsBalance ?? 0) | number:'1.2-2' }} <span class="text-lg font-medium text-[#615e5c]">pts</span></div>
             </div>
           </div>
           @let active = getActiveRateInfo();
@@ -211,15 +211,16 @@
                         <span class="px-3 py-1 rounded-full text-[0.6rem] font-bold uppercase tracking-wider" [class]="typeInfo.cssClass">{{ typeInfo.label }}</span>
                       </td>
                       <td class="px-4 md:px-8 py-6 text-sm font-extrabold text-right" [class]="(tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) ? 'text-red-500' : 'text-emerald-600'">
-                        {{ getTransactionPointsDisplay(tx) | number }}
+                        @let pointsDelta = getTransactionPointsValue(tx);
+                        {{ pointsDelta > 0 ? '+' : '' }}{{ pointsDelta | number:'1.2-2' }}
                       </td>
                       <td class="px-4 md:px-8 py-6 text-sm font-medium text-right">
                         @let balanceInfo = getTransactionBalanceInfo(tx);
                         @let isDebit = (tx.type === 2 || tx.type === 3 || tx.reversedAtUtc);
                         <span [class]="isDebit ? 'text-red-500' : 'text-emerald-600'">
-                          <span class="opacity-50">{{ balanceInfo.oldBalance }}</span>
+                          <span class="opacity-50">{{ balanceInfo.oldBalance | number:'1.2-2' }}</span>
                           <span class="mx-1 opacity-40">→</span>
-                          <span class="font-bold">{{ balanceInfo.newBalance }}</span>
+                          <span class="font-bold">{{ balanceInfo.newBalance | number:'1.2-2' }}</span>
                         </span>
                       </td>
                     </tr>
