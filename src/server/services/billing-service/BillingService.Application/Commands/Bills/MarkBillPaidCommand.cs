@@ -152,6 +152,17 @@ public class MarkBillPaidCommandHandler(
             account.UpdatedAtUtc = now;
         }
 
+        // Ensure this transaction happens AFTER any existing redemptions for this bill
+        var billTransactions = await rewardRepository.GetTransactionsByBillIdAsync(bill.Id, cancellationToken);
+        if (billTransactions.Any())
+        {
+            var latestTimestamp = billTransactions.Max(x => x.CreatedAtUtc);
+            if (latestTimestamp >= now)
+            {
+                now = latestTimestamp.AddMilliseconds(1);
+            }
+        }
+
         // how many points already given to user
         var currentPoints = await rewardRepository.GetNetEarnedPointsForBillAsync(bill.Id, cancellationToken);
         var delta = targetPoints - currentPoints;       // how many new points to add

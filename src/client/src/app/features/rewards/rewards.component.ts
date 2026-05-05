@@ -212,8 +212,38 @@ export class RewardsComponent implements OnInit, OnDestroy {
     this.loadData();
   }
 
+  // Strictly chronological sorting: Oldest first
+  private getChronologicalTransactions(transactions: RewardTransaction[]): RewardTransaction[] {
+    return [...transactions].sort((a, b) => {
+      const at = getUtcTimestamp(a.createdAtUtc);
+      const bt = getUtcTimestamp(b.createdAtUtc);
+      
+      // If transactions belong to the same bill and occurred within 5 seconds,
+      // force the logical order: Redeem must happen before Earn.
+      // This overrides the raw database timestamp to fix async race conditions in older data.
+      if (a.billId && b.billId && a.billId === b.billId && Math.abs(at - bt) < 5000) {
+        const aIsDebit = this.isDebitTransaction(a);
+        const bIsDebit = this.isDebitTransaction(b);
+        if (aIsDebit !== bIsDebit) {
+          return aIsDebit ? -1 : 1; // Debit (Redeem) comes BEFORE Credit (Earn)
+        }
+      }
+      
+      if (at !== bt) return at - bt; // Primary: Time ASC
+      
+      // Secondary: For exactly same timestamp, REDEEMED (2) and REVERSED (3) come before EARNED (0) or ADJUSTED (1)
+      const aIsDebit2 = this.isDebitTransaction(a);
+      const bIsDebit2 = this.isDebitTransaction(b);
+      if (aIsDebit2 !== bIsDebit2) return aIsDebit2 ? -1 : 1; 
+
+      return a.id > b.id ? 1 : -1; // Tertiary: ID stability
+    });
+  }
+
   sortedTransactions() {
-    return this.getActivityHistoryTransactions(this.transactions());
+    // UI Display: Newest first
+    const chrono = this.getChronologicalTransactions(this.transactions());
+    return chrono.reverse();
   }
 
   paginatedTransactions() {
@@ -225,10 +255,6 @@ export class RewardsComponent implements OnInit, OnDestroy {
 
   // Pre-compute balance info for all transactions
   private balanceInfoCache = new Map<string, { oldBalance: number; newBalance: number }>();
-
-  private roundPoints(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
-  }
 
   private toCents(value: number): number {
     return Math.round((value + Number.EPSILON) * 100);
@@ -242,138 +268,44 @@ export class RewardsComponent implements OnInit, OnDestroy {
     return tx.type === 2 || tx.type === 3 || !!tx.reversedAtUtc;
   }
 
-  private readonly actionPairWindowMs = 2000;
-
-  private buildActivityActionGroups(transactions: RewardTransaction[]): Array<{ maxTs: number; items: RewardTransaction[] }> {
-    // Pair consecutive opposite-type entries for the same bill within a small time window.
-    // This models a single payment action producing two reward rows (credit + debit)
-    // even when they are split across adjacent seconds.
-    const byBill = new Map<string, RewardTransaction[]>();
-    for (const tx of transactions) {
-      const billId = tx.billId || 'no-bill';
-      const list = byBill.get(billId);
-      if (!list) {
-        byBill.set(billId, [tx]);
-      } else {
-        list.push(tx);
-      }
-    }
-
-    const groups: Array<{ maxTs: number; items: RewardTransaction[] }> = [];
-
-    for (const list of byBill.values()) {
-      const sorted = [...list].sort((a, b) => {
-        const at = getUtcTimestamp(a.createdAtUtc);
-        const bt = getUtcTimestamp(b.createdAtUtc);
-        if (at !== bt) return bt - at; // newest first
-        if (a.id === b.id) return 0;
-        return a.id > b.id ? 1 : -1;
-      });
-
-      for (let i = 0; i < sorted.length; i += 1) {
-        const first = sorted[i];
-        const firstTs = getUtcTimestamp(first.createdAtUtc);
-        const firstIsDebit = this.isDebitTransaction(first);
-
-        const second = sorted[i + 1];
-        if (second) {
-          const secondTs = getUtcTimestamp(second.createdAtUtc);
-          const secondIsDebit = this.isDebitTransaction(second);
-          const withinWindow = Math.abs(firstTs - secondTs) <= this.actionPairWindowMs;
-
-          if (withinWindow && firstIsDebit !== secondIsDebit) {
-            groups.push({ maxTs: Math.max(firstTs, secondTs), items: [first, second] });
-            i += 1; // consume the paired second item
-            continue;
-          }
-        }
-
-        groups.push({ maxTs: firstTs, items: [first] });
-      }
-    }
-
-    return groups.sort((a, b) => b.maxTs - a.maxTs);
-  }
-
-  private getActivityHistoryTransactions(transactions: RewardTransaction[]): RewardTransaction[] {
-    const groups = this.buildActivityActionGroups(transactions);
-
-    const result: RewardTransaction[] = [];
-    for (const group of groups) {
-      const displayItems = [...group.items].sort((a, b) => {
-        const aDebit = this.isDebitTransaction(a);
-        const bDebit = this.isDebitTransaction(b);
-        if (aDebit !== bDebit) return aDebit ? 1 : -1; // credit first
-
-        const at = getUtcTimestamp(a.createdAtUtc);
-        const bt = getUtcTimestamp(b.createdAtUtc);
-        if (at !== bt) return at - bt;
-
-        if (a.id === b.id) return 0;
-        return a.id > b.id ? 1 : -1;
-      });
-
-      result.push(...displayItems);
-    }
-
-    return result;
-  }
-
   private computeBalanceInfo(): void {
     const currentBalanceCents = this.toCents(this.rewardAccount()?.pointsBalance ?? 0);
-
-    // Rebuild using the same payment-action grouping used for rendering,
-    // but compute balances per group so the arrows reconcile even when we
-    // display credit -> debit inside the action.
     const txs = this.transactions();
     this.balanceInfoCache.clear();
 
-    const sortedGroups = this.buildActivityActionGroups(txs);
+    if (txs.length === 0) return;
 
-    let groupEndBalanceCents = currentBalanceCents;
+    // 1. Sort all transactions OLDER TO NEWER (ASC)
+    const chronoList = this.getChronologicalTransactions(txs);
 
-    for (const group of sortedGroups) {
-      const items = [...group.items];
-      const netDeltaCents = items.reduce((sum, tx) => sum + this.toCents(this.getTransactionPointsValue(tx)), 0);
-      const groupStartBalanceCents = groupEndBalanceCents - netDeltaCents;
+    // 2. Since we only have the CURRENT balance, work backwards through the chrono list
+    // to find the starting balance of this specific transaction set.
+    let runningCents = currentBalanceCents;
+    const transitions: Array<{ id: string; delta: number }> = [];
+    
+    // Iterate from Newest to Oldest (reverse chronological) to subtract deltas
+    for (let i = chronoList.length - 1; i >= 0; i--) {
+      const tx = chronoList[i];
+      const deltaCents = this.toCents(this.getTransactionPointsValue(tx));
+      transitions.push({ id: tx.id, delta: deltaCents });
+    }
 
-      // Ledger semantics within an action:
-      // 1) apply debits (redeem/reverse) first
-      // 2) then apply credits (earned/adjusted)
-      // UI can still render credits above debits (latest-first view), but the arrow values
-      // must reflect the real running balance.
-      const debits = items
-        .filter((tx) => this.isDebitTransaction(tx))
-        .sort((a, b) => getUtcTimestamp(a.createdAtUtc) - getUtcTimestamp(b.createdAtUtc));
-      const credits = items
-        .filter((tx) => !this.isDebitTransaction(tx))
-        .sort((a, b) => getUtcTimestamp(a.createdAtUtc) - getUtcTimestamp(b.createdAtUtc));
+    // 3. Now compute forward from the derived starting point
+    // This ensures that balanceBefore -> balanceAfter is consistent for every single row
+    // and correctly follows the "redeem -> earn" logic for same-bill events.
+    let currentLedgerBalanceCents = runningCents - transitions.reduce((sum, t) => sum + t.delta, 0);
 
-      let runningCents = groupStartBalanceCents;
-      for (const tx of debits) {
-        const deltaCents = this.toCents(this.getTransactionPointsValue(tx));
-        const oldBalanceCents = runningCents;
-        const newBalanceCents = runningCents + deltaCents;
-        this.balanceInfoCache.set(tx.id, {
-          oldBalance: this.fromCents(oldBalanceCents),
-          newBalance: this.fromCents(newBalanceCents)
-        });
-        runningCents = newBalanceCents;
-      }
+    for (const tx of chronoList) {
+      const deltaCents = this.toCents(this.getTransactionPointsValue(tx));
+      const oldBalanceCents = currentLedgerBalanceCents;
+      const newBalanceCents = currentLedgerBalanceCents + deltaCents;
 
-      for (const tx of credits) {
-        const deltaCents = this.toCents(this.getTransactionPointsValue(tx));
-        const oldBalanceCents = runningCents;
-        const newBalanceCents = runningCents + deltaCents;
-        this.balanceInfoCache.set(tx.id, {
-          oldBalance: this.fromCents(oldBalanceCents),
-          newBalance: this.fromCents(newBalanceCents)
-        });
-        runningCents = newBalanceCents;
-      }
+      this.balanceInfoCache.set(tx.id, {
+        oldBalance: this.fromCents(oldBalanceCents),
+        newBalance: this.fromCents(newBalanceCents)
+      });
 
-      // Move to the next older action.
-      groupEndBalanceCents = groupStartBalanceCents;
+      currentLedgerBalanceCents = newBalanceCents;
     }
   }
 
@@ -387,7 +319,7 @@ export class RewardsComponent implements OnInit, OnDestroy {
 
   getTransactionPointsValue(tx: RewardTransaction): number {
     const points = tx.points;
-    if (tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) {
+    if (this.isDebitTransaction(tx)) {
       return -points; // debit
     }
     return points; // credit
@@ -429,7 +361,7 @@ export class RewardsComponent implements OnInit, OnDestroy {
   }
 
   getTransactionPointsDisplay(tx: RewardTransaction): string {
-    const prefix = (tx.type === 2 || tx.type === 3 || tx.reversedAtUtc) ? '-' : '';
+    const prefix = this.isDebitTransaction(tx) ? '-' : '';
     return `${prefix}${tx.points}`;
   }
 

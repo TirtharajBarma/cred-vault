@@ -21,6 +21,7 @@ public interface IRewardRepository
     Task AddTransactionAsync(RewardTransaction transaction, CancellationToken cancellationToken = default);
     Task<decimal> GetNetEarnedPointsForBillAsync(Guid billId, CancellationToken cancellationToken = default);
     Task<bool> HasTransactionForBillAsync(Guid billId, CancellationToken cancellationToken = default);
+    Task<List<RewardTransaction>> GetTransactionsByBillIdAsync(Guid billId, CancellationToken cancellationToken = default);
     Task<RewardTransaction?> GetTransactionByBillIdAsync(Guid billId, CancellationToken cancellationToken = default);
     Task UpdateTransactionAsync(RewardTransaction transaction, CancellationToken cancellationToken = default);
     Task<bool> HasAccountsByTierAsync(Guid tierId, CancellationToken cancellationToken = default);

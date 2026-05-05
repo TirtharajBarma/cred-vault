@@ -1,40 +1,36 @@
-.premium-input {
-  background: white;
-  border: 2px solid #e5e7eb;
-  border-radius: 16px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+.glass-card {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.premium-input:focus {
-  outline: none;
-  border-color: #c9a227;
-  box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.1);
+.mist-blur {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.premium-input:disabled {
-  background: #f9fafb;
-  cursor: not-allowed;
+/* Custom transitions for form focus */
+input:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px -10px rgba(138, 81, 0, 0.15);
 }
 
-.premium-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #c9a227 0%, #d4af37 50%, #c9a227 100%);
-  color: #1a1a1a;
-  font-weight: 700;
-  border-radius: 16px;
-  transition: all 0.3s ease;
+/* Skeleton loader for loading state */
+.skeleton {
+  background: linear-gradient(90deg, #f0edeb 25%, #e5e0dd 50%, #f0edeb 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
 }
 
-.premium-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(201, 162, 39, 0.4);
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
-.premium-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* Refined transitions */
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+/* Premium gradient for profile avatar */
+.profile-gradient {
+  background: linear-gradient(135deg, #8a5100 0%, #b87c14 100%);
 }

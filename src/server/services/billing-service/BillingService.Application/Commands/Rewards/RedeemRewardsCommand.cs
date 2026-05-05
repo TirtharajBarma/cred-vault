@@ -8,7 +8,7 @@ namespace BillingService.Application.Commands.Rewards;
 
 public record RedeemRewardsCommand(
     Guid UserId,
-    int Points,
+    decimal Points,
     RedeemRewardsTarget Target,         // where to apply
     Guid? TargetId,                     // which bill
     bool ApplyToBillAmount = true
@@ -63,7 +63,7 @@ public class RedeemRewardsCommandHandler(
         if (account.PointsBalance < request.Points)
         {
             // If insufficient points, use all available points and adjust the dollar value accordingly
-            var availablePoints = (int)Math.Floor(account.PointsBalance);
+            var availablePoints = account.PointsBalance;
             if (availablePoints <= 0)
             {
                 logger.LogInformation("No points available for redemption. Proceeding with 0 points.");
@@ -101,7 +101,7 @@ public class RedeemRewardsCommandHandler(
 
     private async Task<ApiResponse<RedeemRewardsResult>> HandleAccountRedemption(
         RewardAccount account,
-        int points,
+        decimal points,
         decimal dollarValue,
         DateTime now,
         CancellationToken cancellationToken)
@@ -152,7 +152,7 @@ public class RedeemRewardsCommandHandler(
     private async Task<ApiResponse<RedeemRewardsResult>> HandleBillRedemption(
         RewardAccount account,
         Guid billId,
-        int points,
+        decimal points,
         decimal dollarValue,
         DateTime now,
         bool applyToBillAmount,

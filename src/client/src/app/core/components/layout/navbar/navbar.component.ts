@@ -235,4 +235,10 @@ export class NavbarComponent {
     this.isProfileOpen.set(false);
     this.isNotificationsOpen.set(false);
   }
+
+  closeAll(): void {
+    this.isProfileOpen.set(false);
+    this.isNotificationsOpen.set(false);
+    this.isMobileMenuOpen.set(false);
+  }
 }

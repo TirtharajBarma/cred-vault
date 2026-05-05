@@ -134,20 +134,20 @@
           <!-- Menu Sections -->
           <div class="space-y-1">
             @if (user()?.role === 'admin') {
-              <button routerLink="/admin/dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#8a5100] hover:bg-[#8a5100]/5 rounded-xl transition-all">
+              <button routerLink="/admin/dashboard" (click)="closeAll()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#8a5100] hover:bg-[#8a5100]/5 rounded-xl transition-all">
                 <span class="material-symbols-outlined text-lg">admin_panel_settings</span>
                 Admin Control Center
               </button>
             }
-            <button routerLink="/profile" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
+            <button routerLink="/profile" (click)="closeAll()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
               <span class="material-symbols-outlined text-lg">person_outline</span>
               Account Settings
             </button>
-            <button routerLink="/statements" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
+            <button routerLink="/statements" (click)="closeAll()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
               <span class="material-symbols-outlined text-lg">receipt_long</span>
               Statements
             </button>
-            <button routerLink="/rewards" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
+            <button routerLink="/rewards" (click)="closeAll()" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-[#615e5c] hover:text-[#1b1c1c] hover:bg-[#f1ece7] rounded-xl transition-all">
               <span class="material-symbols-outlined text-lg">stars</span>
               Rewards
             </button>

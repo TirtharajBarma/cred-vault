@@ -1,162 +1,266 @@
-<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-  <!-- Header -->
-  <div class="bg-white border-b border-slate-200 px-6 py-4">
-    <h1 class="text-2xl font-bold text-slate-900">Account Settings</h1>
-    <p class="text-sm text-slate-500 mt-1">Manage your profile and security</p>
+<div class="relative w-full min-h-screen bg-[#F0EDEB] font-headline overflow-hidden">
+  <!-- Atmospheric Glows -->
+  <div class="fixed inset-0 pointer-events-none z-0">
+    <div class="absolute -top-40 -left-40 w-96 h-96 rounded-full blur-[150px] bg-[#d8c3b2] opacity-30"></div>
+    <div class="absolute top-20 -right-40 w-[500px] h-[500px] rounded-full blur-[150px] bg-[#8a5100] opacity-10"></div>
+    <div class="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-white/20"></div>
   </div>
 
-  <div class="p-6 max-w-2xl mx-auto">
+  <div class="relative z-10 max-w-5xl mx-auto px-6 md:px-8 pt-32 pb-20">
     
-    <!-- Profile Card -->
-    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
-      <div class="p-6 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-slate-900">Profile Information</h2>
-        @if (!isEditingProfile()) {
-          <button (click)="toggleEditProfile()" 
-                  class="text-amber-600 hover:text-amber-700 font-medium text-sm flex items-center gap-1">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-            </svg>
-            Edit
-          </button>
-        }
+    <!-- Header Section -->
+    <div class="mb-12">
+      <span class="text-xs font-bold uppercase tracking-[0.2em] text-[#8a5100] mb-4 block">Account Settings</span>
+      <h1 class="text-[3.5rem] leading-none font-headline font-extrabold tracking-tight text-[#1b1c1c] mb-6">
+        Your <span class="text-[#8a5100] italic font-[Georgia,Times,serif] font-light">Profile</span>
+      </h1>
+      <p class="text-[#534437] text-lg max-w-lg leading-relaxed font-body">
+        Manage your personal information, security preferences, and account status.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+      
+      <!-- Left Column: Profile Info -->
+      <div class="lg:col-span-7 space-y-8">
+        
+        <!-- Profile Card -->
+        <div class="glass-card bg-white/90 backdrop-blur-sm rounded-[2.5rem] border border-[#d8c3b2]/30 shadow-[0_28px_80px_-12px_rgba(83,68,55,0.1)] overflow-hidden">
+          <div class="p-8 md:p-10 border-b border-[#d8c3b2]/20 flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-bold text-[#1b1c1c]">Personal Information</h2>
+              <p class="text-sm text-[#615e5c] mt-1 font-body">Update your basic identity details</p>
+            </div>
+            @if (!isEditingProfile()) {
+              <button (click)="toggleEditProfile()" 
+                      class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1b1c1c] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#8a5100] transition-all shadow-md active:scale-95">
+                <span class="material-symbols-outlined text-sm">edit</span>
+                Edit
+              </button>
+            }
+          </div>
+
+          <div class="p-8 md:p-10">
+            @if (profileSuccess()) {
+              <div class="mb-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                <span class="material-symbols-outlined text-emerald-600">check_circle</span>
+                <p class="text-emerald-800 text-sm font-bold">{{ profileSuccess() }}</p>
+              </div>
+            }
+
+            @if (profileError()) {
+              <div class="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                <span class="material-symbols-outlined text-red-500">error</span>
+                <p class="text-red-700 text-sm font-bold">{{ profileError() }}</p>
+              </div>
+            }
+
+            @if (isEditingProfile()) {
+              <div class="space-y-6">
+                <div class="space-y-2">
+                  <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-[#8a5100] ml-1">Full Name</label>
+                  <input type="text" [(ngModel)]="profileForm.fullName" placeholder="Enter your full name"
+                         class="w-full px-6 py-4 bg-[#f8f6f5] border border-[#d8c3b2]/40 rounded-2xl focus:ring-2 focus:ring-[#8a5100]/20 focus:border-[#8a5100] focus:bg-white outline-none transition-all font-body font-medium text-[#1b1c1c]">
+                </div>
+                <div class="flex gap-4 pt-2">
+                  <button (click)="saveProfile()" [disabled]="isSubmittingProfile()"
+                          class="px-8 py-3.5 bg-[#8a5100] text-white font-bold rounded-2xl hover:bg-[#7a4600] disabled:bg-stone-300 transition-all shadow-lg active:scale-95 flex items-center gap-2">
+                    @if (isSubmittingProfile()) { 
+                      <span class="material-symbols-outlined animate-spin text-lg">refresh</span>
+                      Saving... 
+                    } @else { 
+                      Save Changes 
+                    }
+                  </button>
+                  <button (click)="toggleEditProfile()" 
+                          class="px-8 py-3.5 bg-[#f8f6f5] text-[#534437] font-bold rounded-2xl hover:bg-[#ede8e6] transition-all border border-[#d8c3b2]/30">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
+                <div class="relative group">
+                  <div class="w-24 h-24 bg-gradient-to-br from-[#8a5100] to-[#b87c14] rounded-[2rem] flex items-center justify-center text-white text-3xl font-black shadow-xl transform group-hover:rotate-3 transition-transform duration-500">
+                    {{ user()?.fullName?.charAt(0) || '?' }}
+                  </div>
+                  <div class="absolute -bottom-1 -right-1 w-8 h-8 bg-white rounded-xl border border-[#d8c3b2]/20 flex items-center justify-center shadow-sm">
+                    <span class="material-symbols-outlined text-[#8a5100] text-lg">verified_user</span>
+                  </div>
+                </div>
+                <div class="flex-1 text-center md:text-left">
+                  <h3 class="text-3xl font-extrabold text-[#1b1c1c] tracking-tight">{{ user()?.fullName }}</h3>
+                  <div class="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-3">
+                    <span class="text-lg text-[#615e5c] font-body">{{ user()?.email }}</span>
+                    @if (user()?.isEmailVerified) {
+                      <span class="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-500/20 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-xs">verified</span>
+                        Verified
+                      </span>
+                    } @else {
+                      <span class="px-3 py-1 bg-[#8a5100]/10 text-[#8a5100] text-[10px] font-black uppercase tracking-widest rounded-full border border-[#8a5100]/20">
+                        Pending
+                      </span>
+                    }
+                  </div>
+                  
+                  <div class="mt-8 grid grid-cols-2 gap-6 pt-8 border-t border-[#d8c3b2]/10">
+                    <div>
+                      <span class="text-[9px] font-black uppercase tracking-widest text-[#8a5100] block mb-1">Member Since</span>
+                      <p class="text-sm font-bold text-[#1b1c1c] font-body">Jan 2026</p>
+                    </div>
+                    <div>
+                      <span class="text-[9px] font-black uppercase tracking-widest text-[#8a5100] block mb-1">Account Role</span>
+                      <p class="text-sm font-bold text-[#1b1c1c] font-body">Premium Member</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Security / Password Card -->
+        <div class="glass-card bg-white/90 backdrop-blur-sm rounded-[2.5rem] border border-[#d8c3b2]/30 shadow-[0_28px_80px_-12px_rgba(83,68,55,0.06)] overflow-hidden">
+          <div class="p-8 md:p-10 border-b border-[#d8c3b2]/20 flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-bold text-[#1b1c1c]">Security & Access</h2>
+              <p class="text-sm text-[#615e5c] mt-1 font-body">Manage your password and security settings</p>
+            </div>
+            @if (!isChangingPassword()) {
+              <button (click)="toggleChangePassword()" 
+                      class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#f8f6f5] text-[#534437] text-xs font-bold uppercase tracking-widest hover:bg-[#ede8e6] transition-all border border-[#d8c3b2]/30 active:scale-95">
+                <span class="material-symbols-outlined text-sm">lock</span>
+                Update
+              </button>
+            }
+          </div>
+
+          <div class="p-8 md:p-10">
+            @if (passwordSuccess()) {
+              <div class="mb-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                <span class="material-symbols-outlined text-emerald-600">security</span>
+                <p class="text-emerald-800 text-sm font-bold">{{ passwordSuccess() }}</p>
+              </div>
+            }
+
+            @if (passwordError()) {
+              <div class="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                <span class="material-symbols-outlined text-red-500">error</span>
+                <p class="text-red-700 text-sm font-bold">{{ passwordError() }}</p>
+              </div>
+            }
+
+            @if (isChangingPassword()) {
+              <div class="space-y-6 max-w-md">
+                <div class="space-y-2">
+                  <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-[#8a5100] ml-1">Current Password</label>
+                  <input type="password" [(ngModel)]="passwordForm.currentPassword" placeholder="••••••••"
+                         class="w-full px-6 py-4 bg-[#f8f6f5] border border-[#d8c3b2]/40 rounded-2xl focus:ring-2 focus:ring-[#8a5100]/20 focus:border-[#8a5100] focus:bg-white outline-none transition-all font-body text-[#1b1c1c]">
+                </div>
+                <div class="space-y-2">
+                  <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-[#8a5100] ml-1">New Password</label>
+                  <input type="password" [(ngModel)]="passwordForm.newPassword" placeholder="Min. 8 characters"
+                         class="w-full px-6 py-4 bg-[#f8f6f5] border border-[#d8c3b2]/40 rounded-2xl focus:ring-2 focus:ring-[#8a5100]/20 focus:border-[#8a5100] focus:bg-white outline-none transition-all font-body text-[#1b1c1c]">
+                </div>
+                <div class="space-y-2">
+                  <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-[#8a5100] ml-1">Confirm New Password</label>
+                  <input type="password" [(ngModel)]="passwordForm.confirmPassword" placeholder="Repeat new password"
+                         class="w-full px-6 py-4 bg-[#f8f6f5] border border-[#d8c3b2]/40 rounded-2xl focus:ring-2 focus:ring-[#8a5100]/20 focus:border-[#8a5100] focus:bg-white outline-none transition-all font-body text-[#1b1c1c]">
+                </div>
+                <div class="flex gap-4 pt-4">
+                  <button (click)="changePassword()" [disabled]="isSubmittingPassword()"
+                          class="px-8 py-3.5 bg-[#8a5100] text-white font-bold rounded-2xl hover:bg-[#7a4600] disabled:bg-stone-300 transition-all shadow-lg active:scale-95 flex items-center gap-2">
+                    @if (isSubmittingPassword()) { 
+                      <span class="material-symbols-outlined animate-spin text-lg">refresh</span>
+                      Updating... 
+                    } @else { 
+                      Update Password 
+                    }
+                  </button>
+                  <button (click)="toggleChangePassword()" 
+                          class="px-8 py-3.5 bg-[#f8f6f5] text-[#534437] font-bold rounded-2xl hover:bg-[#ede8e6] transition-all border border-[#d8c3b2]/30">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div class="flex items-center gap-6 p-6 bg-[#f8f6f5] rounded-3xl border border-[#d8c3b2]/10 group hover:border-[#8a5100]/20 transition-all duration-500">
+                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                  <span class="material-symbols-outlined text-[#8a5100] text-2xl">key</span>
+                </div>
+                <div>
+                  <p class="font-bold text-[#1b1c1c] tracking-tight">Login Password</p>
+                  <p class="text-xs text-[#615e5c] mt-1 font-body">Password last updated: 2 weeks ago</p>
+                </div>
+                <div class="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span class="material-symbols-outlined text-[#8a5100]">arrow_forward_ios</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
       </div>
 
-      @if (profileSuccess()) {
-        <div class="mx-6 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          <p class="text-green-700 text-sm">{{ profileSuccess() }}</p>
-        </div>
-      }
-
-      @if (profileError()) {
-        <div class="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p class="text-red-700 text-sm">{{ profileError() }}</p>
-        </div>
-      }
-
-      <div class="p-6">
-        @if (isEditingProfile()) {
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-              <input type="text" [(ngModel)]="profileForm.fullName"
-                     class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+      <!-- Right Column: Sidebar Stats -->
+      <div class="lg:col-span-5 space-y-8">
+        
+        <!-- Verification Card -->
+        <div class="glass-card bg-[#1b1c1c] p-8 md:p-10 rounded-[2.5rem] text-white relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 blur-[80px] -mr-20 -mt-20"></div>
+          <div class="relative z-10">
+            <span class="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 mb-4 block">Trust Score</span>
+            <div class="flex items-end gap-2 mb-6">
+              <span class="text-5xl font-black tracking-tighter">98.4</span>
+              <span class="text-sm font-bold text-emerald-400 mb-1.5 uppercase">Elite</span>
             </div>
-            <div class="flex gap-3">
-              <button (click)="saveProfile()" [disabled]="isSubmittingProfile()"
-                      class="px-6 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white font-medium rounded-lg transition-colors">
-                @if (isSubmittingProfile()) { Saving... } @else { Save Changes }
-              </button>
-              <button (click)="toggleEditProfile()" 
-                      class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors">
-                Cancel
-              </button>
-            </div>
-          </div>
-        } @else {
-          <div class="flex items-start gap-4">
-            <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0">
-              {{ user()?.fullName?.charAt(0) || '?' }}
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xl font-semibold text-slate-900">{{ user()?.fullName }}</h3>
-              <p class="text-slate-500 mt-1">{{ user()?.email }}</p>
-              <div class="flex items-center gap-2 mt-2">
-                @if (user()?.isEmailVerified) {
-                  <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
-                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    Verified
-                  </span>
-                } @else {
-                  <span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">Pending Verification</span>
-                }
+            <p class="text-white/60 text-sm leading-relaxed mb-8 font-body">
+              Your account is in excellent standing. You have access to all premium features and accelerated reward rates.
+            </p>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between text-xs border-b border-white/5 pb-3">
+                <span class="text-white/40">KYC Status</span>
+                <span class="font-bold text-emerald-400">Completed</span>
+              </div>
+              <div class="flex items-center justify-between text-xs border-b border-white/5 pb-3">
+                <span class="text-white/40">2FA Security</span>
+                <span class="font-bold text-emerald-400">Enabled</span>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-white/40">Transaction Limit</span>
+                <span class="font-bold">₹5,00,000 / day</span>
               </div>
             </div>
           </div>
-        }
-      </div>
-    </div>
-
-    <!-- Password Card -->
-    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div class="p-6 border-b border-slate-100 flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold text-slate-900">Change Password</h2>
-          <p class="text-sm text-slate-500 mt-1">Update your account password</p>
         </div>
-        @if (!isChangingPassword()) {
-          <button (click)="toggleChangePassword()" 
-                  class="text-amber-600 hover:text-amber-700 font-medium text-sm flex items-center gap-1">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-            </svg>
-            Change
-          </button>
-        }
-      </div>
 
-      @if (passwordSuccess()) {
-        <div class="mx-6 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          <p class="text-green-700 text-sm">{{ passwordSuccess() }}</p>
-        </div>
-      }
-
-      @if (passwordError()) {
-        <div class="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p class="text-red-700 text-sm">{{ passwordError() }}</p>
-        </div>
-      }
-
-      <div class="p-6">
-        @if (isChangingPassword()) {
+        <!-- Linked Services -->
+        <div class="glass-card bg-white/60 backdrop-blur-sm p-8 md:p-10 rounded-[2.5rem] border border-[#d8c3b2]/20">
+          <h3 class="text-lg font-bold text-[#1b1c1c] mb-6">Connected Accounts</h3>
           <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Current Password</label>
-              <input type="password" [(ngModel)]="passwordForm.currentPassword" placeholder="Enter current password"
-                     class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+            <div class="flex items-center gap-4 p-4 bg-white rounded-2xl border border-[#d8c3b2]/10">
+              <div class="w-10 h-10 bg-[#f8f6f5] rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-[#8a5100] text-xl">mail</span>
+              </div>
+              <div class="flex-1">
+                <p class="text-xs font-bold text-[#1b1c1c]">Primary Email</p>
+                <p class="text-[10px] text-[#615e5c] truncate">{{ user()?.email }}</p>
+              </div>
+              <span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">New Password</label>
-              <input type="password" [(ngModel)]="passwordForm.newPassword" placeholder="At least 8 characters"
-                     class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
-              <input type="password" [(ngModel)]="passwordForm.confirmPassword" placeholder="Confirm password"
-                     class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
-            </div>
-            <div class="flex gap-3 pt-2">
-              <button (click)="changePassword()" [disabled]="isSubmittingPassword()"
-                      class="px-6 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white font-medium rounded-lg transition-colors">
-                @if (isSubmittingPassword()) { Updating... } @else { Update Password }
-              </button>
-              <button (click)="toggleChangePassword()" 
-                      class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors">
-                Cancel
-              </button>
+            <div class="flex items-center gap-4 p-4 bg-white/50 rounded-2xl border border-dashed border-[#d8c3b2]/40 grayscale opacity-60">
+              <div class="w-10 h-10 bg-[#f8f6f5] rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-stone-500 text-xl">phone_iphone</span>
+              </div>
+              <div class="flex-1">
+                <p class="text-xs font-bold text-[#1b1c1c]">Mobile Number</p>
+                <p class="text-[10px] text-[#615e5c]">Not connected</p>
+              </div>
+              <button class="text-[10px] font-black text-[#8a5100] uppercase tracking-wider hover:underline">Link</button>
             </div>
           </div>
-        } @else {
-          <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-            <div class="w-10 h-10 bg-slate-200 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-              </svg>
-            </div>
-            <div>
-              <p class="font-medium text-slate-900">Password</p>
-              <p class="text-sm text-slate-500">Last changed: Never</p>
-            </div>
-          </div>
-        }
+        </div>
+
       </div>
     </div>
   </div>

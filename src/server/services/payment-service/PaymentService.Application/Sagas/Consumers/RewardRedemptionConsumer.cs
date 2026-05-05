@@ -20,7 +20,7 @@ public class RewardRedemptionConsumer(
 
         try
         {
-            var pointsToRedeem = (int)Math.Floor(message.Amount / 0.25m);
+            var pointsToRedeem = message.Amount / 0.25m;
 
             if (pointsToRedeem <= 0)
             {

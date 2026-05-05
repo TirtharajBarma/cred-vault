@@ -15,6 +15,7 @@ export class ProfileComponent implements OnInit {
 
   user = this.authService.currentUser;
   
+  isLoading = signal(true);
   isEditingProfile = signal(false);
   isChangingPassword = signal(false);
   
@@ -42,11 +43,16 @@ export class ProfileComponent implements OnInit {
   }
 
   loadProfile(): void {
+    this.isLoading.set(true);
     this.authService.getProfile().subscribe({
       next: (res) => {
+        this.isLoading.set(false);
         if (res.success && res.data) {
           this.profileForm.fullName = res.data.fullName || '';
         }
+      },
+      error: () => {
+        this.isLoading.set(false);
       }
     });
   }
